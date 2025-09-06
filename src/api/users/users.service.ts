@@ -10,7 +10,7 @@ export class UsersService {
     const payload: any = await this.EIP.query<any>(
       `
       SELECT *
-      FROM Carbon_Management_System_Account
+      FROM CMS_Account
       WHERE UserID = ? AND [Password] = ?
     `,
       {
