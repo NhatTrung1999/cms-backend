@@ -9,13 +9,45 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(userid: string, pass: string, factory: string): Promise<any> {
+  async validateUser(
+    userid: string,
+    pass?: string,
+    factory?: string,
+  ): Promise<any> {
+    // console.log(userid);
     const user = await this.usersService.validateUser(userid, pass, factory);
-    if (user && user.Password === pass) {
-      const { Password, ...result } = user;
-      return result;
+    // console.log(pass);
+    if (pass){
+      if (user && user.Password === pass) {
+        const { Password, ...result } = user;
+        return result;
+      }
+    } else {
+      // if (user && user.Password === pass) {
+        const { Password, ...result } = user;
+        return result;
+      // }
+    }
+    
+    // return null;
+  }
+
+  async validateErpUser(userid: string, pass: string) {
+    const user = await this.usersService.validateErpUser(userid, pass);
+    if (user && user.PWD === pass) {
+      const { PWD, ...result } = user;
+      let res = await this.validateUser(result.USERID);
+      return res
     }
     return null;
+  }
+
+  async checkLockErp(userid: string) {
+    return await this.usersService.checkLock(userid);
+  }
+
+  async checkExistUser(userid: string){
+    return await this.usersService.checkExistUser(userid)
   }
 
   async login(user: any) {

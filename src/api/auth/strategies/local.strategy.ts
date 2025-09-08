@@ -10,14 +10,33 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     super({
       usernameField: 'userid',
       passwordField: 'password',
-      passReqToCallback: true
+      passReqToCallback: true,
     });
   }
 
   async validate(req: Request): Promise<any> {
-    // console.log(req.body);
     const { userid, password, factory } = req.body;
-    const user = await this.authService.validateUser(userid, password, factory);
+
+    let user;
+
+    if (userid === 'admin' || userid === 'ESG') {
+      user = await this.authService.validateUser(userid, password, factory);
+    } else {
+      let checkLock = await this.authService.checkLockErp(userid);
+      if (!checkLock) {
+        throw new UnauthorizedException(
+          'Account ERP is clocked! Please enter your other account!',
+        );
+      }
+      const checkExist = await this.authService.checkExistUser(userid)
+
+      if(!checkExist) {
+        throw new UnauthorizedException('This account is not permission!')
+      }
+
+      user = await this.authService.validateErpUser(userid, password);
+    }
+
     if (!user) {
       throw new UnauthorizedException('Account or password is not valid!');
     }

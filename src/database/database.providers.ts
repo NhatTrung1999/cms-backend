@@ -32,8 +32,8 @@ export const databaseProviders = [
         username: configService.get('ERP_USERNAME'),
         password: configService.get('ERP_PASSWORD'),
         database: configService.get('ERP_DATABASE_NAME'),
-        host: configService.get('EIP_HOST'),
-        port: configService.get('EIP_PORT'),
+        host: configService.get('ERP_HOST'),
+        port: configService.get('ERP_PORT'),
         dialectOptions: {
           options: {
             encrypt: false,
