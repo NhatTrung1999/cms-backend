@@ -6,12 +6,14 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './api/auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
+import { UsersModule } from './api/users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,
+    UsersModule
   ],
   controllers: [AppController],
   providers: [

@@ -31,7 +31,9 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
       const checkExist = await this.authService.checkExistUser(userid)
 
       if(!checkExist) {
-        throw new UnauthorizedException('This account is not permission!')
+        throw new UnauthorizedException(
+          'This account has not been set up on the system!',
+        );
       }
 
       user = await this.authService.validateErpUser(userid, password);
