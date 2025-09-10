@@ -1,25 +1,23 @@
 import {
   Inject,
   Injectable,
+  UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
+import { QueryTypes } from 'sequelize';
 
 @Injectable()
-export class FilemanagementService {
+export class Cat9andcat12Service {
   constructor(@Inject('EIP') private readonly EIP: Sequelize) {}
 
-  async getData(module: string, file_name: string, userID: string) {
+  async getData(date, userID) {
+    if (!userID) throw new UnauthorizedException();
+
     try {
-      let where = ' AND 1 = 1 ';
+      let where = ' 1 = 1 ';
 
-      if (module !== '') {
-        where += ` AND Module = '${module}'`;
-      }
-
-      if (file_name !== '') {
-        where += ` AND File_Name = '${file_name}'`;
+      if (date !== '') {
       }
 
       const payload: any = await this.EIP.query<any>(

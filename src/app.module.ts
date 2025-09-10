@@ -7,13 +7,17 @@ import { AuthModule } from './api/auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
 import { UsersModule } from './api/users/users.module';
+import { FilemanagementModule } from './api/filemanagement/filemanagement.module';
+import { Cat9andcat12Module } from './api/cat9andcat12/cat9andcat12.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,
-    UsersModule
+    UsersModule,
+    FilemanagementModule,
+    Cat9andcat12Module
   ],
   controllers: [AppController],
   providers: [

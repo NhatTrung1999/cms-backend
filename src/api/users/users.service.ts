@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { CreateUserDto } from './dto/create-user-dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -168,17 +169,45 @@ export class UsersService {
           type: QueryTypes.INSERT,
         },
       );
-      return result[0]
+      return result[0];
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
   }
 
-  async updateUser(id: string, updateUserDto: CreateUserDto) {
-    console.log(id, updateUserDto);
+  async updateUser(updateUserDto: UpdateUserDto) {
+    const { name, email, role, status, updatedAt, id } = updateUserDto;
+    try {
+      await this.EIP.query(
+        `
+        UPDATE CMS_Account
+        SET 
+            Name = ?,
+            Email = ?,
+            [Role] = ?,
+            [Status] = ?,
+            UpdatedAt = ?,
+            UpdatedDate = GETDATE()
+        WHERE ID = ?
+      `,
+        {
+          replacements: [name, email, role, status, updatedAt, id],
+          type: QueryTypes.UPDATE,
+        },
+      );
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
   }
 
-  async deleteUser(id: string){
-    console.log(id);
+  async deleteUser(id: string) {
+    try {
+      await this.EIP.query(`DELETE FROM CMS_Account WHERE ID = ?`, {
+        replacements: [id],
+        type: QueryTypes.DELETE,
+      });
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
   }
 }
