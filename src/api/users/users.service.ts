@@ -107,7 +107,7 @@ export class UsersService {
     return result;
   }
 
-  async getOne(userid: string, name: string) {
+  async getSearch(userid: string, name: string) {
     let query = `
       SELECT UserID, Name,Email,Role, Status, CreatedAt, CreatedDate, UpdatedAt, UpdatedDate
       FROM CMS_Account

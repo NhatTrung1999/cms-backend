@@ -22,9 +22,9 @@ export class UsersController {
     return res;
   }
 
-  @Get('get-one')
-  async getOne(@Query('userid') userid: string, @Query('name') name: string) {
-    return await this.usersService.getOne(userid, name);
+  @Get('get-search')
+  async getSearch(@Query('userid') userid: string, @Query('name') name: string) {
+    return await this.usersService.getSearch(userid, name);
   }
 
   @Post('add-user')
