@@ -43,7 +43,8 @@ export class Cat9andcat12Service {
   //   }
   // }
 
-  async getData(date: string) {
+  async getData(date: string, offset: number = 1, limit: number = 20) {
+    console.log(offset, limit);
     try {
       let query = `
         SELECT im.INV_DATE,im.INV_NO,id.STYLE_NAME,p.Qty,p.GW,im.CUSTID,
@@ -63,19 +64,26 @@ export class Cat9andcat12Service {
         LEFT JOIN YWDD y ON y.DDBH=id.RYNO
         LEFT JOIN DE_ORDERM do ON do.ORDERNO=y.YSBH
         LEFT JOIN B_GradeOrder bg ON bg.ORDER_B=y.YSBH
-        WHERE 1=1
+        WHERE 1=1 ${date ? `AND CONVERT(VARCHAR, im.INV_DATE, 23) = '${date}'` : ''}
+        ORDER BY im.INV_DATE 
+        OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
       `;
-      const replacements: any[] = [];
+      // const replacements: any[] = [];
 
-      if (date) {
-        query += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) = '${date}'`;
-        replacements.push(date);
-      }
+      // if (date) {
+      //   query += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) = ?`;
+      //   // replacements.push(date);
+      // }
+
+      // query += ` ORDER BY im.INV_DATE
+      //           OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`;
+      // replacements.push(offset, limit)
 
       const res = await this.ERP.query(query, {
-        replacements,
+        replacements: [],
         type: QueryTypes.SELECT,
       });
+
       return res;
     } catch (error) {
       throw new InternalServerErrorException(error);
