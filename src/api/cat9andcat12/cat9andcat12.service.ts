@@ -44,7 +44,6 @@ export class Cat9andcat12Service {
   // }
 
   async getData(date: string, offset: number = 1, limit: number = 20) {
-    console.log(offset, limit);
     try {
       let query = `
         SELECT im.INV_DATE,im.INV_NO,id.STYLE_NAME,p.Qty,p.GW,im.CUSTID,
