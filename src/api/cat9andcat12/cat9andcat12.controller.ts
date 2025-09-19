@@ -23,9 +23,9 @@ export class Cat9andcat12Controller {
   @Get('get-data')
   async getData(
     @Query('Date') date: string,
-    @Query('offset') offset: number,
+    @Query('page') page: number,
     @Query('limit') limit: number,
   ) {
-    return await this.cat9andcat12Service.getData(date, offset, limit);
+    return await this.cat9andcat12Service.getData(date, page, limit);
   }
 }

@@ -195,6 +195,11 @@ export class UsersService {
           type: QueryTypes.UPDATE,
         },
       );
+
+      const payload: any = await this.EIP.query(`SELECT * FROM CMS_Account`, {
+        type: QueryTypes.SELECT,
+      });
+      return payload;
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
@@ -206,6 +211,11 @@ export class UsersService {
         replacements: [id],
         type: QueryTypes.DELETE,
       });
+
+      const payload: any = await this.EIP.query(`SELECT * FROM CMS_Account`, {
+        type: QueryTypes.SELECT,
+      });
+      return payload;
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }

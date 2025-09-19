@@ -43,8 +43,11 @@ export class Cat9andcat12Service {
   //   }
   // }
 
-  async getData(date: string, offset: number = 1, limit: number = 20) {
+  async getData(date: string, page: number = 1, limit: number = 20) {
     try {
+
+      const offset = (page - 1) * limit
+      console.log(offset);
       let query = `
         SELECT im.INV_DATE,im.INV_NO,id.STYLE_NAME,p.Qty,p.GW,im.CUSTID,
             'Truck' LocalLandTransportation,sb.Place_Delivery,im.TO_WHERE Country

@@ -23,7 +23,10 @@ export class UsersController {
   }
 
   @Get('get-search')
-  async getSearch(@Query('userid') userid: string, @Query('name') name: string) {
+  async getSearch(
+    @Query('userid') userid: string,
+    @Query('name') name: string,
+  ) {
     return await this.usersService.getSearch(userid, name);
   }
 
@@ -39,19 +42,21 @@ export class UsersController {
 
   @Patch('update-user')
   async updateUser(@Body() updateUserDto: UpdateUserDto) {
-    await this.usersService.updateUser(updateUserDto);
+    const res = await this.usersService.updateUser(updateUserDto);
     return {
       statusCode: 200,
       message: 'Update successfully!',
+      data: res,
     };
   }
 
   @Delete(':id')
   async deleteUser(@Param('id') id: string) {
-    await this.usersService.deleteUser(id);
+    const res = await this.usersService.deleteUser(id);
     return {
       statusCode: 200,
       message: 'Delete successfully!',
+      data: res
     };
   }
 }
