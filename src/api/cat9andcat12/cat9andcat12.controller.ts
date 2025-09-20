@@ -28,4 +28,21 @@ export class Cat9andcat12Controller {
   ) {
     return await this.cat9andcat12Service.getData(date, page, limit);
   }
+
+  @Get('get-data-test')
+  async getDataTest(
+    @Query('date') date: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+  ) {
+    return await this.cat9andcat12Service.getDataTest(date, page, limit);
+  }
+
+  @Get('test')
+  async getTest(
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+  ) {
+    return await this.cat9andcat12Service.getTest(page, limit);
+  }
 }
