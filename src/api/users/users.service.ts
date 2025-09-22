@@ -97,32 +97,31 @@ export class UsersService {
     return payload[0];
   }
 
-  async getAll() {
-    const result = await this.EIP.query<any>(
-      `SELECT UserID, Name,Email,Role, Status, CreatedAt, CreatedDate, UpdatedAt, UpdatedDate
-        FROM CMS_Account`,
-      { type: QueryTypes.SELECT },
-    );
-
-    return result;
-  }
-
-  async getSearch(userid: string, name: string) {
-    let query = `
-      SELECT ID, UserID, Name,Email,Role, Status, CreatedAt, CreatedDate, UpdatedAt, UpdatedDate
-      FROM CMS_Account
-      WHERE 1=1
-    `;
+  async getSearch(
+    userid: string,
+    name: string,
+    sortField: string = 'UserID',
+    sortOrder: string = 'asc',
+  ) {
+    let where = `WHERE 1=1`;
     const replacements: any[] = [];
+
     if (userid) {
-      query += ` AND UserID LIKE ?`;
+      where += ` AND UserID LIKE ?`;
       replacements.push(`%${userid}%`);
     }
 
     if (name) {
-      query += ` AND NAME LIKE ?`;
+      where += ` AND NAME LIKE ?`;
       replacements.push(`%${name}%`);
     }
+
+    let query = `
+      SELECT ID, UserID, Name,Email,Role, Status, CreatedAt, CreatedDate, UpdatedAt, UpdatedDate
+      FROM CMS_Account
+      ${where}
+      ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+    `;
 
     const result = await this.EIP.query<any>(query, {
       replacements,

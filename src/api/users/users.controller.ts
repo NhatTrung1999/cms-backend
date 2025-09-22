@@ -16,18 +16,19 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
-  @Get()
-  async getAll() {
-    const res = await this.usersService.getAll();
-    return res;
-  }
-
   @Get('get-search')
   async getSearch(
     @Query('userid') userid: string,
     @Query('name') name: string,
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
   ) {
-    return await this.usersService.getSearch(userid, name);
+    return await this.usersService.getSearch(
+      userid,
+      name,
+      sortField,
+      sortOrder,
+    );
   }
 
   @Post('add-user')
@@ -56,7 +57,7 @@ export class UsersController {
     return {
       statusCode: 200,
       message: 'Delete successfully!',
-      data: res
+      data: res,
     };
   }
 }
