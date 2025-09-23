@@ -29,7 +29,13 @@ export class FilemanagementService {
     }
   }
 
-  async getData(module: string, file_name: string, userID: string) {
+  async getData(
+    module: string,
+    file_name: string,
+    userID: string,
+    sortField: string = 'Module',
+    sortOrder: string = 'asc',
+  ) {
     try {
       let where = ' AND 1 = 1 ';
 
@@ -46,6 +52,7 @@ export class FilemanagementService {
           SELECT *
           FROM CMS_File_Management
           WHERE CreatedAt = '${userID}' ${where}
+          ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
         `,
         {
           replacements: [],

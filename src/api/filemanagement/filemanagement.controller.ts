@@ -24,13 +24,16 @@ export class FilemanagementController {
     @Query('Module') module: string,
     @Query('File_Name') file_name: string,
     @Request() req,
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
   ) {
-    // console.log(module, file_name, req.user);
     const userID = getUserId(req);
     const response = await this.filemanagementService.getData(
       module,
       file_name,
       userID,
+      sortField,
+      sortOrder,
     );
 
     return {
@@ -46,7 +49,6 @@ export class FilemanagementController {
     @Query('Date') date: string,
     @Request() req,
   ) {
-    // console.log(module, date, req.user);
     const userID = getUserId(req);
     return await this.filemanagementService.generateFileExcel(
       module,
