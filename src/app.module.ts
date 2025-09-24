@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
 import { UsersModule } from './api/users/users.module';
 import { FilemanagementModule } from './api/filemanagement/filemanagement.module';
 import { Cat9andcat12Module } from './api/cat9andcat12/cat9andcat12.module';
+import { EventsModule } from './api/events/events.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Cat9andcat12Module } from './api/cat9andcat12/cat9andcat12.module';
     DatabaseModule,
     AuthModule,
     UsersModule,
+    EventsModule,
     FilemanagementModule,
     Cat9andcat12Module
   ],

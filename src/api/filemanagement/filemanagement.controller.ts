@@ -50,11 +50,16 @@ export class FilemanagementController {
     @Request() req,
   ) {
     const userID = getUserId(req);
-    return await this.filemanagementService.generateFileExcel(
+    const res = await this.filemanagementService.generateFileExcel(
       module,
       date,
       userID,
     );
+    if (!res) return { statusCode: 401, message: 'Error export!' };
+    return {
+      statusCode: 200,
+      message: 'Export success. Please wait for 5 minutes!',
+    };
   }
 
   @Get('download/:id')

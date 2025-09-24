@@ -140,7 +140,6 @@ export class Cat9andcat12Service {
     sortOrder: string = 'asc',
   ) {
     try {
-      console.log(sortField, sortOrder);
       const offset = (page - 1) * limit;
 
       let where = 'WHERE 1=1';

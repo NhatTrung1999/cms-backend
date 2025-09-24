@@ -9,11 +9,11 @@ export interface IDataCat9AndCat12 {
   Local_Land_Transportation: string;
   Port_Of_Departure: string;
   Port_Of_Arrival: string;
-  Land_Transport_Distance: string;
-  Sea_Transport_Distance: string;
-  Air_Transport_Distance: string;
+  Land_Transport_Distance: number;
+  Sea_Transport_Distance: number;
+  Air_Transport_Distance: number;
   Transport_Method: string;
-  Land_Transport_Ton_Kilometers: string;
-  Sea_Transport_Ton_Kilometers: string;
-  Air_Transport_Ton_Kilometers: string;
+  Land_Transport_Ton_Kilometers: number;
+  Sea_Transport_Ton_Kilometers: number;
+  Air_Transport_Ton_Kilometers: number;
 }
