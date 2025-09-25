@@ -10,7 +10,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as ExcelJS from 'exceljs';
 import { v4 as uuidv4 } from 'uuid';
-import { IDataCat9AndCat12 } from 'src/types/cat9andcat12';
 import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
@@ -90,6 +89,8 @@ export class FilemanagementService {
     }
     const filePath = path.join(folder, fileName);
 
+    await this.createFileExcel(id, module, filePath, date);
+
     let statusWaiting = await this.fileExcelWaiting(
       id,
       module,
@@ -97,8 +98,7 @@ export class FilemanagementService {
       filePath,
       userID,
     );
-    await this.createFileExcel(id, module, filePath, date);
-    if (statusWaiting.length === 0) false;
+    if (statusWaiting.length === 0) return false;
     return true;
   }
 
@@ -214,15 +214,16 @@ export class FilemanagementService {
           if (statusDone.length) {
             return await this.eventsGateway.broadcastEvent(
               'file-excel-done',
-              () => {
-                return 'Export success!';
-              },
+              'Export file excel success!',
             );
           }
-        }, 5000);
+        }, 60000);
       })
       .catch((error: any) => {
-        return 'Error export!';
+        this.eventsGateway.broadcastEvent(
+          'file-excel-error',
+          'Error export file excel!',
+        );
       });
   }
 
@@ -365,8 +366,20 @@ export class FilemanagementService {
       },
     ];
     data.forEach((item) => sheet.addRow(item));
-    sheet.eachRow((row) => {
-      row.eachCell((cell) => {
+
+    sheet.columns.forEach((column) => {
+      let maxLength = 0;
+      if (typeof column.eachCell === 'function') {
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? String(cell.value) : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+      }
+      column.width = maxLength * 1.2;
+    });
+
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
         cell.border = {
           top: { style: 'thin' },
           left: { style: 'thin' },
