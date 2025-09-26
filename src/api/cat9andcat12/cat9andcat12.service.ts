@@ -10,7 +10,6 @@ import { QueryTypes } from 'sequelize';
 @Injectable()
 export class Cat9andcat12Service {
   constructor(
-    @Inject('EIP') private readonly EIP: Sequelize,
     @Inject('ERP') private readonly ERP: Sequelize,
   ) {}
 
@@ -134,6 +133,7 @@ export class Cat9andcat12Service {
 
   async getData(
     date: string,
+
     page: number = 1,
     limit: number = 20,
     sortField: string = 'No',

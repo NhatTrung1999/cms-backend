@@ -29,4 +29,10 @@ export interface IDatabase {
 export interface IDatabaseConfig {
   eip: IDatabase;
   erp: IDatabase;
+  lyv_wms: IDatabase;
+  lhg_wms: IDatabase;
+  lym_wms: IDatabase;
+  lvl_wms: IDatabase;
+  jaz_wms: IDatabase;
+  jzs_wms: IDatabase;
 }
