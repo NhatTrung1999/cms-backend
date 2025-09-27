@@ -133,7 +133,6 @@ export class Cat9andcat12Service {
 
   async getData(
     date: string,
-
     page: number = 1,
     limit: number = 20,
     sortField: string = 'No',
