@@ -5,7 +5,7 @@ import { Cat5Service } from './cat5.service';
 export class Cat5Controller {
   constructor(private readonly cat5Service: Cat5Service) {}
 
-  @Get()
+  @Get('get-data-cat5')
   async getDataWMS(
     @Query('date') date: string,
     @Query('page') page: number,

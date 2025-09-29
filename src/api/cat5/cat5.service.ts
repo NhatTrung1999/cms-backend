@@ -35,23 +35,23 @@ export class Cat5Service {
         replacements.push(date);
       }
 
-      const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
-                              ,dtv.TREATMENT_VENDOR_NAME          AS Vender_Name
-                              ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
-                              ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                              ,CASE 
-                                    WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
-                                    WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
-                                    ELSE NULL
-                              END                                AS The_type_of_waste
-                              ,CASE 
-                                    WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
-                                    WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
-                                    ELSE NULL
-                              END                                AS Waste_type
-                              ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
-                              ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
-                              ,CAST('0' AS INT)                   AS TKT_Ton_km
+      const query = `SELECT dwo.WASTE_DATE AS Waste_disposal_date
+                            ,dtv.TREATMENT_VENDOR_NAME          AS Vender_Name
+                            ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
+                            ,CAST('0' AS INT)                   AS Transportation_Distance_km
+                            ,CASE 
+                                  WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
+                                  WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
+                                  ELSE NULL
+                            END                                AS The_type_of_waste
+                            ,CASE 
+                                  WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
+                                  WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
+                                  ELSE NULL
+                            END                                AS Waste_type
+                            ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
+                            ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
+                            ,CAST('0' AS INT)                   AS TKT_Ton_km
                         FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
                               LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
                                     ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
@@ -63,9 +63,9 @@ export class Cat5Service {
                                     ON  dwc.WASTE_CODE = dwo.WASTE_CODE
                               LEFT JOIN dbo.DATA_TREATMENT_DISTANCE td
                                     ON  td.CODE = dwo.LOCATION_CODE
-                        ${where}
-                        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
-                        OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
+                         ${where}`;
+      // ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+      // OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
 
       const countQuery = `SELECT COUNT(*) AS total
                         FROM dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
@@ -80,7 +80,7 @@ export class Cat5Service {
                         LEFT JOIN dbo.DATA_TREATMENT_DISTANCE td
                               ON td.CODE = dwo.LOCATION_CODE
                         ${where}`;
-      const connects = [this.LYV_WMS, this.LVL_WMS];
+      const connects = [this.LYV_WMS, this.LHG_WMS, this.LYM_WMS, this.LVL_WMS, this.JAZ_WMS, this.JZS_WMS];
 
       const [dataResults, countResults] = await Promise.all([
         Promise.all(
@@ -98,7 +98,26 @@ export class Cat5Service {
         ),
       ]);
 
-      const data = dataResults.flat();
+      let data = dataResults.flat();
+
+      data.sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        if (sortOrder === 'asc') {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        } else {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        }
+      });
+
+      console.log(countResults);
+
+      data = data.slice(offset, offset + limit);
+
+      // data = data.map((item, index) => ({
+      //   ...item,
+      //   No: offset + index + 1,
+      // }));
 
       const total = countResults.reduce((sum, result) => {
         return sum + ((result[0] as { total: number })?.total || 0);
@@ -106,6 +125,7 @@ export class Cat5Service {
       const hasMore = offset + data.length < total;
 
       return { data, page, limit, total, hasMore };
+      // return data.length;
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }

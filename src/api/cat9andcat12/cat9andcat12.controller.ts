@@ -7,7 +7,7 @@ import { Public } from 'src/decorators';
 export class Cat9andcat12Controller {
   constructor(private readonly cat9andcat12Service: Cat9andcat12Service) {}
 
-  @Get('get-data')
+  @Get('get-data-cat9-and-cat12')
   async getTest(
     @Query('date') date: string,
     @Query('page') page: number,
