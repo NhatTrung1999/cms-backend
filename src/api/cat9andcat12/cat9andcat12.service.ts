@@ -6,11 +6,14 @@ import {
 } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
+import { IDataPortCode } from 'src/types/cat9andcat12';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class Cat9andcat12Service {
   constructor(
     @Inject('ERP') private readonly ERP: Sequelize,
+    @Inject('EIP') private readonly EIP: Sequelize,
   ) {}
 
   // async getData(date, userID) {
@@ -247,4 +250,24 @@ export class Cat9andcat12Service {
       throw new InternalServerErrorException(error);
     }
   }
+
+  async getPortCode(): Promise<IDataPortCode[]> {
+    const records: IDataPortCode[] = await this.EIP.query(
+      `SELECT *
+      FROM CMS_PortCode
+      ORDER BY CreatedDate
+      `,
+      { type: QueryTypes.SELECT },
+    );
+    return records;
+  }
+
+//   async importExcelPortCode(buffer: Buffer) {
+//     const workbook = new ExcelJS.Workbook();
+//     await workbook.xlsx.load(buffer.buffer);
+
+//     const worksheet = workbook.worksheets[0];
+//     console.log(worksheet);
+//     return 'Import Excel Port Code';
+//   }
 }

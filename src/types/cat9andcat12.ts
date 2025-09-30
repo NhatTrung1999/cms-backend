@@ -17,3 +17,15 @@ export interface IDataCat9AndCat12 {
   Sea_Transport_Ton_Kilometers: number;
   Air_Transport_Ton_Kilometers: number;
 }
+
+export interface IDataPortCode {
+  Id: string;
+  CustomerNumber: string;
+  CustomerName: null;
+  TWCustomerName: null;
+  Country: null;
+  PortCode: string;
+  CreatedAt: string;
+  CreatedFactory: string;
+  CreatedDate: string;
+}
