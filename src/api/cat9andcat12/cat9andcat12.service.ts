@@ -8,6 +8,8 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { IDataPortCode } from 'src/types/cat9andcat12';
 import * as ExcelJS from 'exceljs';
+import * as fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class Cat9andcat12Service {
@@ -262,12 +264,115 @@ export class Cat9andcat12Service {
     return records;
   }
 
-//   async importExcelPortCode(buffer: Buffer) {
-//     const workbook = new ExcelJS.Workbook();
-//     await workbook.xlsx.load(buffer.buffer);
+  async importExcelPortCode(file: Express.Multer.File) {
+    try {
+      let insertCount = 0;
+      let updateCount = 0;
+      if (!file.path || !fs.existsSync(file.path)) {
+        throw new Error('File path not found!');
+      }
 
-//     const worksheet = workbook.worksheets[0];
-//     console.log(worksheet);
-//     return 'Import Excel Port Code';
-//   }
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(file.path);
+      const worksheet = workbook.getWorksheet(1);
+      if (!worksheet) {
+        throw new Error('No worksheet found in the Excel file');
+      }
+
+      const data: { Customer_Number: string; Port_Code: string }[] = [];
+      let hasHeader: boolean = false;
+
+      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        if (rowNumber === 1 && row.cellCount > 0) {
+          hasHeader = true;
+          return;
+        }
+
+        const headerRow = worksheet.getRow(1);
+        const rowData: any = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const headerCell = headerRow.getCell(colNumber);
+          const headerValue = headerCell.value;
+          if (headerValue !== null && headerValue !== undefined) {
+            const key = headerValue.toString().trim().replace(/\s+/g, '_');
+            rowData[key] = cell.value;
+          }
+        });
+        if (Object.keys(rowData).length > 0 && row.cellCount > 0) {
+          data.push(rowData);
+        }
+      });
+
+      for (let item of data) {
+        const id = uuidv4();
+        const records: { total: number }[] = await this.EIP.query(
+          `SELECT COUNT(*) total
+            FROM CMS_PortCode
+            WHERE CustomerNumber = ?`,
+          {
+            replacements: [item.Customer_Number],
+            type: QueryTypes.SELECT,
+          },
+        );
+
+        if (records[0].total > 0) {
+          await this.EIP.query(
+            `UPDATE CMS_PortCode
+            SET
+                  PortCode = ?,
+                  UpdatedAt = ?,
+                  UpdatedFactory = ?,
+                  UpdatedDate = GETDATE()
+            WHERE CustomerNumber = ?`,
+            {
+              replacements: [
+                item.Port_Code,
+                'admin',
+                'LYV',
+                item.Customer_Number,
+              ],
+              type: QueryTypes.SELECT,
+            },
+          );
+          updateCount++;
+        } else {
+          await this.EIP.query(
+            `INSERT INTO CMS_PortCode
+                    (
+                          Id,
+                          CustomerNumber,
+                          PortCode,
+                          CreatedAt,
+                          CreatedFactory,
+                          CreatedDate
+                    )
+                    VALUES
+                    (
+                          ?,
+                          ?,
+                          ?,
+                          ?,
+                          ?,
+                          GETDATE()
+                    )`,
+            {
+              replacements: [
+                id,
+                item.Customer_Number,
+                item.Port_Code,
+                'admin',
+                'LYV',
+              ],
+              type: QueryTypes.INSERT,
+            },
+          );
+          insertCount++;
+        }
+      }
+      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      return message;
+    } catch (error) {
+      throw new Error(`Error processing Excel file: ${error.message}`);
+    }
+  }
 }

@@ -42,24 +42,17 @@ export class Cat9andcat12Controller {
 
   @Get('import-excel-port-code')
   @UseInterceptors(
-    FileInterceptor('file', {
-      storage: multer.memoryStorage(),
-      fileFilter: (req, file, cb) => {
-        if (!file.originalname.match(/\.(xlsx|xls)$/)) {
-          return cb(new BadRequestException('Only allow file Excel'), false);
-        }
-        cb(null, true);
-      },
-    }),
+    FileInterceptor('file'),
   )
   async importExcelPortCode(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file uploaded!');
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(file.buffer.buffer as any);
 
-    const worksheet = workbook.worksheets[0];
-    worksheet.eachRow((row, rowNumber) => {
-      console.log(row, rowNumber);
-    });
+    try {
+      const data = await this.cat9andcat12Service.importExcelPortCode(file)
+      // console.log(data);
+      return data
+    } catch (error) {
+      throw new BadRequestException(`Error processing file: ${error.message}`);
+    }
   }
 }
