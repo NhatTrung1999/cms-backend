@@ -369,9 +369,14 @@ export class Cat9andcat12Service {
           insertCount++;
         }
       }
+      const records: any = await this.EIP.query(
+        `SELECT *
+          FROM CMS_PortCode`,
+        { type: QueryTypes.SELECT },
+      );
       const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
-      return message;
-    } catch (error) {
+      return { message, records };
+    } catch (error: any) {
       throw new Error(`Error processing Excel file: ${error.message}`);
     }
   }

@@ -21,11 +21,14 @@ export interface IDataCat9AndCat12 {
 export interface IDataPortCode {
   Id: string;
   CustomerNumber: string;
-  CustomerName: null;
-  TWCustomerName: null;
-  Country: null;
+  CustomerName: string;
+  TWCustomerName: string;
+  Country: string;
   PortCode: string;
   CreatedAt: string;
   CreatedFactory: string;
   CreatedDate: string;
+  UpdatedAt: string;
+  UpdatedFactory: string;
+  UpdatedDate: string;
 }

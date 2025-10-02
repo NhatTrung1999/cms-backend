@@ -6,6 +6,7 @@ import {
   UseInterceptors,
   BadRequestException,
   UploadedFile,
+  Post,
 } from '@nestjs/common';
 import { Cat9andcat12Service } from './cat9andcat12.service';
 import { getUserId } from 'src/helper/common.helper';
@@ -40,19 +41,16 @@ export class Cat9andcat12Controller {
     return this.cat9andcat12Service.getPortCode();
   }
 
-  @Get('import-excel-port-code')
-  @UseInterceptors(
-    FileInterceptor('file'),
-  )
+  @Post('import-excel-port-code')
+  @UseInterceptors(FileInterceptor('file'))
   async importExcelPortCode(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file uploaded!');
 
     try {
-      const data = await this.cat9andcat12Service.importExcelPortCode(file)
-      // console.log(data);
-      return data
+      const data = await this.cat9andcat12Service.importExcelPortCode(file);
+      return data;
     } catch (error) {
-      throw new BadRequestException(`Error processing file: ${error.message}`);
+      throw new BadRequestException(`Import failed!`);
     }
   }
 }
