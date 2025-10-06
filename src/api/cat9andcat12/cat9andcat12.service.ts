@@ -155,59 +155,71 @@ export class Cat9andcat12Service {
       }
 
       const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
-                            ,im.INV_DATE          AS [Date]
-                            ,im.INV_NO            AS Invoice_Number
-                            ,id.STYLE_NAME        AS Article_Name
-                            ,p.Qty                AS Quantity
-                            ,p.GW                 AS Gross_Weight
-                            ,im.CUSTID            AS Customer_ID
-                            ,'Truck'              AS Local_Land_Transportation
-                            ,sb.Place_Delivery    AS Port_Of_Departure
-                            ,im.TO_WHERE          AS Port_Of_Arrival
-                            ,CAST('0' AS INT)     AS Land_Transport_Distance
-                            ,CAST('0' AS INT)     AS Sea_Transport_Distance
-                            ,CAST('0' AS INT)     AS Air_Transport_Distance
-                            ,ISNULL(
-                                ISNULL(
-                                    bg.SHPIDS
-                                    ,CASE 
-                                          WHEN (do.ShipMode='Air')
-                                    AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                        WHEN(do.ShipMode='Air Expres')
-                                    AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                        WHEN(do.ShipMode='Ocean')
-                                    AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                        WHEN do.ShipMode_1 IS NULL THEN ''
-                                        ELSE do.ShipMode_1 END
-                                )
-                                ,y.ShipMode
-                            )                    AS Transport_Method
-                            ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
-                            ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
-                            ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
-                      FROM   INVOICE_M im
-                            LEFT JOIN Ship_Booking sb
-                                  ON  sb.INV_NO = im.INV_NO
-                            LEFT JOIN INVOICE_D  AS id
-                                  ON  id.INV_NO = im.INV_NO
-                            LEFT JOIN (
-                                      SELECT INV_NO
-                                            ,RYNO
-                                            ,SUM(PAIRS)     Qty
-                                            ,SUM(GW)        GW
-                                      FROM   PACKING
-                                      GROUP BY
-                                            INV_NO
-                                            ,RYNO
-                                  ) p
-                                  ON  p.INV_NO = id.INV_NO
-                                      AND p.RYNO = id.RYNO
-                            LEFT JOIN YWDD y
-                                  ON  y.DDBH = id.RYNO
-                            LEFT JOIN DE_ORDERM do
-                                  ON  do.ORDERNO = y.YSBH
-                            LEFT JOIN B_GradeOrder bg
-                                  ON  bg.ORDER_B = y.YSBH
+                      ,im.INV_DATE          AS [Date]
+                      ,im.INV_NO            AS Invoice_Number
+                      ,id.STYLE_NAME        AS Article_Name
+                      ,p.Qty                AS Quantity
+                      ,p.GW                 AS Gross_Weight
+                      ,im.CUSTID            AS Customer_ID
+                      ,'Truck'              AS Local_Land_Transportation
+                      ,CASE 
+                            WHEN sb.CheckPortOfDeparture<>'AM' THEN 'VNCLP'
+                            ELSE 'MMRGN'
+                      END                  AS Port_Of_Departure
+                      ,pc.PortCode          AS Port_Of_Arrival
+                      ,CAST('0' AS INT)     AS Land_Transport_Distance
+                      ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                      ,CAST('0' AS INT)     AS Air_Transport_Distance
+                      ,ISNULL(
+                          ISNULL(
+                              bg.SHPIDS
+                              ,CASE 
+                                    WHEN (do.ShipMode='Air')
+                              AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                  WHEN(do.ShipMode='Air Expres')
+                              AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                  WHEN(do.ShipMode='Ocean')
+                              AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                  WHEN do.ShipMode_1 IS NULL THEN ''
+                                  ELSE do.ShipMode_1 END
+                          )
+                          ,y.ShipMode
+                      )                    AS Transport_Method
+                      ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                      ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                      ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                FROM   INVOICE_M im
+                      LEFT JOIN (
+                                SELECT LEFT(LTRIM(RTRIM(INV_NO)) ,2) CheckPortOfDeparture
+                                      ,INV_NO
+                                FROM   Ship_Booking
+                                GROUP BY
+                                      LEFT(LTRIM(RTRIM(INV_NO)) ,2)
+                                      ,INV_NO
+                            ) sb
+                            ON  sb.INV_NO = im.INV_NO
+                      LEFT JOIN INVOICE_D  AS id
+                            ON  id.INV_NO = im.INV_NO
+                      LEFT JOIN (
+                                SELECT INV_NO
+                                      ,RYNO
+                                      ,SUM(PAIRS)     Qty
+                                      ,SUM(GW)        GW
+                                FROM   PACKING
+                                GROUP BY
+                                      INV_NO
+                                      ,RYNO
+                            ) p
+                            ON  p.INV_NO = id.INV_NO
+                                AND p.RYNO = id.RYNO
+                      LEFT JOIN YWDD y
+                            ON  y.DDBH = id.RYNO
+                      LEFT JOIN DE_ORDERM do
+                            ON  do.ORDERNO = y.YSBH
+                      LEFT JOIN B_GradeOrder bg
+                            ON  bg.ORDER_B = y.YSBH
+                      LEFT JOIN TEST.EIP.dbo.CMS_PortCode pc
+                            ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                       ${where}
                       ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
                       OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
@@ -253,11 +265,14 @@ export class Cat9andcat12Service {
     }
   }
 
-  async getPortCode(): Promise<IDataPortCode[]> {
+  async getPortCode(
+    sortField: string = 'CustomerNumber',
+    sortOrder: string = 'asc',
+  ): Promise<IDataPortCode[]> {
     const records: IDataPortCode[] = await this.EIP.query(
       `SELECT *
       FROM CMS_PortCode
-      ORDER BY CreatedDate
+      ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
       `,
       { type: QueryTypes.SELECT },
     );
@@ -279,16 +294,30 @@ export class Cat9andcat12Service {
         throw new Error('No worksheet found in the Excel file');
       }
 
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell((cell) => {
+        if (cell.value) {
+          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
+        }
+      });
+
+      const requiredHeaders = ['Customer_Number', 'Port_Code'];
+      const missingHeaders = requiredHeaders.filter(
+        (h) => !headers.includes(h),
+      );
+
+      if (missingHeaders.length > 0) {
+        throw new Error(
+          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
+        );
+      }
+
       const data: { Customer_Number: string; Port_Code: string }[] = [];
-      let hasHeader: boolean = false;
 
       worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-        if (rowNumber === 1 && row.cellCount > 0) {
-          hasHeader = true;
-          return;
-        }
+        if (rowNumber === 1 && row.cellCount > 0) return;
 
-        const headerRow = worksheet.getRow(1);
         const rowData: any = {};
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           const headerCell = headerRow.getCell(colNumber);
@@ -296,9 +325,10 @@ export class Cat9andcat12Service {
           if (headerValue !== null && headerValue !== undefined) {
             const key = headerValue.toString().trim().replace(/\s+/g, '_');
             rowData[key] = cell.value;
+            // console.log(cell.value);
           }
         });
-        if (Object.keys(rowData).length > 0 && row.cellCount > 0) {
+        if (rowData?.Customer_Number && rowData?.Port_Code) {
           data.push(rowData);
         }
       });
@@ -377,7 +407,7 @@ export class Cat9andcat12Service {
       const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
       return { message, records };
     } catch (error: any) {
-      throw new Error(`Error processing Excel file: ${error.message}`);
+      throw new InternalServerErrorException(`${error.message}`);
     }
   }
 }

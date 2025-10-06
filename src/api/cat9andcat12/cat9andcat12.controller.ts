@@ -37,8 +37,11 @@ export class Cat9andcat12Controller {
   }
 
   @Get('get-port-code')
-  async getPortCode() {
-    return this.cat9andcat12Service.getPortCode();
+  async getPortCode(
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.cat9andcat12Service.getPortCode(sortField, sortOrder);
   }
 
   @Post('import-excel-port-code')
@@ -46,11 +49,7 @@ export class Cat9andcat12Controller {
   async importExcelPortCode(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file uploaded!');
 
-    try {
-      const data = await this.cat9andcat12Service.importExcelPortCode(file);
-      return data;
-    } catch (error) {
-      throw new BadRequestException(`Import failed!`);
-    }
+    const data = await this.cat9andcat12Service.importExcelPortCode(file);
+    return data;
   }
 }
