@@ -45,6 +45,69 @@ export const databaseProviders = [
     },
   },
   {
+    provide: 'LHG_ERP',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('LHG_ERP_USERNAME'),
+        password: configService.get('LHG_ERP_PASSWORD'),
+        database: configService.get('LHG_ERP_DATABASE_NAME'),
+        host: configService.get('LHG_ERP_HOST'),
+        port: configService.get('LHG_ERP_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'LVL_ERP',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('LVL_ERP_USERNAME'),
+        password: configService.get('LVL_ERP_PASSWORD'),
+        database: configService.get('LVL_ERP_DATABASE_NAME'),
+        host: configService.get('LVL_ERP_HOST'),
+        port: configService.get('LVL_ERP_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'LYM_ERP',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('LYM_ERP_USERNAME'),
+        password: configService.get('LYM_ERP_PASSWORD'),
+        database: configService.get('LYM_ERP_DATABASE_NAME'),
+        host: configService.get('LYM_ERP_HOST'),
+        port: configService.get('LYM_ERP_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
     provide: 'LYV_WMS',
     inject: [ConfigService],
     useFactory: async (configService: ConfigService) => {

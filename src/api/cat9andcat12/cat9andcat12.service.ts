@@ -14,8 +14,11 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class Cat9andcat12Service {
   constructor(
-    @Inject('ERP') private readonly ERP: Sequelize,
     @Inject('EIP') private readonly EIP: Sequelize,
+    @Inject('ERP') private readonly ERP: Sequelize,
+    @Inject('LHG_ERP') private readonly LHG_ERP: Sequelize,
+    @Inject('LVL_ERP') private readonly LVL_ERP: Sequelize,
+    @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
   ) {}
 
   // async getData(date, userID) {
@@ -137,132 +140,41 @@ export class Cat9andcat12Service {
   // }
 
   async getData(
-    date: string,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
     page: number = 1,
     limit: number = 20,
     sortField: string = 'No',
     sortOrder: string = 'asc',
   ) {
-    try {
-      const offset = (page - 1) * limit;
-
-      let where = 'WHERE 1=1';
-      const replacements: any[] = [];
-
-      if (date) {
-        where += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) = ?`;
-        replacements.push(date);
-      }
-
-      const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
-                      ,im.INV_DATE          AS [Date]
-                      ,im.INV_NO            AS Invoice_Number
-                      ,id.STYLE_NAME        AS Article_Name
-                      ,p.Qty                AS Quantity
-                      ,p.GW                 AS Gross_Weight
-                      ,im.CUSTID            AS Customer_ID
-                      ,'Truck'              AS Local_Land_Transportation
-                      ,CASE 
-                            WHEN sb.CheckPortOfDeparture<>'AM' THEN 'VNCLP'
-                            ELSE 'MMRGN'
-                      END                  AS Port_Of_Departure
-                      ,pc.PortCode          AS Port_Of_Arrival
-                      ,CAST('0' AS INT)     AS Land_Transport_Distance
-                      ,CAST('0' AS INT)     AS Sea_Transport_Distance
-                      ,CAST('0' AS INT)     AS Air_Transport_Distance
-                      ,ISNULL(
-                          ISNULL(
-                              bg.SHPIDS
-                              ,CASE 
-                                    WHEN (do.ShipMode='Air')
-                              AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                  WHEN(do.ShipMode='Air Expres')
-                              AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                  WHEN(do.ShipMode='Ocean')
-                              AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                  WHEN do.ShipMode_1 IS NULL THEN ''
-                                  ELSE do.ShipMode_1 END
-                          )
-                          ,y.ShipMode
-                      )                    AS Transport_Method
-                      ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
-                      ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
-                      ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
-                FROM   INVOICE_M im
-                      LEFT JOIN (
-                                SELECT LEFT(LTRIM(RTRIM(INV_NO)) ,2) CheckPortOfDeparture
-                                      ,INV_NO
-                                FROM   Ship_Booking
-                                GROUP BY
-                                      LEFT(LTRIM(RTRIM(INV_NO)) ,2)
-                                      ,INV_NO
-                            ) sb
-                            ON  sb.INV_NO = im.INV_NO
-                      LEFT JOIN INVOICE_D  AS id
-                            ON  id.INV_NO = im.INV_NO
-                      LEFT JOIN (
-                                SELECT INV_NO
-                                      ,RYNO
-                                      ,SUM(PAIRS)     Qty
-                                      ,SUM(GW)        GW
-                                FROM   PACKING
-                                GROUP BY
-                                      INV_NO
-                                      ,RYNO
-                            ) p
-                            ON  p.INV_NO = id.INV_NO
-                                AND p.RYNO = id.RYNO
-                      LEFT JOIN YWDD y
-                            ON  y.DDBH = id.RYNO
-                      LEFT JOIN DE_ORDERM do
-                            ON  do.ORDERNO = y.YSBH
-                      LEFT JOIN B_GradeOrder bg
-                            ON  bg.ORDER_B = y.YSBH
-                      LEFT JOIN TEST.EIP.dbo.CMS_PortCode pc
-                            ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                      ${where}
-                      ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
-                      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
-      const data = await this.ERP.query(query, {
-        replacements,
-        type: QueryTypes.SELECT,
-      });
-
-      const totalResult: { total: number }[] = await this.ERP.query(
-        `SELECT COUNT(im.INV_NO) total
-            FROM   INVOICE_M im
-                  LEFT JOIN Ship_Booking sb
-                        ON  sb.INV_NO = im.INV_NO
-                  LEFT JOIN INVOICE_D  AS id
-                        ON  id.INV_NO = im.INV_NO
-                  LEFT JOIN (
-                            SELECT INV_NO
-                                  ,RYNO
-                                  ,SUM(PAIRS)     Qty
-                                  ,SUM(GW)        GW
-                            FROM   PACKING
-                            GROUP BY
-                                  INV_NO
-                                  ,RYNO
-                        ) p
-                        ON  p.INV_NO = id.INV_NO
-                            AND p.RYNO = id.RYNO
-                  LEFT JOIN YWDD y
-                        ON  y.DDBH = id.RYNO
-                  LEFT JOIN DE_ORDERM do
-                        ON  do.ORDERNO = y.YSBH
-                  LEFT JOIN B_GradeOrder bg
-                        ON  bg.ORDER_B = y.YSBH
-            ${where}`,
-        { replacements, type: QueryTypes.SELECT },
-      );
-      const total = totalResult[0]?.total || 0;
-      const hasMore = offset + data.length < total;
-
-      return { data, page, limit, total, hasMore };
-    } catch (error: any) {
-      throw new InternalServerErrorException(error);
+    let db: Sequelize;
+    switch (factory) {
+      case 'LYV':
+        db = this.ERP;
+        break;
+      case 'LHG':
+        db = this.LHG_ERP;
+        break;
+      case 'LYM':
+        db = this.LYM_ERP;
+        break;
+      case 'LVL':
+        db = this.LVL_ERP;
+        break;
+      default:
+        return 'data All';
     }
+
+    return await this.getDataFactory(
+      db,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+      sortField,
+      sortOrder,
+    );
   }
 
   async getPortCode(
@@ -277,6 +189,179 @@ export class Cat9andcat12Service {
       { type: QueryTypes.SELECT },
     );
     return records;
+  }
+
+  async getDataFactory(
+    db: Sequelize,
+    dateFrom: string,
+    dateTo: string,
+    page: number,
+    limit: number,
+    sortField: string,
+    sortOrder: string,
+  ) {
+    try {
+      const offset = (page - 1) * limit;
+
+      let where = 'WHERE 1=1';
+      const replacements: any[] = [];
+
+      if (dateFrom && dateTo) {
+        where += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) BETWEEN ? AND ?`;
+        replacements.push(dateFrom, dateTo);
+      }
+
+      const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
+                            ,im.INV_DATE          AS [Date]
+                            ,im.INV_NO            AS Invoice_Number
+                            ,id.STYLE_NAME        AS Article_Name
+                            ,p.Qty                AS Quantity
+                            ,p.GW                 AS Gross_Weight
+                            ,im.CUSTID            AS Customer_ID
+                            ,'Truck'              AS Local_Land_Transportation
+                            ,CASE 
+                                  WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                  WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                  ELSE 'MMRGN'
+                            END                  AS Port_Of_Departure
+                            ,pc.PortCode          AS Port_Of_Arrival
+                            ,CAST('0' AS INT)     AS Land_Transport_Distance
+                            ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                            ,CAST('0' AS INT)     AS Air_Transport_Distance
+                            ,ISNULL(
+                                ISNULL(
+                                    bg.SHPIDS
+                                    ,CASE 
+                                          WHEN (do.ShipMode='Air')
+                                    AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                        WHEN(do.ShipMode='Air Expres')
+                                    AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                        WHEN(do.ShipMode='Ocean')
+                                    AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                        WHEN do.ShipMode_1 IS NULL THEN ''
+                                        ELSE do.ShipMode_1 END
+                                )
+                                ,y.ShipMode
+                            )                    AS Transport_Method
+                            ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                      FROM   INVOICE_M im
+                            LEFT JOIN INVOICE_D  AS id
+                                  ON  id.INV_NO = im.INV_NO
+                            LEFT JOIN (
+                                      SELECT INV_NO
+                                            ,RYNO
+                                            ,SUM(PAIRS)     Qty
+                                            ,SUM(GW)        GW
+                                      FROM   PACKING
+                                      GROUP BY
+                                            INV_NO
+                                            ,RYNO
+                                  ) p
+                                  ON  p.INV_NO = id.INV_NO
+                                      AND p.RYNO = id.RYNO
+                            LEFT JOIN YWDD y
+                                  ON  y.DDBH = id.RYNO
+                            LEFT JOIN DE_ORDERM do
+                                  ON  do.ORDERNO = y.YSBH
+                            LEFT JOIN B_GradeOrder bg
+                                  ON  bg.ORDER_B = y.YSBH
+                            LEFT JOIN EIPDB.EIP.dbo.CMS_PortCode pc
+                                  ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                      ${where}`;
+      // ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+      // OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
+      // const data = await db.query(query, {
+      //   replacements,
+      //   type: QueryTypes.SELECT,
+      // });
+
+      const countQuery = `SELECT COUNT(im.INV_NO) total
+                          FROM   INVOICE_M im
+                                LEFT JOIN INVOICE_D  AS id
+                                      ON  id.INV_NO = im.INV_NO
+                                LEFT JOIN (
+                                          SELECT INV_NO
+                                                ,RYNO
+                                                ,SUM(PAIRS)     Qty
+                                                ,SUM(GW)        GW
+                                          FROM   PACKING
+                                          GROUP BY
+                                                INV_NO
+                                                ,RYNO
+                                      ) p
+                                      ON  p.INV_NO = id.INV_NO
+                                          AND p.RYNO = id.RYNO
+                                LEFT JOIN YWDD y
+                                      ON  y.DDBH = id.RYNO
+                                LEFT JOIN DE_ORDERM do
+                                      ON  do.ORDERNO = y.YSBH
+                                LEFT JOIN B_GradeOrder bg
+                                      ON  bg.ORDER_B = y.YSBH
+                            ${where}`;
+
+      // const totalResult: { total: number }[] = await db.query(
+      // `SELECT COUNT(im.INV_NO) total
+      //     FROM   INVOICE_M im
+      //           LEFT JOIN Ship_Booking sb
+      //                 ON  sb.INV_NO = im.INV_NO
+      //           LEFT JOIN INVOICE_D  AS id
+      //                 ON  id.INV_NO = im.INV_NO
+      //           LEFT JOIN (
+      //                     SELECT INV_NO
+      //                           ,RYNO
+      //                           ,SUM(PAIRS)     Qty
+      //                           ,SUM(GW)        GW
+      //                     FROM   PACKING
+      //                     GROUP BY
+      //                           INV_NO
+      //                           ,RYNO
+      //                 ) p
+      //                 ON  p.INV_NO = id.INV_NO
+      //                     AND p.RYNO = id.RYNO
+      //           LEFT JOIN YWDD y
+      //                 ON  y.DDBH = id.RYNO
+      //           LEFT JOIN DE_ORDERM do
+      //                 ON  do.ORDERNO = y.YSBH
+      //           LEFT JOIN B_GradeOrder bg
+      //                 ON  bg.ORDER_B = y.YSBH
+      //       ${where}`,
+      //   { replacements, type: QueryTypes.SELECT },
+      // );
+
+      const [dataResults, countResults] = await Promise.all([
+        db.query(query, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+        db.query(countQuery, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+      ]);
+
+      let data = dataResults;
+      data.sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        if (sortOrder === 'asc') {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        } else {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        }
+      });
+
+      data = data.slice(offset, offset + limit);
+
+      const total = (countResults[0] as { total: number })?.total || 0;
+
+      const hasMore = offset + data.length < total;
+
+      return { data, page, limit, total, hasMore };
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
   }
 
   async importExcelPortCode(file: Express.Multer.File) {
