@@ -170,6 +170,7 @@ export class Cat9andcat12Service {
       db,
       dateFrom,
       dateTo,
+      factory,
       page,
       limit,
       sortField,
@@ -195,6 +196,7 @@ export class Cat9andcat12Service {
     db: Sequelize,
     dateFrom: string,
     dateTo: string,
+    factory: string,
     page: number,
     limit: number,
     sortField: string,
@@ -267,7 +269,7 @@ export class Cat9andcat12Service {
                                   ON  do.ORDERNO = y.YSBH
                             LEFT JOIN B_GradeOrder bg
                                   ON  bg.ORDER_B = y.YSBH
-                            LEFT JOIN EIPDB.EIP.dbo.CMS_PortCode pc
+                            LEFT JOIN ${factory === 'LYM' || factory === 'LVL' ? 'EIPDB' : 'EIP'}.EIP.dbo.CMS_PortCode pc
                                   ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                       ${where}`;
       // ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
@@ -299,6 +301,8 @@ export class Cat9andcat12Service {
                                       ON  do.ORDERNO = y.YSBH
                                 LEFT JOIN B_GradeOrder bg
                                       ON  bg.ORDER_B = y.YSBH
+                                LEFT JOIN ${factory === 'LYM' || factory === 'LVL' ? 'EIPDB' : 'EIP'}.EIP.dbo.CMS_PortCode pc
+                                      ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                             ${where}`;
 
       // const totalResult: { total: number }[] = await db.query(

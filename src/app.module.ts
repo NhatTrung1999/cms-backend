@@ -11,9 +11,14 @@ import { FilemanagementModule } from './api/filemanagement/filemanagement.module
 import { Cat9andcat12Module } from './api/cat9andcat12/cat9andcat12.module';
 import { EventsModule } from './api/events/events.module';
 import { Cat5Module } from './api/cat5/cat5.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'frontend', 'dist'),
+    }),
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,
