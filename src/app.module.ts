@@ -13,6 +13,8 @@ import { EventsModule } from './api/events/events.module';
 import { Cat5Module } from './api/cat5/cat5.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { Cat7Module } from './api/cat7/cat7.module';
+import { Cat6Module } from './api/cat6/cat6.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { join } from 'path';
     FilemanagementModule,
     Cat9andcat12Module,
     Cat5Module,
+    Cat7Module,
+    Cat6Module,
   ],
   controllers: [AppController],
   providers: [

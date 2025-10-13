@@ -12,7 +12,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class UsersService {
   constructor(
     @Inject('EIP') private readonly EIP: Sequelize,
-    @Inject('ERP') private readonly ERP: Sequelize,
+    @Inject('LYV_ERP') private readonly LYV_ERP: Sequelize,
   ) {}
 
   async validateUser(userid: string, password?: string, factory?: string) {
@@ -47,7 +47,7 @@ export class UsersService {
   }
 
   async validateErpUser(userid: string, password: string) {
-    const payload: any = await this.ERP.query<any>(
+    const payload: any = await this.LYV_ERP.query<any>(
       `
         SELECT USERID, USERNAME, EMAIL, PWD, LOCK
         FROM Busers
@@ -64,7 +64,7 @@ export class UsersService {
   }
 
   async checkLock(userid: string) {
-    const payload: any = await this.ERP.query<any>(
+    const payload: any = await this.LYV_ERP.query<any>(
       `
       SELECT USERID, USERNAME, EMAIL, PWD, LOCK
       FROM Busers

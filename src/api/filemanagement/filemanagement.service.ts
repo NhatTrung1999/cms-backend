@@ -18,7 +18,7 @@ export class FilemanagementService {
   constructor(
     private configService: ConfigService,
     @Inject('EIP') private readonly EIP: Sequelize,
-    @Inject('ERP') private readonly ERP: Sequelize,
+    @Inject('LYV_ERP') private readonly LYV_ERP: Sequelize,
     private readonly eventsGateway: EventsGateway,
     @Inject('LYV_WMS') private readonly LYV_WMS: Sequelize,
     @Inject('LHG_WMS') private readonly LHG_WMS: Sequelize,
@@ -297,7 +297,7 @@ export class FilemanagementService {
                           LEFT JOIN B_GradeOrder bg
                                 ON  bg.ORDER_B = y.YSBH
                     ${where}`;
-    const data = await this.ERP.query(query, {
+    const data = await this.LYV_ERP.query(query, {
       replacements,
       type: QueryTypes.SELECT,
     });

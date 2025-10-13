@@ -24,16 +24,16 @@ export const databaseProviders = [
     },
   },
   {
-    provide: 'ERP',
+    provide: 'LYV_ERP',
     inject: [ConfigService],
     useFactory: async (configService: ConfigService) => {
       const sequelize = new Sequelize({
         dialect: configService.get('DB_DIALECT'),
-        username: configService.get('ERP_USERNAME'),
-        password: configService.get('ERP_PASSWORD'),
-        database: configService.get('ERP_DATABASE_NAME'),
-        host: configService.get('ERP_HOST'),
-        port: configService.get('ERP_PORT'),
+        username: configService.get('LYV_ERP_USERNAME'),
+        password: configService.get('LYV_ERP_PASSWORD'),
+        database: configService.get('LYV_ERP_DATABASE_NAME'),
+        host: configService.get('LYV_ERP_HOST'),
+        port: configService.get('LYV_ERP_PORT'),
         dialectOptions: {
           options: {
             encrypt: false,
@@ -223,6 +223,48 @@ export const databaseProviders = [
         database: configService.get('JZS_WMS_DATABASE_NAME'),
         host: configService.get('JZS_WMS_HOST'),
         port: configService.get('JZS_WMS_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'HRIS',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('HRIS_USERNAME'),
+        password: configService.get('HRIS_PASSWORD'),
+        database: configService.get('HRIS_DATABASE_NAME'),
+        host: configService.get('HRIS_HOST'),
+        port: configService.get('HRIS_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'UOF',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('UOF_USERNAME'),
+        password: configService.get('UOF_PASSWORD'),
+        database: configService.get('UOF_DATABASE_NAME'),
+        host: configService.get('UOF_HOST'),
+        port: configService.get('UOF_PORT'),
         dialectOptions: {
           options: {
             encrypt: false,

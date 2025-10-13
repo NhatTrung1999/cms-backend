@@ -15,7 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 export class Cat9andcat12Service {
   constructor(
     @Inject('EIP') private readonly EIP: Sequelize,
-    @Inject('ERP') private readonly ERP: Sequelize,
+    @Inject('LYV_ERP') private readonly LYV_ERP: Sequelize,
     @Inject('LHG_ERP') private readonly LHG_ERP: Sequelize,
     @Inject('LVL_ERP') private readonly LVL_ERP: Sequelize,
     @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
@@ -151,7 +151,7 @@ export class Cat9andcat12Service {
     let db: Sequelize;
     switch (factory) {
       case 'LYV':
-        db = this.ERP;
+        db = this.LYV_ERP;
         break;
       case 'LHG':
         db = this.LHG_ERP;
