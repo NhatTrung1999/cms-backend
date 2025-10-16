@@ -15,6 +15,7 @@ export class Cat5Controller {
     @Query('sortField') sortField: string,
     @Query('sortOrder') sortOrder: string,
   ) {
+    // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
     return this.cat5Service.getDataWMS(
       dateFrom,
       dateTo,

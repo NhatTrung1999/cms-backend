@@ -29,6 +29,7 @@ export class Cat9andcat12Controller {
     @Query('sortField') sortField: string,
     @Query('sortOrder') sortOrder: string,
   ) {
+    // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
     return await this.cat9andcat12Service.getData(
       dateFrom,
       dateTo,

@@ -11,6 +11,8 @@ import * as path from 'path';
 import * as ExcelJS from 'exceljs';
 import { v4 as uuidv4 } from 'uuid';
 import { EventsGateway } from '../events/events.gateway';
+import { getADataExcelFactoryCat5 } from 'src/helper/cat5.helper';
+import { getADataExcelFactoryCat9AndCat12 } from 'src/helper/cat9andcat12.helper';
 
 @Injectable()
 export class FilemanagementService {
@@ -19,6 +21,9 @@ export class FilemanagementService {
     private configService: ConfigService,
     @Inject('EIP') private readonly EIP: Sequelize,
     @Inject('LYV_ERP') private readonly LYV_ERP: Sequelize,
+    @Inject('LHG_ERP') private readonly LHG_ERP: Sequelize,
+    @Inject('LVL_ERP') private readonly LVL_ERP: Sequelize,
+    @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
     private readonly eventsGateway: EventsGateway,
     @Inject('LYV_WMS') private readonly LYV_WMS: Sequelize,
     @Inject('LHG_WMS') private readonly LHG_WMS: Sequelize,
@@ -86,7 +91,14 @@ export class FilemanagementService {
     return payload[0];
   }
 
-  async generateFileExcel(module: string, date: string, userID: string) {
+  async generateFileExcel(
+    module: string,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    userID: string,
+  ) {
+    // console.log(module, dateFrom, dateTo, factory, userID);
     const id = uuidv4();
     const fileName = `${module}-${id}.xlsx`;
     const folder = path.join(this.rootFolder, module);
@@ -95,7 +107,7 @@ export class FilemanagementService {
     }
     const filePath = path.join(folder, fileName);
 
-    await this.createFileExcel(id, module, filePath, date);
+    await this.createFileExcel(id, module, filePath, dateFrom, dateTo, factory);
 
     let statusWaiting = await this.fileExcelWaiting(
       id,
@@ -186,8 +198,11 @@ export class FilemanagementService {
     id: string,
     module: string,
     filePath: string,
-    date?: string,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
   ) {
+    // console.log(id, module, filePath, dateFrom, dateTo, factory);
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(module);
 
@@ -196,7 +211,7 @@ export class FilemanagementService {
         console.log('cat1andcat4');
         break;
       case 'cat5':
-        await this.fileExcelCat5(sheet, date);
+        await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat6':
         console.log('cat6');
@@ -205,7 +220,8 @@ export class FilemanagementService {
         console.log('cat7');
         break;
       case 'cat9andcat12':
-        await this.fileExcelCat9AndCat12(sheet, date);
+        // console.log('cat9andcat12');
+        await this.fileExcelCat9AndCat12(sheet, dateFrom, dateTo, factory);
         break;
       default:
         console.log(`Unknown excel file module: ${module}`);
@@ -233,74 +249,122 @@ export class FilemanagementService {
       });
   }
 
-  async fileExcelCat9AndCat12(sheet: ExcelJS.Worksheet, date?: string) {
+  async fileExcelCat9AndCat12(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    let db: Sequelize;
+    switch (factory.trim()) {
+      case 'LYV':
+        db = this.LYV_ERP;
+        break;
+      case 'LHG':
+        db = this.LHG_ERP;
+        break;
+      case 'LYM':
+        db = this.LYM_ERP;
+        break;
+      case 'LVL':
+        db = this.LVL_ERP;
+        break;
+      default:
+        return await this.getAllExcelFactoryCat9AndCat12Data(
+          sheet,
+          dateFrom,
+          dateTo,
+        );
+    }
+
+    await getADataExcelFactoryCat9AndCat12(sheet, db, dateFrom, dateTo);
+  }
+
+  private async getAllExcelFactoryCat9AndCat12Data(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+  ) {
     let where = 'WHERE 1=1';
     const replacements: any[] = [];
 
-    if (date) {
-      where += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) = ?`;
-      replacements.push(date);
+    if (dateFrom && dateTo) {
+      where += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) BETWEEN ? AND ?`;
+      replacements.push(dateFrom, dateTo);
     }
-
     const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
-                          ,im.INV_DATE          AS [Date]
-                          ,im.INV_NO            AS Invoice_Number
-                          ,id.STYLE_NAME        AS Article_Name
-                          ,p.Qty                AS Quantity
-                          ,p.GW                 AS Gross_Weight
-                          ,im.CUSTID            AS Customer_ID
-                          ,'Truck'              AS Local_Land_Transportation
-                          ,sb.Place_Delivery    AS Port_Of_Departure
-                          ,im.TO_WHERE          AS Port_Of_Arrival
-                          ,CAST('0' AS INT)     AS Land_Transport_Distance
-                          ,CAST('0' AS INT)     AS Sea_Transport_Distance
-                          ,CAST('0' AS INT)     AS Air_Transport_Distance
-                          ,ISNULL(
-                              ISNULL(
-                                  bg.SHPIDS
-                                  ,CASE 
-                                        WHEN (do.ShipMode='Air')
-                                  AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                      WHEN(do.ShipMode='Air Expres')
-                                  AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                      WHEN(do.ShipMode='Ocean')
-                                  AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                      WHEN do.ShipMode_1 IS NULL THEN ''
-                                      ELSE do.ShipMode_1 END
-                              )
-                              ,y.ShipMode
-                          )                    AS Transport_Method
-                          ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
-                          ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
-                          ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
-                    FROM   INVOICE_M im
-                          LEFT JOIN Ship_Booking sb
-                                ON  sb.INV_NO = im.INV_NO
-                          LEFT JOIN INVOICE_D  AS id
-                                ON  id.INV_NO = im.INV_NO
-                          LEFT JOIN (
-                                    SELECT INV_NO
-                                          ,RYNO
-                                          ,SUM(PAIRS)     Qty
-                                          ,SUM(GW)        GW
-                                    FROM   PACKING
-                                    GROUP BY
-                                          INV_NO
-                                          ,RYNO
-                                ) p
-                                ON  p.INV_NO = id.INV_NO
-                                    AND p.RYNO = id.RYNO
-                          LEFT JOIN YWDD y
-                                ON  y.DDBH = id.RYNO
-                          LEFT JOIN DE_ORDERM do
-                                ON  do.ORDERNO = y.YSBH
-                          LEFT JOIN B_GradeOrder bg
-                                ON  bg.ORDER_B = y.YSBH
-                    ${where}`;
-    const data = await this.LYV_ERP.query(query, {
-      replacements,
-      type: QueryTypes.SELECT,
-    });
+                            ,im.INV_DATE          AS [Date]
+                            ,im.INV_NO            AS Invoice_Number
+                            ,id.STYLE_NAME        AS Article_Name
+                            ,p.Qty                AS Quantity
+                            ,p.GW                 AS Gross_Weight
+                            ,im.CUSTID            AS Customer_ID
+                            ,'Truck'              AS Local_Land_Transportation
+                            ,CASE 
+                                  WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                  WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                  ELSE 'MMRGN'
+                            END                  AS Port_Of_Departure
+                            ,pc.PortCode          AS Port_Of_Arrival
+                            ,CAST('0' AS INT)     AS Land_Transport_Distance
+                            ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                            ,CAST('0' AS INT)     AS Air_Transport_Distance
+                            ,ISNULL(
+                                ISNULL(
+                                    bg.SHPIDS
+                                    ,CASE 
+                                          WHEN (do.ShipMode='Air')
+                                    AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                        WHEN(do.ShipMode='Air Expres')
+                                    AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                        WHEN(do.ShipMode='Ocean')
+                                    AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                        WHEN do.ShipMode_1 IS NULL THEN ''
+                                        ELSE do.ShipMode_1 END
+                                )
+                                ,y.ShipMode
+                            )                    AS Transport_Method
+                            ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                      FROM   INVOICE_M im
+                            LEFT JOIN INVOICE_D  AS id
+                                  ON  id.INV_NO = im.INV_NO
+                            LEFT JOIN (
+                                      SELECT INV_NO
+                                            ,RYNO
+                                            ,SUM(PAIRS)     Qty
+                                            ,SUM(GW)        GW
+                                      FROM   PACKING
+                                      GROUP BY
+                                            INV_NO
+                                            ,RYNO
+                                  ) p
+                                  ON  p.INV_NO = id.INV_NO
+                                      AND p.RYNO = id.RYNO
+                            LEFT JOIN YWDD y
+                                  ON  y.DDBH = id.RYNO
+                            LEFT JOIN DE_ORDERM do
+                                  ON  do.ORDERNO = y.YSBH
+                            LEFT JOIN B_GradeOrder bg
+                                  ON  bg.ORDER_B = y.YSBH
+                            LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                  ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                      ${where}`;
+    const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP];
+    const dataResults = await Promise.all(
+      connects.map((conn) => {
+        return conn.query(query, {
+          type: QueryTypes.SELECT,
+          replacements,
+        });
+      }),
+    );
+
+    const allData = dataResults.flat();
+
+    let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
+
     sheet.columns = [
       {
         header: 'No.',
@@ -372,7 +436,6 @@ export class FilemanagementService {
       },
     ];
     data.forEach((item) => sheet.addRow(item));
-
     sheet.columns.forEach((column) => {
       let maxLength = 0;
       if (typeof column.eachCell === 'function') {
@@ -383,7 +446,6 @@ export class FilemanagementService {
       }
       column.width = maxLength * 1.2;
     });
-
     sheet.eachRow({ includeEmpty: true }, (row) => {
       row.eachCell({ includeEmpty: true }, (cell) => {
         cell.border = {
@@ -396,32 +458,68 @@ export class FilemanagementService {
     });
   }
 
-  async fileExcelCat5(sheet: ExcelJS.Worksheet, date?: string) {
-    let where = 'WHERE 1=1';
-    const replacements: any[] = [];
-
-    if (date) {
-      where += ` AND CONVERT(VARCHAR, dwo.WASTE_DATE, 23) = ?`;
-      replacements.push(date);
+  async fileExcelCat5(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    // console.log(dateFrom, dateTo, factory);
+    let db: Sequelize;
+    switch (factory.trim()) {
+      case 'LYV':
+        db = this.LYV_WMS;
+        break;
+      case 'LHG':
+        db = this.LHG_WMS;
+        break;
+      case 'LYM':
+        db = this.LYM_WMS;
+        break;
+      case 'LVL':
+        db = this.LVL_WMS;
+        break;
+      case 'JAZ':
+        db = this.JAZ_WMS;
+        break;
+      case 'JZS':
+        db = this.JZS_WMS;
+        break;
+      default:
+        return await this.getAllDataExcelFactoryCat5(sheet, dateFrom, dateTo);
     }
 
+    await getADataExcelFactoryCat5(sheet, db, dateFrom, dateTo);
+  }
+
+  private async getAllDataExcelFactoryCat5(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    let where = 'WHERE 1=1';
+    const replacements: any[] = [];
+    if (dateTo && dateFrom) {
+      where += ` AND dwo.WASTE_DATE BETWEEN ? AND ?`;
+      replacements.push(dateFrom, dateTo);
+    }
     const query = `SELECT dwo.WASTE_DATE AS Waste_disposal_date
-                          ,dtv.TREATMENT_VENDOR_NAME          AS Vender_Name
-                          ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
-                          ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                          ,CASE 
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
-                                ELSE NULL
-                          END                                AS The_type_of_waste
-                          ,CASE 
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
-                                ELSE NULL
-                          END                                AS Waste_type
-                          ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
-                          ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
-                          ,CAST('0' AS INT)                   AS TKT_Ton_km
+                        ,dtv.TREATMENT_VENDOR_NAME          AS Vender_Name
+                        ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
+                        ,CAST('0' AS INT)                   AS Transportation_Distance_km
+                        ,CASE
+                              WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
+                              WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
+                              ELSE NULL
+                        END                                AS The_type_of_waste
+                        ,CASE
+                              WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
+                              WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
+                              ELSE NULL
+                        END                                AS Waste_type
+                        ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
+                        ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
+                        ,CAST('0' AS INT)                   AS TKT_Ton_km
                     FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
                           LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
                                 ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
@@ -442,7 +540,6 @@ export class FilemanagementService {
       this.JAZ_WMS,
       this.JZS_WMS,
     ];
-
     const dataResults = await Promise.all(
       connects.map((conn) => {
         return conn.query(query, {
@@ -451,9 +548,7 @@ export class FilemanagementService {
         });
       }),
     );
-
     let data = dataResults.flat();
-
     sheet.columns = [
       {
         header: 'Waste disposal date',
@@ -493,7 +588,6 @@ export class FilemanagementService {
       },
     ];
     data.forEach((item) => sheet.addRow(item));
-
     sheet.columns.forEach((column) => {
       let maxLength = 0;
       if (typeof column.eachCell === 'function') {
@@ -504,7 +598,6 @@ export class FilemanagementService {
       }
       column.width = maxLength * 1.2;
     });
-
     sheet.eachRow({ includeEmpty: true }, (row) => {
       row.eachCell({ includeEmpty: true }, (cell) => {
         cell.border = {

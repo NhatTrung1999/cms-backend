@@ -1,0 +1,175 @@
+import * as ExcelJS from 'exceljs';
+import { QueryTypes } from 'sequelize';
+import { Sequelize } from 'sequelize-typescript';
+
+export const getADataExcelFactoryCat9AndCat12 = async (
+  sheet: ExcelJS.Worksheet,
+  db: Sequelize,
+  dateFrom: string,
+  dateTo: string,
+) => {
+  let where = 'WHERE 1=1';
+  const replacements: any[] = [];
+
+  if (dateFrom && dateTo) {
+    where += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) BETWEEN ? AND ?`;
+    replacements.push(dateFrom, dateTo);
+  }
+
+  const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
+                            ,im.INV_DATE          AS [Date]
+                            ,im.INV_NO            AS Invoice_Number
+                            ,id.STYLE_NAME        AS Article_Name
+                            ,p.Qty                AS Quantity
+                            ,p.GW                 AS Gross_Weight
+                            ,im.CUSTID            AS Customer_ID
+                            ,'Truck'              AS Local_Land_Transportation
+                            ,CASE 
+                                  WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                  WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                  ELSE 'MMRGN'
+                            END                  AS Port_Of_Departure
+                            ,pc.PortCode          AS Port_Of_Arrival
+                            ,CAST('0' AS INT)     AS Land_Transport_Distance
+                            ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                            ,CAST('0' AS INT)     AS Air_Transport_Distance
+                            ,ISNULL(
+                                ISNULL(
+                                    bg.SHPIDS
+                                    ,CASE 
+                                          WHEN (do.ShipMode='Air')
+                                    AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                        WHEN(do.ShipMode='Air Expres')
+                                    AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                        WHEN(do.ShipMode='Ocean')
+                                    AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                        WHEN do.ShipMode_1 IS NULL THEN ''
+                                        ELSE do.ShipMode_1 END
+                                )
+                                ,y.ShipMode
+                            )                    AS Transport_Method
+                            ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                      FROM   INVOICE_M im
+                            LEFT JOIN INVOICE_D  AS id
+                                  ON  id.INV_NO = im.INV_NO
+                            LEFT JOIN (
+                                      SELECT INV_NO
+                                            ,RYNO
+                                            ,SUM(PAIRS)     Qty
+                                            ,SUM(GW)        GW
+                                      FROM   PACKING
+                                      GROUP BY
+                                            INV_NO
+                                            ,RYNO
+                                  ) p
+                                  ON  p.INV_NO = id.INV_NO
+                                      AND p.RYNO = id.RYNO
+                            LEFT JOIN YWDD y
+                                  ON  y.DDBH = id.RYNO
+                            LEFT JOIN DE_ORDERM do
+                                  ON  do.ORDERNO = y.YSBH
+                            LEFT JOIN B_GradeOrder bg
+                                  ON  bg.ORDER_B = y.YSBH
+                            LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                  ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                      ${where}`;
+  const data = await db.query(query, {
+    replacements,
+    type: QueryTypes.SELECT,
+  });
+  sheet.columns = [
+    {
+      header: 'No.',
+      key: 'No',
+    },
+    {
+      header: 'Date',
+      key: 'Date',
+    },
+    {
+      header: 'Invoice Number',
+      key: 'Invoice_Number',
+    },
+    {
+      header: 'Article Name',
+      key: 'Article_Name',
+    },
+    {
+      header: 'Quantity',
+      key: 'Quantity',
+    },
+    {
+      header: 'Gross Weight',
+      key: 'Gross_Weight',
+    },
+    {
+      header: 'Customer ID',
+      key: 'Customer_ID',
+    },
+    {
+      header: 'Local land transportation',
+      key: 'Local_Land_Transportation',
+    },
+    {
+      header: 'Port of Departure',
+      key: 'Port_Of_Departure',
+    },
+    {
+      header: 'Port of Arrival',
+      key: 'Port_Of_Arrival',
+    },
+    {
+      header: 'Land Transport Distance',
+      key: 'Land_Transport_Distance',
+    },
+    {
+      header: 'Sea Transport Distance',
+      key: 'Sea_Transport_Distance',
+    },
+    {
+      header: 'Air Transport Distance',
+      key: 'Air_Transport_Distance',
+    },
+    {
+      header: 'Transport Method',
+      key: 'Transport_Method',
+    },
+    {
+      header: 'Land Transport Ton-Kilometers',
+      key: 'Land_Transport_Ton_Kilometers',
+    },
+    {
+      header: 'Sea Transport Ton-Kilometers',
+      key: 'Sea_Transport_Ton_Kilometers',
+    },
+    {
+      header: 'Air Transport Ton-Kilometers',
+      key: 'Air_Transport_Ton_Kilometers',
+    },
+  ];
+  data.forEach((item) => sheet.addRow(item));
+
+  sheet.columns.forEach((column) => {
+    let maxLength = 0;
+    if (typeof column.eachCell === 'function') {
+      column.eachCell({ includeEmpty: true }, (cell) => {
+        const cellValue = cell.value ? String(cell.value) : '';
+        maxLength = Math.max(maxLength, cellValue.length);
+      });
+    }
+    column.width = maxLength * 1.2;
+  });
+
+  sheet.eachRow({ includeEmpty: true }, (row) => {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+  });
+};

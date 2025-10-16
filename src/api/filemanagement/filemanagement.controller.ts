@@ -46,13 +46,18 @@ export class FilemanagementController {
   @Get('generate-file-excel')
   async generateFileExcel(
     @Query('Module') module: string,
-    @Query('Date') date: string,
+    @Query('DateFrom') dateFrom: string,
+    @Query('DateTo') dateTo: string,
+    @Query('Factory') factory: string,
     @Request() req,
   ) {
+    // console.log(module, dateFrom, dateTo, factory, req.user);
     const userID = getUserId(req);
     const res = await this.filemanagementService.generateFileExcel(
       module,
-      date,
+      dateFrom,
+      dateTo,
+      factory,
       userID,
     );
     if (!res) return { statusCode: 401, message: 'Error export!' };
@@ -65,7 +70,7 @@ export class FilemanagementController {
   @Get('download/:id')
   async downloadFile(@Param('id') id: string, @Res() res: Response) {
     const fileRecord = await this.filemanagementService.getFileById(id);
-    console.log(fileRecord);
+    // console.log(fileRecord);
     if (!fs.existsSync(fileRecord.Path)) {
       throw new NotFoundException('File not found on server');
     }
