@@ -68,8 +68,6 @@ export class Cat7Service {
       }),
     ]);
 
-    console.log(dataResults, countResults);
-
     let data = dataResults;
     data.sort((a, b) => {
       const aValue = a[sortField];

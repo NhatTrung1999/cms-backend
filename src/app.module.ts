@@ -15,6 +15,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { Cat7Module } from './api/cat7/cat7.module';
 import { Cat6Module } from './api/cat6/cat6.module';
+import { Cat1andcat4Module } from './api/cat1andcat4/cat1andcat4.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { Cat6Module } from './api/cat6/cat6.module';
     Cat5Module,
     Cat7Module,
     Cat6Module,
+    Cat1andcat4Module,
   ],
   controllers: [AppController],
   providers: [

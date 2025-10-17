@@ -13,6 +13,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { EventsGateway } from '../events/events.gateway';
 import { getADataExcelFactoryCat5 } from 'src/helper/cat5.helper';
 import { getADataExcelFactoryCat9AndCat12 } from 'src/helper/cat9andcat12.helper';
+import { getADataExcelFactoryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
+import { getADataExcelFactoryCat7 } from 'src/helper/cat7.helper';
 
 @Injectable()
 export class FilemanagementService {
@@ -31,6 +33,7 @@ export class FilemanagementService {
     @Inject('LVL_WMS') private readonly LVL_WMS: Sequelize,
     @Inject('JAZ_WMS') private readonly JAZ_WMS: Sequelize,
     @Inject('JZS_WMS') private readonly JZS_WMS: Sequelize,
+    @Inject('HRIS') private readonly HRIS: Sequelize,
   ) {
     this.rootFolder = this.configService.get(
       'EXCEL_STORAGE_PATH',
@@ -100,7 +103,7 @@ export class FilemanagementService {
   ) {
     // console.log(module, dateFrom, dateTo, factory, userID);
     const id = uuidv4();
-    const fileName = `${module}-${id}.xlsx`;
+    const fileName = `${factory}-${module}-${dateFrom}-${dateTo}.xlsx`;
     const folder = path.join(this.rootFolder, module);
     if (!fs.existsSync(folder)) {
       fs.mkdirSync(folder, { recursive: true });
@@ -208,16 +211,16 @@ export class FilemanagementService {
 
     switch (module.toLowerCase()) {
       case 'cat1andcat4':
-        console.log('cat1andcat4');
+        await this.fileExcelCat1AndCat4(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat5':
         await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat6':
-        console.log('cat6');
+        await this.fileExcelCat6();
         break;
       case 'cat7':
-        console.log('cat7');
+        await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat9andcat12':
         // console.log('cat9andcat12');
@@ -608,5 +611,170 @@ export class FilemanagementService {
         };
       });
     });
+  }
+
+  async fileExcelCat1AndCat4(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    let db: Sequelize;
+    switch (factory.trim()) {
+      case 'LYV':
+        db = this.LYV_ERP;
+        break;
+      case 'LHG':
+        db = this.LHG_ERP;
+        break;
+      case 'LYM':
+        db = this.LYM_ERP;
+        break;
+      case 'LVL':
+        db = this.LVL_ERP;
+        break;
+      default:
+        return await this.getAllDataExcelFactoryCat1AndCat4(
+          sheet,
+          dateFrom,
+          dateTo,
+        );
+    }
+
+    await getADataExcelFactoryCat1AndCat4(sheet, db, dateFrom, dateTo);
+  }
+
+  private async getAllDataExcelFactoryCat1AndCat4(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    let where = 'WHERE 1=1';
+    const replacements: any[] = [];
+    if (dateFrom && dateTo) {
+      where += ` AND CONVERT(VARCHAR, c.USERDate, 23) BETWEEN ? AND ?`;
+      replacements.push(dateFrom, dateTo);
+    }
+    const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY c.USERDate) AS INT) AS [No]
+                          ,c.USERDate        AS [Date]
+                          ,c.CGNO            AS Purchase_Order
+                          ,c2.CLBH           AS Material_No
+                          ,CAST('0' AS INT)     AS [Weight]
+                          ,z.SupplierCode AS Supplier_Code
+                          ,z.ThirdCountryLandTransport AS Thirdcountry_Land_Transport
+                          ,z.PortofDeparture AS Port_Of_Departure
+                          ,z.PortofArrival AS Port_Of_Arrival
+                          ,z.Transportationmethod AS Factory_Domestic_Land_Transport
+                          ,CAST('0' AS INT)     AS Land_Transport_Distance
+                          ,z.SeaTransportDistance AS Sea_Transport_Distance
+                          ,CAST('0' AS INT) AS Air_Transport_Distance
+                          ,CAST('0' AS INT) AS Land_Transport_Ton_Kilometers
+                          ,CAST('0' AS INT) AS Sea_Transport_Ton_Kilometers
+                          ,CAST('0' AS INT) AS Air_Transport_Ton_Kilometers
+                    FROM   CGZL              AS c
+                          INNER JOIN CGZLS  AS c2
+                                ON  c2.CGNO = c.CGNO
+                          LEFT JOIN zszl    AS z
+                                ON  z.zsdh = c.CGNO
+                    ${where}`;
+    const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP];
+    const dataResults = await Promise.all(
+      connects.map((conn) => {
+        return conn.query(query, {
+          type: QueryTypes.SELECT,
+          replacements,
+        });
+      }),
+    );
+    let data = dataResults.flat();
+    sheet.columns = [
+      { header: 'No.', key: 'No' },
+      { header: 'Date', key: 'Date' },
+      { header: 'Purchase Order', key: 'Purchase_Order' },
+      { header: 'Material No.', key: 'Material_No' },
+      { header: 'Weight (Unit: Ton)', key: 'Weight' },
+      { header: 'Supplier Code', key: 'Supplier_Code' },
+      {
+        header: 'Third-country Land Transport (A)',
+        key: 'Thirdcountry_Land_Transport',
+      },
+      { header: 'Port of Departure', key: 'Port_Of_Departure' },
+      { header: 'Port of Arrival', key: 'Port_Of_Arrival' },
+      {
+        header: 'Factory (Domestic Land Transport) (B)',
+        key: 'Factory_Domestic_Land_Transport',
+      },
+      {
+        header: 'Land Transport Distance (A+B)',
+        key: 'Land_Transport_Distance',
+      },
+      { header: 'Sea Transport Distance', key: 'Sea_Transport_Distance' },
+      { header: 'Air Transport Distance', key: 'Air_Transport_Distance' },
+      {
+        header: 'Land Transport Ton-Kilometers',
+        key: 'Land_Transport_Ton_Kilometers',
+      },
+      {
+        header: 'Sea Transport Ton-Kilometers',
+        key: 'Sea_Transport_Ton_Kilometers',
+      },
+      {
+        header: 'Air Transport Ton-Kilometers',
+        key: 'Air_Transport_Ton_Kilometers',
+      },
+    ];
+    data.forEach((item) => sheet.addRow(item));
+    sheet.columns.forEach((column) => {
+      let maxLength = 0;
+      if (typeof column.eachCell === 'function') {
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? String(cell.value) : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+      }
+      column.width = maxLength * 1.2;
+    });
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
+  }
+
+  async fileExcelCat6() {}
+
+  async fileExcelCat7(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    let db: Sequelize;
+    switch (factory.trim()) {
+      case 'LYV':
+        db = this.HRIS;
+        break;
+      case 'LHG':
+        return 'LHG Coming soon...';
+      // db = this.LHG_ERP;
+      // break;
+      case 'LYM':
+        return 'LYM Coming soon...';
+      // db = this.LYM_ERP;
+      // break;
+      case 'LVL':
+        return 'LVL Coming soon...';
+      // db = this.LVL_ERP;
+      // break;
+      default:
+        return 'Coming soon...';
+    }
+
+    await getADataExcelFactoryCat7(sheet, db, dateFrom, dateTo);
   }
 }
