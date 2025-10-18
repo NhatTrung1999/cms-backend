@@ -48,7 +48,7 @@ export class FilemanagementService {
     module: string,
     file_name: string,
     userID: string,
-    sortField: string = 'Module',
+    sortField: string = 'CreatedDate',
     sortOrder: string = 'asc',
   ) {
     try {
@@ -117,6 +117,7 @@ export class FilemanagementService {
       module,
       fileName,
       filePath,
+      factory,
       userID,
     );
     if (statusWaiting.length === 0) return false;
@@ -128,6 +129,7 @@ export class FilemanagementService {
     module: string,
     fileName: string,
     filePath: string,
+    factory: string,
     userID: string,
   ) {
     try {
@@ -162,14 +164,14 @@ export class FilemanagementService {
             filePath,
             '0',
             userID,
-            'LYV',
-            new Date().toISOString().slice(0, 10),
+            factory,
+            new Date().toISOString(),
           ],
           type: QueryTypes.INSERT,
         },
       );
       const result = await this.EIP.query(
-        `SELECT * FROM CMS_File_Management WHERE ID = ?`,
+        `SELECT * FROM CMS_File_Management WHERE ID = ? ORDER BY CreatedDate`,
         { replacements: [id], type: QueryTypes.SELECT },
       );
       return result;
@@ -188,7 +190,7 @@ export class FilemanagementService {
         { replacements: [id], type: QueryTypes.UPDATE },
       );
       const result = await this.EIP.query(
-        `SELECT * FROM CMS_File_Management WHERE ID = ?`,
+        `SELECT * FROM CMS_File_Management WHERE ID = ? ORDER BY CreatedDate`,
         { replacements: [id], type: QueryTypes.SELECT },
       );
       return result;

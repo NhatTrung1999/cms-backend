@@ -93,133 +93,209 @@ export class Cat9andcat12Service {
       const offset = (page - 1) * limit;
 
       let where = 'WHERE 1=1';
+      let where1 = 'WHERE 1=1';
       const replacements: any[] = [];
 
       if (dateFrom && dateTo) {
-        where += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) BETWEEN ? AND ?`;
-        replacements.push(dateFrom, dateTo);
+        where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+        where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+        replacements.push(dateFrom, dateTo, dateFrom, dateTo);
       }
 
-      const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
-                            ,im.INV_DATE          AS [Date]
-                            ,im.INV_NO            AS Invoice_Number
-                            ,id.STYLE_NAME        AS Article_Name
-                            ,p.Qty                AS Quantity
-                            ,p.GW                 AS Gross_Weight
-                            ,im.CUSTID            AS Customer_ID
-                            ,'Truck'              AS Local_Land_Transportation
-                            ,CASE 
-                                  WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
-                                  WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
-                                  ELSE 'MMRGN'
-                            END                  AS Port_Of_Departure
-                            ,pc.PortCode          AS Port_Of_Arrival
-                            ,CAST('0' AS INT)     AS Land_Transport_Distance
-                            ,CAST('0' AS INT)     AS Sea_Transport_Distance
-                            ,CAST('0' AS INT)     AS Air_Transport_Distance
-                            ,ISNULL(
-                                ISNULL(
-                                    bg.SHPIDS
+      // console.log(replacements);
+
+      const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
+                          ,*
+                    FROM   (
+                              SELECT im.INV_DATE          AS [Date]
+                                    ,im.INV_NO            AS Invoice_Number
+                                    ,id.STYLE_NAME        AS Article_Name
+                                    ,p.Qty                AS Quantity
+                                    ,p.GW                 AS Gross_Weight
+                                    ,im.CUSTID            AS Customer_ID
+                                    ,'Truck'              AS Local_Land_Transportation
                                     ,CASE 
-                                          WHEN (do.ShipMode='Air')
-                                    AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                        WHEN(do.ShipMode='Air Expres')
-                                    AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                        WHEN(do.ShipMode='Ocean')
-                                    AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                        WHEN do.ShipMode_1 IS NULL THEN ''
-                                        ELSE do.ShipMode_1 END
-                                )
-                                ,y.ShipMode
-                            )                    AS Transport_Method
-                            ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
-                            ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
-                            ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
-                      FROM   INVOICE_M im
-                            LEFT JOIN INVOICE_D  AS id
-                                  ON  id.INV_NO = im.INV_NO
-                            LEFT JOIN (
-                                      SELECT INV_NO
-                                            ,RYNO
-                                            ,SUM(PAIRS)     Qty
-                                            ,SUM(GW)        GW
-                                      FROM   PACKING
-                                      GROUP BY
-                                            INV_NO
-                                            ,RYNO
-                                  ) p
-                                  ON  p.INV_NO = id.INV_NO
-                                      AND p.RYNO = id.RYNO
-                            LEFT JOIN YWDD y
-                                  ON  y.DDBH = id.RYNO
-                            LEFT JOIN DE_ORDERM do
-                                  ON  do.ORDERNO = y.YSBH
-                            LEFT JOIN B_GradeOrder bg
-                                  ON  bg.ORDER_B = y.YSBH
-                            LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
-                                  ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                      ${where}`;
-      // ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
-      // OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
-      // const data = await db.query(query, {
-      //   replacements,
-      //   type: QueryTypes.SELECT,
-      // });
+                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                          ELSE 'MMRGN'
+                                      END                  AS Port_Of_Departure
+                                    ,pc.PortCode          AS Port_Of_Arrival
+                                    ,CAST('0' AS INT)     AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)     AS Air_Transport_Distance
+                                    ,ISNULL(
+                                          ISNULL(
+                                              bg.SHPIDS
+                                            ,CASE 
+                                                  WHEN (do.ShipMode='Air')
+                                              AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                                  WHEN(do.ShipMode='Air Expres')
+                                              AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                                  WHEN(do.ShipMode='Ocean')
+                                              AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                                  WHEN do.ShipMode_1 IS NULL THEN ''
+                                                  ELSE do.ShipMode_1
+                                                  END
+                                          )
+                                        ,y.ShipMode
+                                      )                    AS Transport_Method
+                                    ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_M im
+                                      LEFT JOIN INVOICE_D  AS id
+                                          ON  id.INV_NO = im.INV_NO
+                                      LEFT JOIN (
+                                              SELECT INV_NO
+                                                    ,RYNO
+                                                    ,SUM(PAIRS) Qty
+                                                    ,SUM(GW) GW
+                                              FROM   PACKING
+                                              GROUP BY
+                                                      INV_NO
+                                                    ,RYNO
+                                          ) p
+                                          ON  p.INV_NO = id.INV_NO
+                                              AND p.RYNO = id.RYNO
+                                      LEFT JOIN YWDD y
+                                          ON  y.DDBH = id.RYNO
+                                      LEFT JOIN DE_ORDERM do
+                                          ON  do.ORDERNO = y.YSBH
+                                      LEFT JOIN B_GradeOrder bg
+                                          ON  bg.ORDER_B = y.YSBH
+                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                              ${where} AND NOT EXISTS (
+                                                    SELECT 1
+                                                    FROM   INVOICE_SAMPLE is1
+                                                    WHERE  is1.Inv_No = im.Inv_No
+                                                )
+                              UNION
+                              SELECT im.INV_DATE       AS [Date]
+                                    ,is1.Inv_No        AS Invoice_Number
+                                    ,NULL              AS Article_Name
+                                    ,is1.Qty           AS Quantity
+                                    ,is1.GW            AS Gross_Weight
+                                    ,im.CUSTID         AS Customer_ID
+                                    ,'Truck'           AS Local_Land_Transportation
+                                    ,CASE 
+                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                          ELSE 'MMRGN'
+                                      END               AS Port_Of_Departure
+                                    ,pc.PortCode              AS Port_Of_Arrival
+                                    ,CAST('0' AS INT)  AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)  AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)  AS Air_Transport_Distance
+                                    ,is1.S_BY          AS Transport_Method
+                                    ,CAST('0' AS INT)  AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)  AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)  AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_SAMPLE is1
+                                      LEFT JOIN INVOICE_M im
+                                          ON  im.Inv_No = is1.Inv_No
+                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                              ${where1}
+                          ) AS Cat9AndCat12`;
 
-      const countQuery = `SELECT COUNT(im.INV_NO) total
-                          FROM   INVOICE_M im
-                                LEFT JOIN INVOICE_D  AS id
-                                      ON  id.INV_NO = im.INV_NO
-                                LEFT JOIN (
-                                          SELECT INV_NO
-                                                ,RYNO
-                                                ,SUM(PAIRS)     Qty
-                                                ,SUM(GW)        GW
-                                          FROM   PACKING
-                                          GROUP BY
-                                                INV_NO
-                                                ,RYNO
-                                      ) p
-                                      ON  p.INV_NO = id.INV_NO
-                                          AND p.RYNO = id.RYNO
-                                LEFT JOIN YWDD y
-                                      ON  y.DDBH = id.RYNO
-                                LEFT JOIN DE_ORDERM do
-                                      ON  do.ORDERNO = y.YSBH
-                                LEFT JOIN B_GradeOrder bg
-                                      ON  bg.ORDER_B = y.YSBH
-                                LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
-                                      ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                            ${where}`;
-
-      // const totalResult: { total: number }[] = await db.query(
-      // `SELECT COUNT(im.INV_NO) total
-      //     FROM   INVOICE_M im
-      //           LEFT JOIN Ship_Booking sb
-      //                 ON  sb.INV_NO = im.INV_NO
-      //           LEFT JOIN INVOICE_D  AS id
-      //                 ON  id.INV_NO = im.INV_NO
-      //           LEFT JOIN (
-      //                     SELECT INV_NO
-      //                           ,RYNO
-      //                           ,SUM(PAIRS)     Qty
-      //                           ,SUM(GW)        GW
-      //                     FROM   PACKING
-      //                     GROUP BY
-      //                           INV_NO
-      //                           ,RYNO
-      //                 ) p
-      //                 ON  p.INV_NO = id.INV_NO
-      //                     AND p.RYNO = id.RYNO
-      //           LEFT JOIN YWDD y
-      //                 ON  y.DDBH = id.RYNO
-      //           LEFT JOIN DE_ORDERM do
-      //                 ON  do.ORDERNO = y.YSBH
-      //           LEFT JOIN B_GradeOrder bg
-      //                 ON  bg.ORDER_B = y.YSBH
-      //       ${where}`,
-      //   { replacements, type: QueryTypes.SELECT },
-      // );
+      const countQuery = `SELECT COUNT(*) AS total
+                        FROM   (
+                                  SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
+                                                  ,*
+                                    FROM   (
+                                              SELECT im.INV_DATE          AS [Date]
+                                                    ,im.INV_NO            AS Invoice_Number
+                                                    ,id.STYLE_NAME        AS Article_Name
+                                                    ,p.Qty                AS Quantity
+                                                    ,p.GW                 AS Gross_Weight
+                                                    ,im.CUSTID            AS Customer_ID
+                                                    ,'Truck'              AS Local_Land_Transportation
+                                                    ,CASE 
+                                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                                          ELSE 'MMRGN'
+                                                      END                  AS Port_Of_Departure
+                                                    ,pc.PortCode          AS Port_Of_Arrival
+                                                    ,CAST('0' AS INT)     AS Land_Transport_Distance
+                                                    ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                                                    ,CAST('0' AS INT)     AS Air_Transport_Distance
+                                                    ,ISNULL(
+                                                          ISNULL(
+                                                              bg.SHPIDS
+                                                            ,CASE 
+                                                                  WHEN (do.ShipMode='Air')
+                                                              AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                                                  WHEN(do.ShipMode='Air Expres')
+                                                              AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                                                  WHEN(do.ShipMode='Ocean')
+                                                              AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                                                  WHEN do.ShipMode_1 IS NULL THEN ''
+                                                                  ELSE do.ShipMode_1
+                                                                  END
+                                                          )
+                                                        ,y.ShipMode
+                                                      )                    AS Transport_Method
+                                                    ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                                              FROM   INVOICE_M im
+                                                      LEFT JOIN INVOICE_D  AS id
+                                                          ON  id.INV_NO = im.INV_NO
+                                                      LEFT JOIN (
+                                                              SELECT INV_NO
+                                                                    ,RYNO
+                                                                    ,SUM(PAIRS) Qty
+                                                                    ,SUM(GW) GW
+                                                              FROM   PACKING
+                                                              GROUP BY
+                                                                      INV_NO
+                                                                    ,RYNO
+                                                          ) p
+                                                          ON  p.INV_NO = id.INV_NO
+                                                              AND p.RYNO = id.RYNO
+                                                      LEFT JOIN YWDD y
+                                                          ON  y.DDBH = id.RYNO
+                                                      LEFT JOIN DE_ORDERM do
+                                                          ON  do.ORDERNO = y.YSBH
+                                                      LEFT JOIN B_GradeOrder bg
+                                                          ON  bg.ORDER_B = y.YSBH
+                                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                                              ${where} AND NOT EXISTS (
+                                                                    SELECT 1
+                                                                    FROM   INVOICE_SAMPLE is1
+                                                                    WHERE  is1.Inv_No = im.Inv_No
+                                                                )
+                                              UNION
+                                              SELECT im.INV_DATE       AS [Date]
+                                                    ,is1.Inv_No        AS Invoice_Number
+                                                    ,NULL              AS Article_Name
+                                                    ,is1.Qty           AS Quantity
+                                                    ,is1.GW            AS Gross_Weight
+                                                    ,im.CUSTID         AS Customer_ID
+                                                    ,'Truck'           AS Local_Land_Transportation
+                                                    ,CASE 
+                                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                                          ELSE 'MMRGN'
+                                                      END               AS Port_Of_Departure
+                                                    ,pc.PortCode              AS Port_Of_Arrival
+                                                    ,CAST('0' AS INT)  AS Land_Transport_Distance
+                                                    ,CAST('0' AS INT)  AS Sea_Transport_Distance
+                                                    ,CAST('0' AS INT)  AS Air_Transport_Distance
+                                                    ,is1.S_BY          AS Transport_Method
+                                                    ,CAST('0' AS INT)  AS Land_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)  AS Sea_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)  AS Air_Transport_Ton_Kilometers
+                                              FROM   INVOICE_SAMPLE is1
+                                                      LEFT JOIN INVOICE_M im
+                                                          ON  im.Inv_No = is1.Inv_No
+                                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                                              ${where1}
+                                          ) AS Cat9AndCat12
+                        ) AS sub`;
 
       const [dataResults, countResults] = await Promise.all([
         db.query(query, {
@@ -231,6 +307,8 @@ export class Cat9andcat12Service {
           type: QueryTypes.SELECT,
         }),
       ]);
+
+      // console.log(dataResults);
 
       let data = dataResults;
       data.sort((a, b) => {
@@ -263,101 +341,270 @@ export class Cat9andcat12Service {
     sortField: string,
     sortOrder: string,
   ) {
-    // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
     const offset = (page - 1) * limit;
 
     let where = 'WHERE 1=1';
+    let where1 = 'WHERE 1=1';
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR, im.INV_DATE, 23) BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo);
+      where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+      where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+      replacements.push(dateFrom, dateTo, dateFrom, dateTo);
     }
 
-    const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
-                            ,im.INV_DATE          AS [Date]
-                            ,im.INV_NO            AS Invoice_Number
-                            ,id.STYLE_NAME        AS Article_Name
-                            ,p.Qty                AS Quantity
-                            ,p.GW                 AS Gross_Weight
-                            ,im.CUSTID            AS Customer_ID
-                            ,'Truck'              AS Local_Land_Transportation
-                            ,CASE 
-                                  WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
-                                  WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
-                                  ELSE 'MMRGN'
-                            END                  AS Port_Of_Departure
-                            ,pc.PortCode          AS Port_Of_Arrival
-                            ,CAST('0' AS INT)     AS Land_Transport_Distance
-                            ,CAST('0' AS INT)     AS Sea_Transport_Distance
-                            ,CAST('0' AS INT)     AS Air_Transport_Distance
-                            ,ISNULL(
-                                ISNULL(
-                                    bg.SHPIDS
+    // const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
+    //                         ,im.INV_DATE          AS [Date]
+    //                         ,im.INV_NO            AS Invoice_Number
+    //                         ,id.STYLE_NAME        AS Article_Name
+    //                         ,p.Qty                AS Quantity
+    //                         ,p.GW                 AS Gross_Weight
+    //                         ,im.CUSTID            AS Customer_ID
+    //                         ,'Truck'              AS Local_Land_Transportation
+    //                         ,CASE
+    //                               WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+    //                               WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+    //                               ELSE 'MMRGN'
+    //                         END                  AS Port_Of_Departure
+    //                         ,pc.PortCode          AS Port_Of_Arrival
+    //                         ,CAST('0' AS INT)     AS Land_Transport_Distance
+    //                         ,CAST('0' AS INT)     AS Sea_Transport_Distance
+    //                         ,CAST('0' AS INT)     AS Air_Transport_Distance
+    //                         ,ISNULL(
+    //                             ISNULL(
+    //                                 bg.SHPIDS
+    //                                 ,CASE
+    //                                       WHEN (do.ShipMode='Air')
+    //                                 AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+    //                                     WHEN(do.ShipMode='Air Expres')
+    //                                 AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+    //                                     WHEN(do.ShipMode='Ocean')
+    //                                 AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+    //                                     WHEN do.ShipMode_1 IS NULL THEN ''
+    //                                     ELSE do.ShipMode_1 END
+    //                             )
+    //                             ,y.ShipMode
+    //                         )                    AS Transport_Method
+    //                         ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+    //                         ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+    //                         ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+    //                   FROM   INVOICE_M im
+    //                         LEFT JOIN INVOICE_D  AS id
+    //                               ON  id.INV_NO = im.INV_NO
+    //                         LEFT JOIN (
+    //                                   SELECT INV_NO
+    //                                         ,RYNO
+    //                                         ,SUM(PAIRS)     Qty
+    //                                         ,SUM(GW)        GW
+    //                                   FROM   PACKING
+    //                                   GROUP BY
+    //                                         INV_NO
+    //                                         ,RYNO
+    //                               ) p
+    //                               ON  p.INV_NO = id.INV_NO
+    //                                   AND p.RYNO = id.RYNO
+    //                         LEFT JOIN YWDD y
+    //                               ON  y.DDBH = id.RYNO
+    //                         LEFT JOIN DE_ORDERM do
+    //                               ON  do.ORDERNO = y.YSBH
+    //                         LEFT JOIN B_GradeOrder bg
+    //                               ON  bg.ORDER_B = y.YSBH
+    //                         LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+    //                               ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+    //                   ${where}`;
+
+    const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
+                          ,*
+                    FROM   (
+                              SELECT im.INV_DATE          AS [Date]
+                                    ,im.INV_NO            AS Invoice_Number
+                                    ,id.STYLE_NAME        AS Article_Name
+                                    ,p.Qty                AS Quantity
+                                    ,p.GW                 AS Gross_Weight
+                                    ,im.CUSTID            AS Customer_ID
+                                    ,'Truck'              AS Local_Land_Transportation
                                     ,CASE 
-                                          WHEN (do.ShipMode='Air')
-                                    AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                        WHEN(do.ShipMode='Air Expres')
-                                    AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                        WHEN(do.ShipMode='Ocean')
-                                    AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                        WHEN do.ShipMode_1 IS NULL THEN ''
-                                        ELSE do.ShipMode_1 END
-                                )
-                                ,y.ShipMode
-                            )                    AS Transport_Method
-                            ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
-                            ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
-                            ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
-                      FROM   INVOICE_M im
-                            LEFT JOIN INVOICE_D  AS id
-                                  ON  id.INV_NO = im.INV_NO
-                            LEFT JOIN (
-                                      SELECT INV_NO
-                                            ,RYNO
-                                            ,SUM(PAIRS)     Qty
-                                            ,SUM(GW)        GW
-                                      FROM   PACKING
-                                      GROUP BY
-                                            INV_NO
-                                            ,RYNO
-                                  ) p
-                                  ON  p.INV_NO = id.INV_NO
-                                      AND p.RYNO = id.RYNO
-                            LEFT JOIN YWDD y
-                                  ON  y.DDBH = id.RYNO
-                            LEFT JOIN DE_ORDERM do
-                                  ON  do.ORDERNO = y.YSBH
-                            LEFT JOIN B_GradeOrder bg
-                                  ON  bg.ORDER_B = y.YSBH
-                            LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
-                                  ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                      ${where}`;
-    const countQuery = `SELECT COUNT(im.INV_NO) total
-                      FROM   INVOICE_M im
-                            LEFT JOIN INVOICE_D  AS id
-                                  ON  id.INV_NO = im.INV_NO
-                            LEFT JOIN (
-                                      SELECT INV_NO
-                                            ,RYNO
-                                            ,SUM(PAIRS)     Qty
-                                            ,SUM(GW)        GW
-                                      FROM   PACKING
-                                      GROUP BY
-                                            INV_NO
-                                            ,RYNO
-                                  ) p
-                                  ON  p.INV_NO = id.INV_NO
-                                      AND p.RYNO = id.RYNO
-                            LEFT JOIN YWDD y
-                                  ON  y.DDBH = id.RYNO
-                            LEFT JOIN DE_ORDERM do
-                                  ON  do.ORDERNO = y.YSBH
-                            LEFT JOIN B_GradeOrder bg
-                                  ON  bg.ORDER_B = y.YSBH
-                            LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
-                                  ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                        ${where}`;
+                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                          ELSE 'MMRGN'
+                                      END                  AS Port_Of_Departure
+                                    ,pc.PortCode          AS Port_Of_Arrival
+                                    ,CAST('0' AS INT)     AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)     AS Air_Transport_Distance
+                                    ,ISNULL(
+                                          ISNULL(
+                                              bg.SHPIDS
+                                            ,CASE 
+                                                  WHEN (do.ShipMode='Air')
+                                              AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                                  WHEN(do.ShipMode='Air Expres')
+                                              AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                                  WHEN(do.ShipMode='Ocean')
+                                              AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                                  WHEN do.ShipMode_1 IS NULL THEN ''
+                                                  ELSE do.ShipMode_1
+                                                  END
+                                          )
+                                        ,y.ShipMode
+                                      )                    AS Transport_Method
+                                    ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_M im
+                                      LEFT JOIN INVOICE_D  AS id
+                                          ON  id.INV_NO = im.INV_NO
+                                      LEFT JOIN (
+                                              SELECT INV_NO
+                                                    ,RYNO
+                                                    ,SUM(PAIRS) Qty
+                                                    ,SUM(GW) GW
+                                              FROM   PACKING
+                                              GROUP BY
+                                                      INV_NO
+                                                    ,RYNO
+                                          ) p
+                                          ON  p.INV_NO = id.INV_NO
+                                              AND p.RYNO = id.RYNO
+                                      LEFT JOIN YWDD y
+                                          ON  y.DDBH = id.RYNO
+                                      LEFT JOIN DE_ORDERM do
+                                          ON  do.ORDERNO = y.YSBH
+                                      LEFT JOIN B_GradeOrder bg
+                                          ON  bg.ORDER_B = y.YSBH
+                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                              ${where} AND NOT EXISTS (
+                                                    SELECT 1
+                                                    FROM   INVOICE_SAMPLE is1
+                                                    WHERE  is1.Inv_No = im.Inv_No
+                                                )
+                              UNION
+                              SELECT im.INV_DATE       AS [Date]
+                                    ,is1.Inv_No        AS Invoice_Number
+                                    ,NULL              AS Article_Name
+                                    ,is1.Qty           AS Quantity
+                                    ,is1.GW            AS Gross_Weight
+                                    ,im.CUSTID         AS Customer_ID
+                                    ,'Truck'           AS Local_Land_Transportation
+                                    ,CASE 
+                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                          ELSE 'MMRGN'
+                                      END               AS Port_Of_Departure
+                                    ,pc.PortCode              AS Port_Of_Arrival
+                                    ,CAST('0' AS INT)  AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)  AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)  AS Air_Transport_Distance
+                                    ,is1.S_BY          AS Transport_Method
+                                    ,CAST('0' AS INT)  AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)  AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)  AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_SAMPLE is1
+                                      LEFT JOIN INVOICE_M im
+                                          ON  im.Inv_No = is1.Inv_No
+                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                              ${where1}
+                          ) AS Cat9AndCat12`;
+
+    const countQuery = `SELECT COUNT(*) AS total
+                        FROM   (
+                                  SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
+                                                  ,*
+                                    FROM   (
+                                              SELECT im.INV_DATE          AS [Date]
+                                                    ,im.INV_NO            AS Invoice_Number
+                                                    ,id.STYLE_NAME        AS Article_Name
+                                                    ,p.Qty                AS Quantity
+                                                    ,p.GW                 AS Gross_Weight
+                                                    ,im.CUSTID            AS Customer_ID
+                                                    ,'Truck'              AS Local_Land_Transportation
+                                                    ,CASE 
+                                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                                          ELSE 'MMRGN'
+                                                      END                  AS Port_Of_Departure
+                                                    ,pc.PortCode          AS Port_Of_Arrival
+                                                    ,CAST('0' AS INT)     AS Land_Transport_Distance
+                                                    ,CAST('0' AS INT)     AS Sea_Transport_Distance
+                                                    ,CAST('0' AS INT)     AS Air_Transport_Distance
+                                                    ,ISNULL(
+                                                          ISNULL(
+                                                              bg.SHPIDS
+                                                            ,CASE 
+                                                                  WHEN (do.ShipMode='Air')
+                                                              AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                                                  WHEN(do.ShipMode='Air Expres')
+                                                              AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                                                  WHEN(do.ShipMode='Ocean')
+                                                              AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                                                  WHEN do.ShipMode_1 IS NULL THEN ''
+                                                                  ELSE do.ShipMode_1
+                                                                  END
+                                                          )
+                                                        ,y.ShipMode
+                                                      )                    AS Transport_Method
+                                                    ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                                              FROM   INVOICE_M im
+                                                      LEFT JOIN INVOICE_D  AS id
+                                                          ON  id.INV_NO = im.INV_NO
+                                                      LEFT JOIN (
+                                                              SELECT INV_NO
+                                                                    ,RYNO
+                                                                    ,SUM(PAIRS) Qty
+                                                                    ,SUM(GW) GW
+                                                              FROM   PACKING
+                                                              GROUP BY
+                                                                      INV_NO
+                                                                    ,RYNO
+                                                          ) p
+                                                          ON  p.INV_NO = id.INV_NO
+                                                              AND p.RYNO = id.RYNO
+                                                      LEFT JOIN YWDD y
+                                                          ON  y.DDBH = id.RYNO
+                                                      LEFT JOIN DE_ORDERM do
+                                                          ON  do.ORDERNO = y.YSBH
+                                                      LEFT JOIN B_GradeOrder bg
+                                                          ON  bg.ORDER_B = y.YSBH
+                                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                                              ${where} AND NOT EXISTS (
+                                                                    SELECT 1
+                                                                    FROM   INVOICE_SAMPLE is1
+                                                                    WHERE  is1.Inv_No = im.Inv_No
+                                                                )
+                                              UNION
+                                              SELECT im.INV_DATE       AS [Date]
+                                                    ,is1.Inv_No        AS Invoice_Number
+                                                    ,NULL              AS Article_Name
+                                                    ,is1.Qty           AS Quantity
+                                                    ,is1.GW            AS Gross_Weight
+                                                    ,im.CUSTID         AS Customer_ID
+                                                    ,'Truck'           AS Local_Land_Transportation
+                                                    ,CASE 
+                                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
+                                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
+                                                          ELSE 'MMRGN'
+                                                      END               AS Port_Of_Departure
+                                                    ,pc.PortCode              AS Port_Of_Arrival
+                                                    ,CAST('0' AS INT)  AS Land_Transport_Distance
+                                                    ,CAST('0' AS INT)  AS Sea_Transport_Distance
+                                                    ,CAST('0' AS INT)  AS Air_Transport_Distance
+                                                    ,is1.S_BY          AS Transport_Method
+                                                    ,CAST('0' AS INT)  AS Land_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)  AS Sea_Transport_Ton_Kilometers
+                                                    ,CAST('0' AS INT)  AS Air_Transport_Ton_Kilometers
+                                              FROM   INVOICE_SAMPLE is1
+                                                      LEFT JOIN INVOICE_M im
+                                                          ON  im.Inv_No = is1.Inv_No
+                                                      LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
+                                              ${where1}
+                                          ) AS Cat9AndCat12
+                        ) AS sub`;
     const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP];
     const [dataResults, countResults] = await Promise.all([
       Promise.all(
@@ -377,7 +624,7 @@ export class Cat9andcat12Service {
         }),
       ),
     ]);
-    // console.log(dataResults, countResults);
+
     const allData = dataResults.flat();
 
     let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
