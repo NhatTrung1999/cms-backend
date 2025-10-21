@@ -8,7 +8,7 @@ export const getADataExcelFactoryCat7 = async (
   dateFrom: string,
   dateTo: string,
 ) => {
-  let where = "WHERE 1=1 AND Work_Or_Not<>'2'";
+  let where = "WHERE 1=1 AND Work_Or_Not<>'2' AND DP.Vehicle IS NOT NULL";
   const replacements: any[] = [];
 
   if (dateTo && dateFrom) {
@@ -20,7 +20,7 @@ export const getADataExcelFactoryCat7 = async (
                           ,DP.Staying_Address            AS Residential_address
                           ,DP.Vehicle                    AS Main_transportation_type
                           ,CAST('0' AS INT)              AS km
-                          ,ROUND(SUM(WORKING_TIME) ,2)   AS Number_of_working_days
+                          ,ROUND(SUM(WORKING_TIME) / 8 ,2)   AS Number_of_working_days
                           ,CAST('0' AS INT)              AS PKT_p_km
                     FROM   DATA_WORK_TIME WT
                           LEFT JOIN Data_Person_Detail  AS DP
