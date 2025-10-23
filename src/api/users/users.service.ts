@@ -19,7 +19,7 @@ export class UsersService {
     // console.log(password);
     let query = `
     SELECT *
-    FROM CMS_Account
+    FROM CMW_Account
     WHERE UserID = ?
   `;
     const replacements: any[] = [userid];
@@ -34,7 +34,7 @@ export class UsersService {
     // const payload: any = await this.EIP.query<any>(
     // `
     //   SELECT *
-    //   FROM CMS_Account
+    //   FROM CMW_Account
     //   WHERE UserID = ? AND [Password] = ?
     // `,
     //   {
@@ -85,7 +85,7 @@ export class UsersService {
     const payload: any = await this.EIP.query<any>(
       `
       SELECT *
-      FROM CMS_Account
+      FROM CMW_Account
       WHERE UserID = ?
     `,
       {
@@ -118,7 +118,7 @@ export class UsersService {
 
     let query = `
       SELECT ID, UserID, Name,Email,Role, Status, CreatedAt, CreatedDate, UpdatedAt, UpdatedDate
-      FROM CMS_Account
+      FROM CMW_Account
       ${where}
       ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
     `;
@@ -136,7 +136,7 @@ export class UsersService {
     try {
       const result = await this.EIP.query(
         `
-        INSERT INTO CMS_Account
+        INSERT INTO CMW_Account
         (
           ID,
           Name,
@@ -179,7 +179,7 @@ export class UsersService {
     try {
       await this.EIP.query(
         `
-        UPDATE CMS_Account
+        UPDATE CMW_Account
         SET 
             Name = ?,
             Email = ?,
@@ -195,7 +195,7 @@ export class UsersService {
         },
       );
 
-      const payload: any = await this.EIP.query(`SELECT * FROM CMS_Account`, {
+      const payload: any = await this.EIP.query(`SELECT * FROM CMW_Account`, {
         type: QueryTypes.SELECT,
       });
       return payload;
@@ -206,12 +206,12 @@ export class UsersService {
 
   async deleteUser(id: string) {
     try {
-      await this.EIP.query(`DELETE FROM CMS_Account WHERE ID = ?`, {
+      await this.EIP.query(`DELETE FROM CMW_Account WHERE ID = ?`, {
         replacements: [id],
         type: QueryTypes.DELETE,
       });
 
-      const payload: any = await this.EIP.query(`SELECT * FROM CMS_Account`, {
+      const payload: any = await this.EIP.query(`SELECT * FROM CMW_Account`, {
         type: QueryTypes.SELECT,
       });
       return payload;

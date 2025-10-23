@@ -65,7 +65,7 @@ export class FilemanagementService {
       const payload: any = await this.EIP.query<any>(
         `
           SELECT *
-          FROM CMS_File_Management
+          FROM CMW_File_Management
           WHERE CreatedAt = '${userID}' ${where}
           ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
         `,
@@ -83,7 +83,7 @@ export class FilemanagementService {
   async getFileById(id: string) {
     const payload: any = await this.EIP.query(
       `SELECT *
-        FROM CMS_File_Management
+        FROM CMW_File_Management
         WHERE ID = ?`,
       {
         replacements: [id],
@@ -134,7 +134,7 @@ export class FilemanagementService {
   ) {
     try {
       await this.EIP.query(
-        `INSERT INTO CMS_File_Management
+        `INSERT INTO CMW_File_Management
           (
             ID,
             Module,
@@ -171,7 +171,7 @@ export class FilemanagementService {
         },
       );
       const result = await this.EIP.query(
-        `SELECT * FROM CMS_File_Management WHERE ID = ? ORDER BY CreatedDate`,
+        `SELECT * FROM CMW_File_Management WHERE ID = ? ORDER BY CreatedDate`,
         { replacements: [id], type: QueryTypes.SELECT },
       );
       return result;
@@ -183,14 +183,14 @@ export class FilemanagementService {
   async fileExcelDone(id: string) {
     try {
       await this.EIP.query(
-        `UPDATE CMS_File_Management
+        `UPDATE CMW_File_Management
           SET
             [Status] = '1'
           WHERE ID = ?`,
         { replacements: [id], type: QueryTypes.UPDATE },
       );
       const result = await this.EIP.query(
-        `SELECT * FROM CMS_File_Management WHERE ID = ? ORDER BY CreatedDate`,
+        `SELECT * FROM CMW_File_Management WHERE ID = ? ORDER BY CreatedDate`,
         { replacements: [id], type: QueryTypes.SELECT },
       );
       return result;
@@ -353,7 +353,7 @@ export class FilemanagementService {
                                   ON  do.ORDERNO = y.YSBH
                             LEFT JOIN B_GradeOrder bg
                                   ON  bg.ORDER_B = y.YSBH
-                            LEFT JOIN EIP.EIP.dbo.CMS_PortCode pc
+                            LEFT JOIN CMW.CMW.dbo.CMW_PortCode pc
                                   ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                       ${where}`;
     const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP];
