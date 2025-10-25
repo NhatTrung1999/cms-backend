@@ -30,8 +30,8 @@ export const getADataExcelFactoryCat9AndCat12 = async (
                                     ,'Truck'              AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'VNCLP'
                                           ELSE 'MMRGN'
                                       END                  AS Port_Of_Departure
                                     ,pc.PortCode          AS Port_Of_Arrival
@@ -84,8 +84,8 @@ export const getADataExcelFactoryCat9AndCat12 = async (
                                     ,'Truck'           AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'VNCLP'
                                           ELSE 'MMRGN'
                                       END               AS Port_Of_Departure
                                     ,pc.PortCode       AS Port_Of_Arrival

@@ -108,6 +108,27 @@ export const databaseProviders = [
     },
   },
   {
+    provide: 'LYF_ERP',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('LYF_ERP_USERNAME'),
+        password: configService.get('LYF_ERP_PASSWORD'),
+        database: configService.get('LYF_ERP_DATABASE_NAME'),
+        host: configService.get('LYF_ERP_HOST'),
+        port: configService.get('LYF_ERP_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
     provide: 'LYV_WMS',
     inject: [ConfigService],
     useFactory: async (configService: ConfigService) => {

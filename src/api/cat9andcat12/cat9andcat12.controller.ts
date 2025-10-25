@@ -50,7 +50,9 @@ export class Cat9andcat12Controller {
   }
 
   @Post('import-excel-port-code')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }),
+  )
   async importExcelPortCode(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file uploaded!');
 

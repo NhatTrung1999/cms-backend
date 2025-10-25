@@ -19,6 +19,7 @@ export class Cat9andcat12Service {
     @Inject('LHG_ERP') private readonly LHG_ERP: Sequelize,
     @Inject('LVL_ERP') private readonly LVL_ERP: Sequelize,
     @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
+    @Inject('LYF_ERP') private readonly LYF_ERP: Sequelize,
   ) {}
 
   async getData(
@@ -44,10 +45,14 @@ export class Cat9andcat12Service {
       case 'LVL':
         db = this.LVL_ERP;
         break;
+      case 'LYF':
+        db = this.LYF_ERP;
+        break;
       default:
         return await this.getAllDataFactory(
           dateFrom,
           dateTo,
+          factory,
           page,
           limit,
           sortField,
@@ -59,6 +64,7 @@ export class Cat9andcat12Service {
       db,
       dateFrom,
       dateTo,
+      factory,
       page,
       limit,
       sortField,
@@ -84,6 +90,7 @@ export class Cat9andcat12Service {
     db: Sequelize,
     dateFrom: string,
     dateTo: string,
+    factory: string,
     page: number,
     limit: number,
     sortField: string,
@@ -94,6 +101,7 @@ export class Cat9andcat12Service {
 
       let where = 'WHERE 1=1';
       let where1 = 'WHERE 1=1';
+      let portOfDeparture = '';
       const replacements: any[] = [];
 
       if (dateFrom && dateTo) {
@@ -102,6 +110,22 @@ export class Cat9andcat12Service {
         replacements.push(dateFrom, dateTo, dateFrom, dateTo);
       }
 
+      switch (factory.trim()) {
+        case 'LYV':
+        case 'LHG':
+        case 'LVL':
+          portOfDeparture = 'VNCLP';
+          break;
+        case 'LYM':
+          portOfDeparture = 'MMRGN';
+          break;
+        case 'LYF':
+          portOfDeparture = 'IDSRG';
+          break;
+        default:
+          portOfDeparture = '';
+          break;
+      }
       // console.log(replacements);
 
       const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
@@ -116,10 +140,9 @@ export class Cat9andcat12Service {
                                     ,'Truck'              AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                          ELSE 'MMRGN'
-                                      END                  AS Port_Of_Departure
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                          ELSE '${portOfDeparture}'
+                                    END                  AS Port_Of_Departure
                                     ,pc.PortCode          AS Port_Of_Arrival
                                     ,CAST('0' AS INT)     AS Land_Transport_Distance
                                     ,CAST('0' AS INT)     AS Sea_Transport_Distance
@@ -170,10 +193,9 @@ export class Cat9andcat12Service {
                                     ,'Truck'           AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                          ELSE 'MMRGN'
-                                      END               AS Port_Of_Departure
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                          ELSE '${portOfDeparture}'
+                                    END                  AS Port_Of_Departure
                                     ,pc.PortCode       AS Port_Of_Arrival
                                     ,CAST('0' AS INT)  AS Land_Transport_Distance
                                     ,CAST('0' AS INT)  AS Sea_Transport_Distance
@@ -208,10 +230,9 @@ export class Cat9andcat12Service {
                                                   ,'Truck'              AS Local_Land_Transportation
                                                   ,CASE 
                                                         WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                                        ELSE 'MMRGN'
-                                                    END                  AS Port_Of_Departure
+                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                                        ELSE '${portOfDeparture}'
+                                                  END                  AS Port_Of_Departure
                                                   ,pc.PortCode          AS Port_Of_Arrival
                                                   ,CAST('0' AS INT)     AS Land_Transport_Distance
                                                   ,CAST('0' AS INT)     AS Sea_Transport_Distance
@@ -262,10 +283,9 @@ export class Cat9andcat12Service {
                                                   ,'Truck'           AS Local_Land_Transportation
                                                   ,CASE 
                                                         WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                                        ELSE 'MMRGN'
-                                                    END               AS Port_Of_Departure
+                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                                        ELSE '${portOfDeparture}'
+                                                  END                  AS Port_Of_Departure
                                                   ,pc.PortCode       AS Port_Of_Arrival
                                                   ,CAST('0' AS INT)  AS Land_Transport_Distance
                                                   ,CAST('0' AS INT)  AS Sea_Transport_Distance
@@ -326,6 +346,7 @@ export class Cat9andcat12Service {
   private async getAllDataFactory(
     dateFrom: string,
     dateTo: string,
+    factory: string,
     page: number,
     limit: number,
     sortField: string,
@@ -335,6 +356,7 @@ export class Cat9andcat12Service {
 
     let where = 'WHERE 1=1';
     let where1 = 'WHERE 1=1';
+    let portOfDeparture = '';
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
@@ -343,65 +365,22 @@ export class Cat9andcat12Service {
       replacements.push(dateFrom, dateTo, dateFrom, dateTo);
     }
 
-    // const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY im.INV_DATE) AS INT) AS [No]
-    //                         ,im.INV_DATE          AS [Date]
-    //                         ,im.INV_NO            AS Invoice_Number
-    //                         ,id.STYLE_NAME        AS Article_Name
-    //                         ,p.Qty                AS Quantity
-    //                         ,p.GW                 AS Gross_Weight
-    //                         ,im.CUSTID            AS Customer_ID
-    //                         ,'Truck'              AS Local_Land_Transportation
-    //                         ,CASE
-    //                               WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,2) ,'')='' THEN ''
-    //                               WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,2)<>'AM' THEN 'VNCLP'
-    //                               ELSE 'MMRGN'
-    //                         END                  AS Port_Of_Departure
-    //                         ,pc.PortCode          AS Port_Of_Arrival
-    //                         ,CAST('0' AS INT)     AS Land_Transport_Distance
-    //                         ,CAST('0' AS INT)     AS Sea_Transport_Distance
-    //                         ,CAST('0' AS INT)     AS Air_Transport_Distance
-    //                         ,ISNULL(
-    //                             ISNULL(
-    //                                 bg.SHPIDS
-    //                                 ,CASE
-    //                                       WHEN (do.ShipMode='Air')
-    //                                 AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-    //                                     WHEN(do.ShipMode='Air Expres')
-    //                                 AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-    //                                     WHEN(do.ShipMode='Ocean')
-    //                                 AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-    //                                     WHEN do.ShipMode_1 IS NULL THEN ''
-    //                                     ELSE do.ShipMode_1 END
-    //                             )
-    //                             ,y.ShipMode
-    //                         )                    AS Transport_Method
-    //                         ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
-    //                         ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
-    //                         ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
-    //                   FROM   INVOICE_M im
-    //                         LEFT JOIN INVOICE_D  AS id
-    //                               ON  id.INV_NO = im.INV_NO
-    //                         LEFT JOIN (
-    //                                   SELECT INV_NO
-    //                                         ,RYNO
-    //                                         ,SUM(PAIRS)     Qty
-    //                                         ,SUM(GW)        GW
-    //                                   FROM   PACKING
-    //                                   GROUP BY
-    //                                         INV_NO
-    //                                         ,RYNO
-    //                               ) p
-    //                               ON  p.INV_NO = id.INV_NO
-    //                                   AND p.RYNO = id.RYNO
-    //                         LEFT JOIN YWDD y
-    //                               ON  y.DDBH = id.RYNO
-    //                         LEFT JOIN DE_ORDERM do
-    //                               ON  do.ORDERNO = y.YSBH
-    //                         LEFT JOIN B_GradeOrder bg
-    //                               ON  bg.ORDER_B = y.YSBH
-    //                         LEFT JOIN CMW.CMW.dbo.CMW_PortCode pc
-    //                               ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-    //                   ${where}`;
+    switch (factory.trim()) {
+      case 'LYV':
+      case 'LHG':
+      case 'LVL':
+        portOfDeparture = 'VNCLP';
+        break;
+      case 'LYM':
+        portOfDeparture = 'MMRGN';
+        break;
+      case 'LYF':
+        portOfDeparture = 'IDSRG';
+        break;
+      default:
+        portOfDeparture = '';
+        break;
+    }
 
     const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
                           ,*
@@ -415,10 +394,9 @@ export class Cat9andcat12Service {
                                     ,'Truck'              AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                          ELSE 'MMRGN'
-                                      END                  AS Port_Of_Departure
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                          ELSE '${portOfDeparture}'
+                                    END                  AS Port_Of_Departure
                                     ,pc.PortCode          AS Port_Of_Arrival
                                     ,CAST('0' AS INT)     AS Land_Transport_Distance
                                     ,CAST('0' AS INT)     AS Sea_Transport_Distance
@@ -469,10 +447,9 @@ export class Cat9andcat12Service {
                                     ,'Truck'           AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                          ELSE 'MMRGN'
-                                      END               AS Port_Of_Departure
+                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                          ELSE '${portOfDeparture}'
+                                    END                  AS Port_Of_Departure
                                     ,pc.PortCode       AS Port_Of_Arrival
                                     ,CAST('0' AS INT)  AS Land_Transport_Distance
                                     ,CAST('0' AS INT)  AS Sea_Transport_Distance
@@ -507,10 +484,9 @@ export class Cat9andcat12Service {
                                                   ,'Truck'              AS Local_Land_Transportation
                                                   ,CASE 
                                                         WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                                        ELSE 'MMRGN'
-                                                    END                  AS Port_Of_Departure
+                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                                        ELSE '${portOfDeparture}'
+                                                  END                  AS Port_Of_Departure
                                                   ,pc.PortCode          AS Port_Of_Arrival
                                                   ,CAST('0' AS INT)     AS Land_Transport_Distance
                                                   ,CAST('0' AS INT)     AS Sea_Transport_Distance
@@ -561,10 +537,9 @@ export class Cat9andcat12Service {
                                                   ,'Truck'           AS Local_Land_Transportation
                                                   ,CASE 
                                                         WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'VNCLP'
-                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'SGN'
-                                                        ELSE 'MMRGN'
-                                                    END               AS Port_Of_Departure
+                                                        WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                                        ELSE '${portOfDeparture}'
+                                                  END                  AS Port_Of_Departure
                                                   ,pc.PortCode       AS Port_Of_Arrival
                                                   ,CAST('0' AS INT)  AS Land_Transport_Distance
                                                   ,CAST('0' AS INT)  AS Sea_Transport_Distance
