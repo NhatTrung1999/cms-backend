@@ -314,10 +314,31 @@ export class FilemanagementService {
                                     ,im.CUSTID            AS Customer_ID
                                     ,'Truck'              AS Local_Land_Transportation
                                     ,CASE 
-                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'VNCLP'
-                                          ELSE 'MMRGN'
+                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
+                                                                                      WHEN SUBSTRING(
+                                                                                              im.INV_NO
+                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
+                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
+                                                                                      WHEN SUBSTRING(
+                                                                                              im.INV_NO
+                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
+                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                          )='YF' THEN 'IDSRG'
+                                                                                      WHEN SUBSTRING(
+                                                                                              im.INV_NO
+                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
+                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                          )='TY' THEN 'MMRGN'
+                                                                                      ELSE 'VNCLP'
+                                                                                END
+                                          ELSE CASE 
+                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                                    ELSE 'VNCLP'
+                                                END
                                       END                  AS Port_Of_Departure
                                     ,pc.PortCode          AS Port_Of_Arrival
                                     ,CAST('0' AS INT)     AS Land_Transport_Distance
@@ -349,10 +370,12 @@ export class FilemanagementService {
                                       LEFT JOIN B_GradeOrder bg
                                           ON  bg.ORDER_B = y.YSBH
                                       LEFT JOIN (
-                                        SELECT CustomerNumber, PortCode, TransportMethod
-                                        FROM CMW.CMW.dbo.CMW_PortCode
-                                        WHERE TransportMethod = 'SEA'
-                                      ) pc
+                                              SELECT CustomerNumber
+                                                    ,PortCode
+                                                    ,TransportMethod
+                                              FROM   CMW.CMW.dbo.CMW_PortCode
+                                              WHERE  TransportMethod = 'SEA'
+                                          ) pc
                                           ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                               ${where} AND NOT EXISTS (
                                                     SELECT 1
@@ -368,10 +391,31 @@ export class FilemanagementService {
                                     ,im.CUSTID         AS Customer_ID
                                     ,'Truck'           AS Local_Land_Transportation
                                     ,CASE 
-                                          WHEN ISNULL(LEFT(LTRIM(RTRIM(im.INV_NO)) ,3) ,'')='' THEN ''
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                          WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)<>'AM-' THEN 'VNCLP'
-                                          ELSE 'MMRGN'
+                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
+                                                                                      WHEN SUBSTRING(
+                                                                                              im.INV_NO
+                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
+                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
+                                                                                      WHEN SUBSTRING(
+                                                                                              im.INV_NO
+                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
+                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                          )='YF' THEN 'IDSRG'
+                                                                                      WHEN SUBSTRING(
+                                                                                              im.INV_NO
+                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
+                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                          )='TY' THEN 'MMRGN'
+                                                                                      ELSE 'VNCLP'
+                                                                                END
+                                          ELSE CASE 
+                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
+                                                    ELSE 'VNCLP'
+                                                END
                                       END               AS Port_Of_Departure
                                     ,pc.PortCode       AS Port_Of_Arrival
                                     ,CAST('0' AS INT)  AS Land_Transport_Distance
@@ -385,14 +429,22 @@ export class FilemanagementService {
                                       LEFT JOIN INVOICE_M im
                                           ON  im.Inv_No = is1.Inv_No
                                       LEFT JOIN (
-                                        SELECT CustomerNumber, PortCode, TransportMethod
-                                        FROM CMW.CMW.dbo.CMW_PortCode
-                                        WHERE TransportMethod = 'AIR'
-                                      ) pc
+                                              SELECT CustomerNumber
+                                                    ,PortCode
+                                                    ,TransportMethod
+                                              FROM   CMW.CMW.dbo.CMW_PortCode
+                                              WHERE  TransportMethod = 'AIR'
+                                          ) pc
                                           ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                               ${where1}
                           ) AS Cat9AndCat12`;
-    const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP];
+    const connects = [
+      this.LYV_ERP,
+      this.LHG_ERP,
+      this.LYM_ERP,
+      this.LVL_ERP,
+      this.LYF_ERP,
+    ];
     const dataResults = await Promise.all(
       connects.map((conn) => {
         return conn.query(query, {
