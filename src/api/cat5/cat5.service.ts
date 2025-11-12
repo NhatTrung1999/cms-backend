@@ -87,23 +87,25 @@ export class Cat5Service {
       replacements.push(dateFrom, dateTo);
     }
 
-    const query = `SELECT dwo.WASTE_DATE AS Waste_disposal_date
-                        ,dtv.TREATMENT_VENDOR_NAME          AS Vender_Name
-                        ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
-                        ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                        ,CASE
-                              WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
-                              WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
-                              ELSE NULL
-                        END                                AS The_type_of_waste
-                        ,CASE
-                              WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
-                              WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
-                              ELSE NULL
-                        END                                AS Waste_type
-                        ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
-                        ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
-                        ,CAST('0' AS INT)                   AS TKT_Ton_km
+    const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
+                          ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
+                          ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
+                          ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
+                          ,CAST('0' AS INT)                   AS Transportation_Distance_km
+                          ,CASE 
+                                WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
+                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
+                                ELSE NULL
+                          END                                AS The_type_of_waste
+                          ,CASE 
+                                WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
+                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
+                                ELSE NULL
+                          END                                AS Waste_type
+                          ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
+                          ,dtm.TREATMENT_METHOD_ID            AS Treatment_Method_ID
+                          ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
+                          ,CAST('0' AS INT)                   AS TKT_Ton_km
                     FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
                           LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
                                 ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
@@ -185,23 +187,25 @@ export class Cat5Service {
         replacements.push(dateFrom, dateTo);
       }
 
-      const query = `SELECT dwo.WASTE_DATE AS Waste_disposal_date
-                          ,dtv.TREATMENT_VENDOR_NAME          AS Vender_Name
-                          ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
-                          ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                          ,CASE
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
-                                ELSE NULL
-                          END                                AS The_type_of_waste
-                          ,CASE
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
-                                ELSE NULL
-                          END                                AS Waste_type
-                          ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
-                          ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
-                          ,CAST('0' AS INT)                   AS TKT_Ton_km
+      const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
+                            ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
+                            ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
+                            ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
+                            ,CAST('0' AS INT)                   AS Transportation_Distance_km
+                            ,CASE 
+                                  WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
+                                  WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
+                                  ELSE NULL
+                            END                                AS The_type_of_waste
+                            ,CASE 
+                                  WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
+                                  WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
+                                  ELSE NULL
+                            END                                AS Waste_type
+                            ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
+                            ,dtm.TREATMENT_METHOD_ID            AS Treatment_Method_ID
+                            ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
+                            ,CAST('0' AS INT)                   AS TKT_Ton_km
                       FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
                             LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
                                   ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER

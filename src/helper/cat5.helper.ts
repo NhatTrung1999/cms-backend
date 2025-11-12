@@ -18,21 +18,23 @@ export const getADataExcelFactoryCat5 = async (
     replacements.push(dateFrom, dateTo);
   }
 
-  const query = `SELECT dwo.WASTE_DATE AS Waste_disposal_date
-                        ,dtv.TREATMENT_VENDOR_NAME          AS Vender_Name
+  const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
+                        ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
+                        ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
                         ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
                         ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                        ,CASE
+                        ,CASE 
                               WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
                               WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
                               ELSE NULL
                         END                                AS The_type_of_waste
-                        ,CASE
+                        ,CASE 
                               WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
                               WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
                               ELSE NULL
                         END                                AS Waste_type
                         ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
+                        ,dtm.TREATMENT_METHOD_ID            AS Treatment_Method_ID
                         ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
                         ,CAST('0' AS INT)                   AS TKT_Ton_km
                     FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
@@ -58,8 +60,12 @@ export const getADataExcelFactoryCat5 = async (
       key: 'Waste_disposal_date',
     },
     {
-      header: 'Vender Name',
-      key: 'Vender_Name',
+      header: 'Vendor Name',
+      key: 'Vendor_Name',
+    },
+    {
+      header: 'Vendor ID',
+      key: 'Vendor_ID',
     },
     {
       header: 'Waste collection address',
@@ -80,6 +86,10 @@ export const getADataExcelFactoryCat5 = async (
     {
       header: '*Waste Treatment method',
       key: 'Waste_Treatment_method',
+    },
+    {
+      header: 'Treatment Method ID',
+      key: 'Treatment_Method_ID',
     },
     {
       header: '*Weight of waste treated (Unit：kg)',

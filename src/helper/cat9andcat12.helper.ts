@@ -21,70 +21,74 @@ export const getADataExcelFactoryCat9AndCat12 = async (
   const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
                           ,*
                     FROM   (
-                              SELECT im.INV_DATE          AS [Date]
-                                    ,im.INV_NO            AS Invoice_Number
-                                    ,id.STYLE_NAME        AS Article_Name
-                                    ,p.Qty                AS Quantity
-                                    ,p.GW                 AS Gross_Weight
-                                    ,im.CUSTID            AS Customer_ID
-                                    ,'Truck'              AS Local_Land_Transportation
+                              SELECT im.INV_DATE             AS [Date]
+                                    ,sb.ExFty_Date           AS Shipment_Date
+                                    ,im.INV_NO               AS Invoice_Number
+                                    ,id.STYLE_NAME           AS Article_Name
+                                    ,id.ARTICLE              AS Article_ID
+                                    ,p.Qty                   AS Quantity
+                                    ,p.GW                    AS Gross_Weight
+                                    ,im.CUSTID               AS Customer_ID
+                                    ,'Truck'                 AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                      WHEN SUBSTRING(
+                                                                                    WHEN SUBSTRING(
                                                                                               im.INV_NO
-                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
-                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
+                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
                                                                                           ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                      WHEN SUBSTRING(
+                                                                                    WHEN SUBSTRING(
                                                                                               im.INV_NO
-                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
-                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
+                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
                                                                                           )='YF' THEN 'IDSRG'
-                                                                                      WHEN SUBSTRING(
+                                                                                    WHEN SUBSTRING(
                                                                                               im.INV_NO
-                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
-                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
+                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
                                                                                           )='TY' THEN 'MMRGN'
-                                                                                      ELSE 'VNCLP'
+                                                                                    ELSE 'VNCLP'
                                                                                 END
                                           ELSE CASE 
                                                     WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
                                                     ELSE 'VNCLP'
-                                                END
-                                      END                  AS Port_Of_Departure
-                                    ,pc.PortCode          AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)     AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)     AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)     AS Air_Transport_Distance
-                                    ,'SEA'                AS Transport_Method
-                                    ,CAST('0' AS INT)     AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)     AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)     AS Air_Transport_Ton_Kilometers
+                                              END
+                                    END                     AS Port_Of_Departure
+                                    ,pc.PortCode             AS Port_Of_Arrival
+                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
+                                    ,'SEA'                   AS Transport_Method
+                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
                               FROM   INVOICE_M im
-                                      LEFT JOIN INVOICE_D  AS id
+                                    LEFT JOIN INVOICE_D     AS id
                                           ON  id.INV_NO = im.INV_NO
-                                      LEFT JOIN (
+                                    LEFT JOIN Ship_Booking  AS sb
+                                          ON  sb.INV_NO = im.INV_NO
+                                    LEFT JOIN (
                                               SELECT INV_NO
                                                     ,RYNO
-                                                    ,SUM(PAIRS) Qty
-                                                    ,SUM(GW) GW
+                                                    ,SUM(PAIRS)     Qty
+                                                    ,SUM(GW)        GW
                                               FROM   PACKING
                                               GROUP BY
-                                                      INV_NO
+                                                    INV_NO
                                                     ,RYNO
                                           ) p
                                           ON  p.INV_NO = id.INV_NO
                                               AND p.RYNO = id.RYNO
-                                      LEFT JOIN YWDD y
+                                    LEFT JOIN YWDD y
                                           ON  y.DDBH = id.RYNO
-                                      LEFT JOIN DE_ORDERM do
+                                    LEFT JOIN DE_ORDERM do
                                           ON  do.ORDERNO = y.YSBH
-                                      LEFT JOIN B_GradeOrder bg
+                                    LEFT JOIN B_GradeOrder bg
                                           ON  bg.ORDER_B = y.YSBH
-                                      LEFT JOIN (
+                                    LEFT JOIN (
                                               SELECT CustomerNumber
                                                     ,PortCode
                                                     ,TransportMethod
@@ -98,52 +102,58 @@ export const getADataExcelFactoryCat9AndCat12 = async (
                                                     WHERE  is1.Inv_No = im.Inv_No
                                                 )
                               UNION
-                              SELECT im.INV_DATE       AS [Date]
-                                    ,is1.Inv_No        AS Invoice_Number
-                                    ,'SAMPLE SHOE'     AS Article_Name
-                                    ,is1.Qty           AS Quantity
-                                    ,is1.GW            AS Gross_Weight
-                                    ,im.CUSTID         AS Customer_ID
-                                    ,'Truck'           AS Local_Land_Transportation
+                              SELECT im.INV_DATE             AS [Date]
+                                    ,sb.ExFty_Date           AS Shipment_Date
+                                    ,is1.Inv_No              AS Invoice_Number
+                                    ,'SAMPLE SHOE'           AS Article_Name
+                                    ,id.ARTICLE              AS Article_ID
+                                    ,is1.Qty                 AS Quantity
+                                    ,is1.GW                  AS Gross_Weight
+                                    ,im.CUSTID               AS Customer_ID
+                                    ,'Truck'                 AS Local_Land_Transportation
                                     ,CASE 
                                           WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                      WHEN SUBSTRING(
+                                                                                    WHEN SUBSTRING(
                                                                                               im.INV_NO
-                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
-                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
+                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
                                                                                           ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                      WHEN SUBSTRING(
+                                                                                    WHEN SUBSTRING(
                                                                                               im.INV_NO
-                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
-                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
+                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
                                                                                           )='YF' THEN 'IDSRG'
-                                                                                      WHEN SUBSTRING(
+                                                                                    WHEN SUBSTRING(
                                                                                               im.INV_NO
-                                                                                              ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                              ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1) 
-                                                                                              - CHARINDEX('/' ,im.INV_NO)- 1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
+                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
+                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
                                                                                           )='TY' THEN 'MMRGN'
-                                                                                      ELSE 'VNCLP'
+                                                                                    ELSE 'VNCLP'
                                                                                 END
                                           ELSE CASE 
                                                     WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
                                                     ELSE 'VNCLP'
-                                                END
-                                      END               AS Port_Of_Departure
-                                    ,pc.PortCode       AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)  AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)  AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)  AS Air_Transport_Distance
-                                    ,'AIR'             AS Transport_Method
-                                    ,CAST('0' AS INT)  AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)  AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)  AS Air_Transport_Ton_Kilometers
+                                              END
+                                    END                     AS Port_Of_Departure
+                                    ,pc.PortCode             AS Port_Of_Arrival
+                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
+                                    ,'AIR'                   AS Transport_Method
+                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
                               FROM   INVOICE_SAMPLE is1
-                                      LEFT JOIN INVOICE_M im
+                                    LEFT JOIN INVOICE_M im
                                           ON  im.Inv_No = is1.Inv_No
-                                      LEFT JOIN (
+                                    LEFT JOIN INVOICE_D     AS id
+                                          ON  id.INV_NO = is1.INV_NO
+                                    LEFT JOIN Ship_Booking  AS sb
+                                          ON  sb.INV_NO = is1.Inv_No
+                                    LEFT JOIN (
                                               SELECT CustomerNumber
                                                     ,PortCode
                                                     ,TransportMethod
@@ -167,12 +177,20 @@ export const getADataExcelFactoryCat9AndCat12 = async (
       key: 'Date',
     },
     {
+      header: 'Shipment Date',
+      key: 'Shipment_Date',
+    },
+    {
       header: 'Invoice Number',
       key: 'Invoice_Number',
     },
     {
       header: 'Article Name',
       key: 'Article_Name',
+    },
+    {
+      header: 'Article ID',
+      key: 'Article_ID',
     },
     {
       header: 'Quantity',
