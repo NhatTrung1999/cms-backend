@@ -23,6 +23,7 @@ export const databaseProviders = [
       return sequelize;
     },
   },
+  // cat 9 & 12
   {
     provide: 'LYV_ERP',
     inject: [ConfigService],
@@ -128,6 +129,49 @@ export const databaseProviders = [
       return sequelize;
     },
   },
+  {
+    provide: 'JAZ_ERP',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('JAZ_ERP_USERNAME'),
+        password: configService.get('JAZ_ERP_PASSWORD'),
+        database: configService.get('JAZ_ERP_DATABASE_NAME'),
+        host: configService.get('JAZ_ERP_HOST'),
+        port: configService.get('JAZ_ERP_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'JZS_ERP',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('JZS_ERP_USERNAME'),
+        password: configService.get('JZS_ERP_PASSWORD'),
+        database: configService.get('JZS_ERP_DATABASE_NAME'),
+        host: configService.get('JZS_ERP_HOST'),
+        port: configService.get('JZS_ERP_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  // cat 5
   {
     provide: 'LYV_WMS',
     inject: [ConfigService],
@@ -254,17 +298,18 @@ export const databaseProviders = [
       return sequelize;
     },
   },
+  // cat 7
   {
-    provide: 'HRIS',
+    provide: 'LYV_HRIS',
     inject: [ConfigService],
     useFactory: async (configService: ConfigService) => {
       const sequelize = new Sequelize({
         dialect: configService.get('DB_DIALECT'),
-        username: configService.get('HRIS_USERNAME'),
-        password: configService.get('HRIS_PASSWORD'),
-        database: configService.get('HRIS_DATABASE_NAME'),
-        host: configService.get('HRIS_HOST'),
-        port: configService.get('HRIS_PORT'),
+        username: configService.get('LYV_HRIS_USERNAME'),
+        password: configService.get('LYV_HRIS_PASSWORD'),
+        database: configService.get('LYV_HRIS_DATABASE_NAME'),
+        host: configService.get('LYV_HRIS_HOST'),
+        port: configService.get('LYV_HRIS_PORT'),
         dialectOptions: {
           options: {
             encrypt: false,
@@ -275,6 +320,112 @@ export const databaseProviders = [
       return sequelize;
     },
   },
+  {
+    provide: 'LHG_HRIS',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('LHG_HRIS_USERNAME'),
+        password: configService.get('LHG_HRIS_PASSWORD'),
+        database: configService.get('LHG_HRIS_DATABASE_NAME'),
+        host: configService.get('LHG_HRIS_HOST'),
+        port: configService.get('LHG_HRIS_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'LVL_HRIS',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('LVL_HRIS_USERNAME'),
+        password: configService.get('LVL_HRIS_PASSWORD'),
+        database: configService.get('LVL_HRIS_DATABASE_NAME'),
+        host: configService.get('LVL_HRIS_HOST'),
+        port: configService.get('LVL_HRIS_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'LYM_HRIS',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('LYM_HRIS_USERNAME'),
+        password: configService.get('LYM_HRIS_PASSWORD'),
+        database: configService.get('LYM_HRIS_DATABASE_NAME'),
+        host: configService.get('LYM_HRIS_HOST'),
+        port: configService.get('LYM_HRIS_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'JAZ_HRIS',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('JAZ_HRIS_USERNAME'),
+        password: configService.get('JAZ_HRIS_PASSWORD'),
+        database: configService.get('JAZ_HRIS_DATABASE_NAME'),
+        host: configService.get('JAZ_HRIS_HOST'),
+        port: configService.get('JAZ_HRIS_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  {
+    provide: 'JZS_HRIS',
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService) => {
+      const sequelize = new Sequelize({
+        dialect: configService.get('DB_DIALECT'),
+        username: configService.get('JZS_HRIS_USERNAME'),
+        password: configService.get('JZS_HRIS_PASSWORD'),
+        database: configService.get('JZS_HRIS_DATABASE_NAME'),
+        host: configService.get('JZS_HRIS_HOST'),
+        port: configService.get('JZS_HRIS_PORT'),
+        dialectOptions: {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+          },
+        },
+      });
+      return sequelize;
+    },
+  },
+  // cat 6
   {
     provide: 'UOF',
     inject: [ConfigService],

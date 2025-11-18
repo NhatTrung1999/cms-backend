@@ -20,6 +20,8 @@ export class Cat9andcat12Service {
     @Inject('LVL_ERP') private readonly LVL_ERP: Sequelize,
     @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
     @Inject('LYF_ERP') private readonly LYF_ERP: Sequelize,
+    @Inject('JAZ_ERP') private readonly JAZ_ERP: Sequelize,
+    @Inject('JZS_ERP') private readonly JZS_ERP: Sequelize,
   ) {}
 
   async getData(
@@ -47,6 +49,12 @@ export class Cat9andcat12Service {
         break;
       case 'LYF':
         db = this.LYF_ERP;
+        break;
+      case 'JAZ':
+        db = this.JAZ_ERP;
+        break;
+      case 'JZS':
+        db = this.JZS_ERP;
         break;
       default:
         return await this.getAllDataFactory(
@@ -99,8 +107,8 @@ export class Cat9andcat12Service {
     try {
       const offset = (page - 1) * limit;
 
-      let where = 'WHERE 1=1';
-      let where1 = 'WHERE 1=1';
+      let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
+      let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
       const replacements: any[] = [];
 
       if (dateFrom && dateTo) {
@@ -451,8 +459,8 @@ export class Cat9andcat12Service {
   ) {
     const offset = (page - 1) * limit;
 
-    let where = 'WHERE 1=1';
-    let where1 = 'WHERE 1=1';
+    let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
+    let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
@@ -755,7 +763,15 @@ export class Cat9andcat12Service {
                               ${where1}
                           ) AS Cat9AndCat12
                         ) AS sub`;
-    const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP, this.LYF_ERP];
+    const connects = [
+      this.LYV_ERP,
+      this.LHG_ERP,
+      this.LYM_ERP,
+      this.LVL_ERP,
+      this.LYF_ERP,
+      this.JAZ_ERP,
+      this.JZS_ERP,
+    ];
     const [dataResults, countResults] = await Promise.all([
       Promise.all(
         connects.map((conn) => {

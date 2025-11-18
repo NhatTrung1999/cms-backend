@@ -8,8 +8,8 @@ export const getADataExcelFactoryCat9AndCat12 = async (
   dateFrom: string,
   dateTo: string,
 ) => {
-  let where = 'WHERE 1=1';
-  let where1 = 'WHERE 1=1';
+  let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
+  let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
   const replacements: any[] = [];
 
   if (dateFrom && dateTo) {

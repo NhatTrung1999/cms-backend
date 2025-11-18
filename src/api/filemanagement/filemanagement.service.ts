@@ -14,7 +14,7 @@ import { EventsGateway } from '../events/events.gateway';
 import { getADataExcelFactoryCat5 } from 'src/helper/cat5.helper';
 import { getADataExcelFactoryCat9AndCat12 } from 'src/helper/cat9andcat12.helper';
 import { getADataExcelFactoryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
-import { getADataExcelFactoryCat7 } from 'src/helper/cat7.helper';
+import { buildQuery, getADataExcelFactoryCat7 } from 'src/helper/cat7.helper';
 
 @Injectable()
 export class FilemanagementService {
@@ -22,19 +22,29 @@ export class FilemanagementService {
   constructor(
     private configService: ConfigService,
     @Inject('EIP') private readonly EIP: Sequelize,
+    // cat 9 & 12
     @Inject('LYV_ERP') private readonly LYV_ERP: Sequelize,
     @Inject('LHG_ERP') private readonly LHG_ERP: Sequelize,
     @Inject('LVL_ERP') private readonly LVL_ERP: Sequelize,
     @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
     @Inject('LYF_ERP') private readonly LYF_ERP: Sequelize,
+    @Inject('JAZ_ERP') private readonly JAZ_ERP: Sequelize,
+    @Inject('JZS_ERP') private readonly JZS_ERP: Sequelize,
     private readonly eventsGateway: EventsGateway,
+    //cat 5
     @Inject('LYV_WMS') private readonly LYV_WMS: Sequelize,
     @Inject('LHG_WMS') private readonly LHG_WMS: Sequelize,
     @Inject('LYM_WMS') private readonly LYM_WMS: Sequelize,
     @Inject('LVL_WMS') private readonly LVL_WMS: Sequelize,
     @Inject('JAZ_WMS') private readonly JAZ_WMS: Sequelize,
     @Inject('JZS_WMS') private readonly JZS_WMS: Sequelize,
-    @Inject('HRIS') private readonly HRIS: Sequelize,
+    // cat 7
+    @Inject('LYV_HRIS') private readonly LYV_HRIS: Sequelize,
+    @Inject('LHG_HRIS') private readonly LHG_HRIS: Sequelize,
+    @Inject('LVL_HRIS') private readonly LVL_HRIS: Sequelize,
+    @Inject('LYM_HRIS') private readonly LYM_HRIS: Sequelize,
+    @Inject('JAZ_HRIS') private readonly JAZ_HRIS: Sequelize,
+    @Inject('JZS_HRIS') private readonly JZS_HRIS: Sequelize,
   ) {
     this.rootFolder = this.configService.get(
       'EXCEL_STORAGE_PATH',
@@ -278,6 +288,12 @@ export class FilemanagementService {
       case 'LYF':
         db = this.LYF_ERP;
         break;
+      case 'JAZ':
+        db = this.JAZ_ERP;
+        break;
+      case 'JZS':
+        db = this.JZS_ERP;
+        break;
       default:
         return await this.getAllExcelFactoryCat9AndCat12Data(
           sheet,
@@ -294,8 +310,8 @@ export class FilemanagementService {
     dateFrom: string,
     dateTo: string,
   ) {
-    let where = 'WHERE 1=1';
-    let where1 = 'WHERE 1=1';
+    let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
+    let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
@@ -454,6 +470,8 @@ export class FilemanagementService {
       this.LYM_ERP,
       this.LVL_ERP,
       this.LYF_ERP,
+      this.JAZ_ERP,
+      this.JZS_ERP,
     ];
     const dataResults = await Promise.all(
       connects.map((conn) => {
@@ -875,24 +893,87 @@ export class FilemanagementService {
     let db: Sequelize;
     switch (factory.trim()) {
       case 'LYV':
-        db = this.HRIS;
+        db = this.LYV_HRIS;
         break;
       case 'LHG':
-        return 'LHG Coming soon...';
-      // db = this.LHG_ERP;
-      // break;
+        db = this.LHG_HRIS;
+        break;
       case 'LYM':
-        return 'LYM Coming soon...';
-      // db = this.LYM_ERP;
-      // break;
+        db = this.LYM_HRIS;
+        break;
       case 'LVL':
-        return 'LVL Coming soon...';
-      // db = this.LVL_ERP;
-      // break;
+        db = this.LVL_HRIS;
+        break;
+      case 'JAZ':
+        db = this.JAZ_HRIS;
+        break;
+      case 'JZS':
+        db = this.JZS_HRIS;
+        break;
       default:
-        return 'Coming soon...';
+        return await this.getAllDataExcelFactoryCat7(sheet, dateFrom, dateTo);
     }
 
-    await getADataExcelFactoryCat7(sheet, db, dateFrom, dateTo);
+    await getADataExcelFactoryCat7(sheet, db, dateFrom, dateTo, factory);
+  }
+
+  private async getAllDataExcelFactoryCat7(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    const connects: { facotryName: string; conn: Sequelize }[] = [
+      { facotryName: 'LYV', conn: this.LYV_HRIS },
+      { facotryName: 'LHG', conn: this.LHG_HRIS },
+      { facotryName: 'LVL', conn: this.LVL_HRIS },
+      { facotryName: 'LYM', conn: this.LYM_HRIS },
+      { facotryName: 'JAZ', conn: this.JAZ_HRIS },
+      { facotryName: 'JZS', conn: this.JZS_HRIS },
+    ];
+
+    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+    const dataResults = await Promise.all(
+      connects.map(({ facotryName, conn }) => {
+        const { query } = buildQuery(facotryName, dateFrom, dateTo);
+        return conn.query(query, { type: QueryTypes.SELECT, replacements });
+      }),
+    );
+
+    let data = dataResults.flat();
+    sheet.columns = [
+      { header: 'Staff ID', key: 'Staff_ID' },
+      { header: 'Residential address', key: 'Residential_address' },
+      {
+        header: 'Main transportation type',
+        key: 'Main_transportation_type',
+      },
+      { header: 'km', key: 'km' },
+      { header: 'Number of working days', key: 'Number_of_working_days' },
+      { header: 'PKT (p-km)', key: 'PKT_p_km' },
+    ];
+    data.forEach((item) => sheet.addRow(item));
+
+    sheet.columns.forEach((column) => {
+      let maxLength = 0;
+      if (typeof column.eachCell === 'function') {
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? String(cell.value) : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+      }
+      column.width = maxLength * 1.2;
+    });
+
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
   }
 }
