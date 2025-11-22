@@ -16,6 +16,7 @@ import { join } from 'path';
 import { Cat7Module } from './api/cat7/cat7.module';
 import { Cat6Module } from './api/cat6/cat6.module';
 import { Cat1andcat4Module } from './api/cat1andcat4/cat1andcat4.module';
+import { InfofactoryModule } from './api/infofactory/infofactory.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { Cat1andcat4Module } from './api/cat1andcat4/cat1andcat4.module';
     UsersModule,
     EventsModule,
     FilemanagementModule,
+    InfofactoryModule,
     Cat9andcat12Module,
     Cat5Module,
     Cat7Module,
