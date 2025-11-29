@@ -21,11 +21,11 @@ export class Cat6Service {
     const offset = (page - 1) * limit;
     const query = `SELECT *
                     FROM CDS_HRBUSS_BusTripData
-                    WHERE DOC_NBR = 'LYV_HR_BT251100022'`;
+                    --WHERE DOC_NBR = 'LYV-HR-BT251100017'`;
 
     const countQuery = `SELECT COUNT(*) as total
                         FROM CDS_HRBUSS_BusTripData
-                        WHERE DOC_NBR = 'LYV_HR_BT251100022'`;
+                        --WHERE DOC_NBR = 'LYV-HR-BT251100017'`;
 
     const [dataResults, countResults] = await Promise.all([
       this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<
@@ -36,9 +36,10 @@ export class Cat6Service {
       }) as Promise<{ total: number }[]>,
     ]);
 
-    const records: ICat6Record[] = dataResults.map((item) => ({
+    const records: ICat6Query[] = dataResults.map((item) => ({
       ...item,
       Routes: JSON.parse(item.Routes),
+      Accommodation: JSON.parse(item.Accommodation)
     }));
 
     return { records };

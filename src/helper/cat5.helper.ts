@@ -10,7 +10,7 @@ export const getADataExcelFactoryCat5 = async (
   dateFrom: string,
   dateTo: string,
 ) => {
-  let where = 'WHERE 1=1';
+  let where = 'WHERE 1=1 AND dwc.DISABLED = 0 AND dwo.QUANTITY<>0';
   const replacements: any[] = [];
 
   if (dateTo && dateFrom) {

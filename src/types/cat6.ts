@@ -3,34 +3,40 @@ export interface ICat6Query {
   DOC_NBR: string;
   Factory: string;
   Departure: string;
-  Arrival: string;
+  Destination: string;
   TypeTravel: string;
   Routes: string;
-  TypeAccom: string;
-  Transport: string;
-  Distance: string;
-  TotalMoney: string;
-  Dorm: string;
-  StayNight: number;
-  HotelAddress: string;
-  HotelNumber: string;
-  Purpose: string;
+  DuringDay: number;
+  Distance: number;
+  TotalMoney: number;
+  Accommodation: string;
   CreatedAt: string;
   UserCreate: string;
   BPMStatus: string;
-  YN: string;
-  ArrivalText: string;
-  Transports: string;
+  YN: number;
+  Factory_User: string;
+  DateStart: string;
+  DateEnd: string;
 }
 
-export interface ICat6Record extends Omit<ICat6Query, 'Routes'> {
+export interface ICat6Record
+  extends Omit<ICat6Query, 'Routes' | 'Accommodation'> {
   Routes: {
     AddressName: string;
     Transport: string;
     AddressDetail: string;
     isAirport: boolean;
   }[];
+
+  Accommodation: {
+    id: string;
+    isSameAsAbove: boolean;
+    type: string;
+    address: string;
+    nights: number;
+  }[];
 }
+
 
 export interface ICat6Data {
   Document_Date: string;

@@ -112,7 +112,6 @@ export class FilemanagementService {
     factory: string,
     userID: string,
   ) {
-    // console.log(module, dateFrom, dateTo, factory, userID);
     const id = uuidv4();
     const fileName = `${factory}-${module}-${dateFrom}-${dateTo}.xlsx`;
     const folder = path.join(this.rootFolder, module);
@@ -218,7 +217,6 @@ export class FilemanagementService {
     dateTo: string,
     factory: string,
   ) {
-    // console.log(id, module, filePath, dateFrom, dateTo, factory);
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(module);
 
@@ -236,7 +234,6 @@ export class FilemanagementService {
         await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat9andcat12':
-        // console.log('cat9andcat12');
         await this.fileExcelCat9AndCat12(sheet, dateFrom, dateTo, factory);
         break;
       default:
@@ -626,7 +623,7 @@ export class FilemanagementService {
     dateFrom: string,
     dateTo: string,
   ) {
-    let where = 'WHERE 1=1';
+    let where = 'WHERE 1=1 AND dwc.DISABLED = 0 AND dwo.QUANTITY<>0';
     const replacements: any[] = [];
     if (dateTo && dateFrom) {
       where += ` AND dwo.WASTE_DATE BETWEEN ? AND ?`;

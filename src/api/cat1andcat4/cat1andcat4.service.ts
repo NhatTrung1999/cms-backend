@@ -168,21 +168,21 @@ export class Cat1andcat4Service {
       }
       // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
       const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY c.USERDate) AS INT) AS [No]
-                          ,c.USERDate        AS [Date]
-                          ,c.CGNO            AS Purchase_Order
-                          ,c2.CLBH           AS Material_No
-                          ,CAST('0' AS INT)     AS [Weight]
-                          ,z.SupplierCode AS Supplier_Code
-                          ,z.ThirdCountryLandTransport AS Thirdcountry_Land_Transport
-                          ,z.PortofDeparture AS Port_Of_Departure
-                          ,z.PortofArrival AS Port_Of_Arrival
-                          ,z.Transportationmethod AS Factory_Domestic_Land_Transport
-                          ,CAST('0' AS INT)     AS Land_Transport_Distance
-                          ,z.SeaTransportDistance AS Sea_Transport_Distance
-                          ,CAST('0' AS INT) AS Air_Transport_Distance
-                          ,CAST('0' AS INT) AS Land_Transport_Ton_Kilometers
-                          ,CAST('0' AS INT) AS Sea_Transport_Ton_Kilometers
-                          ,CAST('0' AS INT) AS Air_Transport_Ton_Kilometers
+                            ,c.USERDate                   AS [Date]
+                            ,c.CGNO                       AS Purchase_Order
+                            ,c2.CLBH                      AS Material_No
+                            ,CAST('0' AS INT)             AS [Weight]
+                            ,'SupplierCode'              AS Supplier_Code
+                            ,'ThirdCountryLandTransport'  AS Thirdcountry_Land_Transport
+                            ,'PortofDeparture'            AS Port_Of_Departure
+                            ,'PortofArrival'              AS Port_Of_Arrival
+                            ,'Transportationmethod'       AS Factory_Domestic_Land_Transport
+                            ,CAST('0' AS INT)             AS Land_Transport_Distance
+                            ,'SeaTransportDistance'       AS Sea_Transport_Distance
+                            ,CAST('0' AS INT)             AS Air_Transport_Distance
+                            ,CAST('0' AS INT)             AS Land_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)             AS Sea_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)             AS Air_Transport_Ton_Kilometers
                     FROM   CGZL              AS c
                           INNER JOIN CGZLS  AS c2
                                 ON  c2.CGNO = c.CGNO
@@ -192,20 +192,26 @@ export class Cat1andcat4Service {
       const countQuery = `SELECT COUNT(*) total
                         FROM   (
                                   SELECT CAST(ROW_NUMBER() OVER(ORDER BY c.USERDate) AS INT) AS [No]
-                                        ,c.USERDate              AS [Date]
-                                        ,c.CGNO                  AS Purchase_Order
-                                        ,c2.CLBH                 AS Material_No
-                                        ,z.SupplierCode          AS Supplier_Code
-                                        ,z.ThirdCountryLandTransport AS Thirdcountry_Land_Transport
-                                        ,z.PortofDeparture       AS Port_Of_Departure
-                                        ,z.PortofArrival         AS Port_Of_Arrival
-                                        ,z.Transportationmethod  AS Factory_Domestic_Land_Transport
-                                        ,z.SeaTransportDistance  AS Sea_Transport_Distance
-                                  FROM   CGZL                    AS c
-                                          INNER JOIN CGZLS        AS c2
-                                              ON  c2.CGNO = c.CGNO
-                                          LEFT JOIN zszl          AS z
-                                              ON  z.zsdh = c.CGNO
+                                        ,c.USERDate                   AS [Date]
+                                        ,c.CGNO                       AS Purchase_Order
+                                        ,c2.CLBH                      AS Material_No
+                                        ,CAST('0' AS INT)             AS [Weight]
+                                        ,'SupplierCode'              AS Supplier_Code
+                                        ,'ThirdCountryLandTransport'  AS Thirdcountry_Land_Transport
+                                        ,'PortofDeparture'            AS Port_Of_Departure
+                                        ,'PortofArrival'              AS Port_Of_Arrival
+                                        ,'Transportationmethod'       AS Factory_Domestic_Land_Transport
+                                        ,CAST('0' AS INT)             AS Land_Transport_Distance
+                                        ,'SeaTransportDistance'       AS Sea_Transport_Distance
+                                        ,CAST('0' AS INT)             AS Air_Transport_Distance
+                                        ,CAST('0' AS INT)             AS Land_Transport_Ton_Kilometers
+                                        ,CAST('0' AS INT)             AS Sea_Transport_Ton_Kilometers
+                                        ,CAST('0' AS INT)             AS Air_Transport_Ton_Kilometers
+                    FROM   CGZL              AS c
+                          INNER JOIN CGZLS  AS c2
+                                ON  c2.CGNO = c.CGNO
+                          LEFT JOIN zszl    AS z
+                                ON  z.zsdh = c.CGNO
                                   ${where}
                         ) AS Sub`;
       const [dataResults, countResults] = await Promise.all([
@@ -255,21 +261,21 @@ export class Cat1andcat4Service {
       }
       // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
       const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY c.USERDate) AS INT) AS [No]
-                          ,c.USERDate        AS [Date]
-                          ,c.CGNO            AS Purchase_Order
-                          ,c2.CLBH           AS Material_No
-                          ,CAST('0' AS INT)     AS [Weight]
-                          ,z.SupplierCode AS Supplier_Code
-                          ,z.ThirdCountryLandTransport AS Thirdcountry_Land_Transport
-                          ,z.PortofDeparture AS Port_Of_Departure
-                          ,z.PortofArrival AS Port_Of_Arrival
-                          ,z.Transportationmethod AS Factory_Domestic_Land_Transport
-                          ,CAST('0' AS INT)     AS Land_Transport_Distance
-                          ,z.SeaTransportDistance AS Sea_Transport_Distance
-                          ,CAST('0' AS INT) AS Air_Transport_Distance
-                          ,CAST('0' AS INT) AS Land_Transport_Ton_Kilometers
-                          ,CAST('0' AS INT) AS Sea_Transport_Ton_Kilometers
-                          ,CAST('0' AS INT) AS Air_Transport_Ton_Kilometers
+                            ,c.USERDate                   AS [Date]
+                            ,c.CGNO                       AS Purchase_Order
+                            ,c2.CLBH                      AS Material_No
+                            ,CAST('0' AS INT)             AS [Weight]
+                            ,'SupplierCode'              AS Supplier_Code
+                            ,'ThirdCountryLandTransport'  AS Thirdcountry_Land_Transport
+                            ,'PortofDeparture'            AS Port_Of_Departure
+                            ,'PortofArrival'              AS Port_Of_Arrival
+                            ,'Transportationmethod'       AS Factory_Domestic_Land_Transport
+                            ,CAST('0' AS INT)             AS Land_Transport_Distance
+                            ,'SeaTransportDistance'       AS Sea_Transport_Distance
+                            ,CAST('0' AS INT)             AS Air_Transport_Distance
+                            ,CAST('0' AS INT)             AS Land_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)             AS Sea_Transport_Ton_Kilometers
+                            ,CAST('0' AS INT)             AS Air_Transport_Ton_Kilometers
                     FROM   CGZL              AS c
                           INNER JOIN CGZLS  AS c2
                                 ON  c2.CGNO = c.CGNO
@@ -279,19 +285,25 @@ export class Cat1andcat4Service {
       const countQuery = `SELECT COUNT(*) total
                         FROM   (
                                   SELECT CAST(ROW_NUMBER() OVER(ORDER BY c.USERDate) AS INT) AS [No]
-                                        ,c.USERDate              AS [Date]
-                                        ,c.CGNO                  AS Purchase_Order
-                                        ,c2.CLBH                 AS Material_No
-                                        ,z.SupplierCode          AS Supplier_Code
-                                        ,z.ThirdCountryLandTransport AS Thirdcountry_Land_Transport
-                                        ,z.PortofDeparture       AS Port_Of_Departure
-                                        ,z.PortofArrival         AS Port_Of_Arrival
-                                        ,z.Transportationmethod  AS Factory_Domestic_Land_Transport
-                                        ,z.SeaTransportDistance  AS Sea_Transport_Distance
-                                  FROM   CGZL                    AS c
-                                          INNER JOIN CGZLS        AS c2
+                                          ,c.USERDate                   AS [Date]
+                                          ,c.CGNO                       AS Purchase_Order
+                                          ,c2.CLBH                      AS Material_No
+                                          ,CAST('0' AS INT)             AS [Weight]
+                                          ,'SupplierCode'              AS Supplier_Code
+                                          ,'ThirdCountryLandTransport'  AS Thirdcountry_Land_Transport
+                                          ,'PortofDeparture'            AS Port_Of_Departure
+                                          ,'PortofArrival'              AS Port_Of_Arrival
+                                          ,'Transportationmethod'       AS Factory_Domestic_Land_Transport
+                                          ,CAST('0' AS INT)             AS Land_Transport_Distance
+                                          ,'SeaTransportDistance'       AS Sea_Transport_Distance
+                                          ,CAST('0' AS INT)             AS Air_Transport_Distance
+                                          ,CAST('0' AS INT)             AS Land_Transport_Ton_Kilometers
+                                          ,CAST('0' AS INT)             AS Sea_Transport_Ton_Kilometers
+                                          ,CAST('0' AS INT)             AS Air_Transport_Ton_Kilometers
+                                  FROM   CGZL              AS c
+                                        INNER JOIN CGZLS  AS c2
                                               ON  c2.CGNO = c.CGNO
-                                          LEFT JOIN zszl          AS z
+                                        LEFT JOIN zszl    AS z
                                               ON  z.zsdh = c.CGNO
                                   ${where}
                         ) AS Sub`;

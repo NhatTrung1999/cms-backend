@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { buildQuery } from 'src/helper/cat7.helper';
+import { buildQuery, buildQueryCustomExport } from 'src/helper/cat7.helper';
 
 @Injectable()
 export class Cat7Service {
@@ -92,7 +92,7 @@ export class Cat7Service {
   //     : 'u.userId = dwt.UserNo';
 
   //   const query = `SELECT u.userId                       AS Staff_ID
-  //                         ,CASE 
+  //                         ,CASE
   //                               WHEN u.Address_Live IS NULL THEN u.Bus_Route
   //                               ELSE u.Address_Live
   //                         END                            AS Residential_address
@@ -114,7 +114,7 @@ export class Cat7Service {
   //   const countQuery = `SELECT COUNT(*) AS total
   //                       FROM   (
   //                                 SELECT u.userId                       AS Staff_ID
-  //                                       ,CASE 
+  //                                       ,CASE
   //                                             WHEN u.Address_Live IS NULL THEN u.Bus_Route
   //                                             ELSE u.Address_Live
   //                                       END                            AS Residential_address
@@ -130,7 +130,7 @@ export class Cat7Service {
   //                                         u.userId
   //                                         ,u.Address_Live
   //                                         ,u.Vehicle
-  //                                         ,u.Bus_Route	
+  //                                         ,u.Bus_Route
   //                       ) AS Sub`;
   //   return { query, countQuery };
   // }
@@ -190,30 +190,200 @@ export class Cat7Service {
     try {
       const offset = (page - 1) * limit;
 
-      const connects: { facotryName: string; conn: Sequelize }[] = [
-        { facotryName: 'LYV', conn: this.LYV_HRIS },
-        { facotryName: 'LHG', conn: this.LHG_HRIS },
-        { facotryName: 'LVL', conn: this.LVL_HRIS },
-        { facotryName: 'LYM', conn: this.LYM_HRIS },
-        { facotryName: 'JAZ', conn: this.JAZ_HRIS },
-        { facotryName: 'JZS', conn: this.JZS_HRIS },
+      const connects: { factoryName: string; conn: Sequelize }[] = [
+        { factoryName: 'LYV', conn: this.LYV_HRIS },
+        { factoryName: 'LHG', conn: this.LHG_HRIS },
+        { factoryName: 'LVL', conn: this.LVL_HRIS },
+        { factoryName: 'LYM', conn: this.LYM_HRIS },
+        { factoryName: 'JAZ', conn: this.JAZ_HRIS },
+        { factoryName: 'JZS', conn: this.JZS_HRIS },
       ];
 
       const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
 
       const [dataResults, countResults] = await Promise.all([
         Promise.all(
-          connects.map(({ facotryName, conn }) => {
-            const { query } = buildQuery(facotryName, dateFrom, dateTo);
+          connects.map(({ factoryName, conn }) => {
+            const { query } = buildQuery(factoryName, dateFrom, dateTo);
             return conn.query(query, { type: QueryTypes.SELECT, replacements });
           }),
         ),
         Promise.all(
-          connects.map(({ facotryName, conn }) => {
-            const { countQuery } = buildQuery(
-              facotryName,
+          connects.map(({ factoryName, conn }) => {
+            const { countQuery } = buildQuery(factoryName, dateFrom, dateTo);
+            return conn.query(countQuery, {
+              type: QueryTypes.SELECT,
+              replacements,
+            });
+          }),
+        ),
+      ]);
+
+      let data = dataResults.flat();
+
+      data.sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        if (sortOrder === 'asc') {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        } else {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        }
+      });
+
+      data = data.slice(offset, offset + limit);
+
+      const total = countResults.reduce((sum, result) => {
+        return sum + ((result[0] as { total: number })?.total || 0);
+      }, 0);
+      const hasMore = offset + data.length < total;
+
+      return { data, page, limit, total, hasMore };
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  // custom export
+  async getCustomExport(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    page: number = 1,
+    limit: number = 20,
+    sortField: string = 'ID',
+    sortOrder: string = 'asc',
+  ) {
+    // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
+    let db: Sequelize;
+    switch (factory) {
+      case 'LYV':
+        db = this.LYV_HRIS;
+        break;
+      case 'LHG':
+        db = this.LHG_HRIS;
+        break;
+      case 'LYM':
+        db = this.LYM_HRIS;
+        break;
+      case 'LVL':
+        db = this.LVL_HRIS;
+        break;
+      case 'JAZ':
+        db = this.JAZ_HRIS;
+        break;
+      case 'JZS':
+        db = this.JZS_HRIS;
+        break;
+      default:
+        return await this.getAllDataCustomExport(
+          dateFrom,
+          dateTo,
+          page,
+          limit,
+          sortField,
+          sortOrder,
+        );
+    }
+    return await this.getDataCustomExport(
+      db,
+      dateFrom,
+      dateTo,
+      page,
+      factory,
+      limit,
+      sortField,
+      sortOrder,
+    );
+  }
+
+  private async getDataCustomExport(
+    db: Sequelize,
+    dateFrom: string,
+    dateTo: string,
+    page: number,
+    factory: string,
+    limit: number,
+    sortField: string,
+    sortOrder: string,
+  ) {
+    // console.log(sortField, sortOrder, page, limit);
+    const offset = (page - 1) * limit;
+
+    const { query, countQuery } = buildQueryCustomExport(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+
+    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+    const [dataResults, countResults] = await Promise.all([
+      db.query(query, { replacements, type: QueryTypes.SELECT }),
+      db.query(countQuery, {
+        replacements,
+        type: QueryTypes.SELECT,
+      }),
+    ]);
+    let data = dataResults;
+    data.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    data = data.slice(offset, offset + limit);
+
+    const total = (countResults[0] as { total: number })?.total || 0;
+
+    const hasMore = offset + data.length < total;
+
+    return { data, page, limit, total, hasMore };
+  }
+
+  private async getAllDataCustomExport(
+    dateFrom: string,
+    dateTo: string,
+    page: number,
+    limit: number,
+    sortField: string,
+    sortOrder: string,
+  ) {
+    try {
+      const offset = (page - 1) * limit;
+
+      const connects: { factoryName: string; conn: Sequelize }[] = [
+        { factoryName: 'LYV', conn: this.LYV_HRIS },
+        { factoryName: 'LHG', conn: this.LHG_HRIS },
+        { factoryName: 'LVL', conn: this.LVL_HRIS },
+        { factoryName: 'LYM', conn: this.LYM_HRIS },
+        { factoryName: 'JAZ', conn: this.JAZ_HRIS },
+        { factoryName: 'JZS', conn: this.JZS_HRIS },
+      ];
+
+      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+      const [dataResults, countResults] = await Promise.all([
+        Promise.all(
+          connects.map(({ factoryName, conn }) => {
+            const { query } = buildQueryCustomExport(
               dateFrom,
               dateTo,
+              factoryName,
+            );
+            return conn.query(query, { type: QueryTypes.SELECT, replacements });
+          }),
+        ),
+        Promise.all(
+          connects.map(({ factoryName, conn }) => {
+            const { countQuery } = buildQueryCustomExport(
+              dateFrom,
+              dateTo,
+              factoryName,
             );
             return conn.query(countQuery, {
               type: QueryTypes.SELECT,

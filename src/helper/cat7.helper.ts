@@ -118,3 +118,111 @@ export const getADataExcelFactoryCat7 = async (
     });
   });
 };
+
+export const buildQueryCustomExport = (
+  dateFrom: string,
+  dateTo: string,
+  factory: string,
+) => {
+  const baseWhere: string =
+    factory !== 'LYM'
+      ? `WHERE a.lock = '0' AND e.Work_Or_Not<>'2' AND e.Working_Time>0`
+      : `WHERE  c.workhours>0 AND a.lock = '0'`;
+
+  const dateFilter: string =
+    factory !== 'LYM'
+      ? ` AND CONVERT(DATE ,e.Check_Day) BETWEEN ? AND ?`
+      : ` AND CONVERT(DATE ,c.CDate) BETWEEN ? AND ?`;
+
+  const table: string =
+    factory !== 'LYM'
+      ? `users                         AS a
+          LEFT JOIN Data_Person         AS b
+                ON  a.userId COLLATE SQL_Latin1_General_CP1_CI_AS = b.Person_ID COLLATE SQL_Latin1_General_CP1_CI_AS
+          LEFT JOIN Data_Department     AS c
+                ON  b.Department_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = c.Department_Serial_Key COLLATE 
+                    SQL_Latin1_General_CP1_CI_AS
+          LEFT JOIN Data_Person_Detail  AS d
+                ON  d.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = a.Person_Serial_Key COLLATE 
+                    SQL_Latin1_General_CP1_CI_AS
+          LEFT JOIN Data_Work_Time      AS e
+                ON  e.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = a.Person_Serial_Key COLLATE 
+                    SQL_Latin1_General_CP1_CI_AS`
+      : `users                    AS a
+       LEFT JOIN HR_Users       AS b
+            ON  b.UserNo = a.userId
+       LEFT JOIN HR_Attendance  AS c
+            ON  c.UserNo = a.userId
+                AND c.UserNo = b.UserNo`;
+  const groupBy: string =
+    factory !== 'LYM'
+      ? `c.Department_Name
+      ,a.userId
+      ,a.fullName
+      ,d.Address_Live
+      ,a.Vehicle
+      ,a.Bus_Route
+      ,a.PickupDropoffStation
+      ,a.Address_Live`
+      : `b.Part
+      ,a.userId
+      ,a.fullName
+      ,a.Address_Live
+      ,a.Bus_Route
+      ,a.PickupDropoffStation
+      ,b.Addr_now
+	  ,a.Vehicle`;
+
+  const where: string =
+    dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY a.userId) AS INT) AS [No]
+                          ,'${factory}'                         AS Factory
+                          ,${factory !== 'LYM' ? 'c.Department_Name' : 'b.Part'}             AS Department
+                          ,a.userId                      AS ID
+                          ,a.fullName                    AS FullName
+                          ,CASE 
+                                WHEN a.Vehicle='Company shuttle bus' THEN ${factory !== 'LYM' ? 'd.Address_Live' : 'b.Addr_now'} COLLATE SQL_Latin1_General_CP1_CI_AS
+                                ELSE a.Address_Live COLLATE SQL_Latin1_General_CP1_CI_AS
+                          END                           AS CurrentAddress
+                          ,a.Vehicle                     AS TransportationMode
+                          ,CASE 
+                                WHEN a.Vehicle='Company shuttle bus' THEN a.Bus_Route COLLATE SQL_Latin1_General_CP1_CI_AS
+                                ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
+                          END                           AS BusRoute
+                          ,CASE 
+                                WHEN a.Vehicle='Company shuttle bus' THEN a.PickupDropoffStation COLLATE SQL_Latin1_General_CP1_CI_AS
+                                ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
+                          END                           AS PickupPoint
+                          ,COUNT(${factory !== 'LYM' ? 'e.WORKING_TIME' : 'c.workhours'})         AS Number_of_working_days
+                    FROM   ${table}
+                    ${where}
+                    GROUP BY ${groupBy}`;
+
+  const countQuery = `SELECT COUNT(ID) AS total
+                      FROM   (
+                                SELECT CAST(ROW_NUMBER() OVER(ORDER BY a.userId) AS INT) AS [No]
+                                      ,'${factory}'                         AS Factory
+                                      ,${factory !== 'LYM' ? 'c.Department_Name' : 'b.Part'}             AS Department
+                                      ,a.userId                      AS ID
+                                      ,a.fullName                    AS FullName
+                                      ,CASE 
+                                            WHEN a.Vehicle='Company shuttle bus' THEN ${factory !== 'LYM' ? 'd.Address_Live' : 'b.Addr_now'} COLLATE SQL_Latin1_General_CP1_CI_AS
+                                            ELSE a.Address_Live COLLATE SQL_Latin1_General_CP1_CI_AS
+                                      END                           AS CurrentAddress
+                                      ,a.Vehicle                     AS TransportationMode
+                                      ,CASE 
+                                            WHEN a.Vehicle='Company shuttle bus' THEN a.Bus_Route COLLATE SQL_Latin1_General_CP1_CI_AS
+                                            ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
+                                      END                           AS BusRoute
+                                      ,CASE 
+                                            WHEN a.Vehicle='Company shuttle bus' THEN a.PickupDropoffStation COLLATE SQL_Latin1_General_CP1_CI_AS
+                                            ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
+                                      END                           AS PickupPoint
+                                      ,COUNT(${factory !== 'LYM' ? 'e.WORKING_TIME' : 'c.workhours'})         AS Number_of_working_days
+                                FROM   ${table}
+                                ${where}
+                                GROUP BY ${groupBy}
+                      ) AS Sub`;
+  return { query, countQuery };
+};

@@ -5,9 +5,31 @@ import { Sequelize } from 'sequelize-typescript';
 @Injectable()
 export class InfofactoryService {
   constructor(@Inject('EIP') private readonly EIP: Sequelize) {}
-  async getInfoFactory() {
-    const query = 'SELECT * FROM CMW_Info_Factory';
-    const data = await this.EIP.query(query, { type: QueryTypes.SELECT})
-    console.log(data);
+  async getInfoFactory(
+    companyName: string,
+    city: string,
+    sortField: string,
+    sortOrder: string,
+  ) {
+    let where = 'WHERE 1=1';
+    const replacements: any[] = [];
+
+    if (companyName) {
+      where += ` AND CompanyName LIKE ?`;
+      replacements.push(`%${companyName}%`);
+    }
+
+    if (city) {
+      where += ` AND City LIKE ?`;
+      replacements.push(`%${city}%`);
+    }
+
+    const query = `SELECT * FROM CMW_Info_Factory ${where} ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}`;
+
+    const data = await this.EIP.query(query, {
+      replacements,
+      type: QueryTypes.SELECT,
+    });
+    return data;
   }
 }

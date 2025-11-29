@@ -79,7 +79,7 @@ export class Cat5Service {
   ) {
     // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
     const offset = (page - 1) * limit;
-    let where = 'WHERE 1=1';
+    let where = 'WHERE 1=1 AND dwc.DISABLED = 0 AND dwo.QUANTITY<>0';
     const replacements: any[] = [];
 
     if (dateTo && dateFrom) {
@@ -179,7 +179,7 @@ export class Cat5Service {
     try {
       const offset = (page - 1) * limit;
 
-      let where = 'WHERE 1=1';
+      let where = 'WHERE 1=1 AND dwc.DISABLED = 0 AND dwo.QUANTITY<>0';
       const replacements: any[] = [];
 
       if (dateTo && dateFrom) {

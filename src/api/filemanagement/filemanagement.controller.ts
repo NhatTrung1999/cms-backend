@@ -49,9 +49,10 @@ export class FilemanagementController {
     @Query('DateFrom') dateFrom: string,
     @Query('DateTo') dateTo: string,
     @Query('Factory') factory: string,
+    @Query('Fields') fields: string[],
     @Request() req,
   ) {
-    // console.log(module, dateFrom, dateTo, factory, req.user);
+    // console.log(fields);
     const userID = getUserId(req);
     const res = await this.filemanagementService.generateFileExcel(
       module,
