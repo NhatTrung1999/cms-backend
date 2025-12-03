@@ -59,4 +59,14 @@ export class Cat9andcat12Controller {
     const data = await this.cat9andcat12Service.importExcelPortCode(file);
     return data;
   }
+
+  @Public()
+  @Get('auto-sent-cms')
+  async autoSentCMS(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+  ) {
+    const data = await this.cat9andcat12Service.autoSentCMS(dateFrom, dateTo);
+    return data;
+  }
 }

@@ -59,6 +59,7 @@ export class FilemanagementController {
       dateFrom,
       dateTo,
       factory,
+      fields,
       userID,
     );
     if (!res) return { statusCode: 401, message: 'Error export!' };

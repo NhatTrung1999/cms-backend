@@ -1,6 +1,7 @@
 import * as ExcelJS from 'exceljs';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
+import { getFactory } from './factory.helper';
 
 export const buildQuery = (
   factory: string,
@@ -119,6 +120,319 @@ export const getADataExcelFactoryCat7 = async (
   });
 };
 
+export const buildQueryAutoSentCMS = (
+  factory: string,
+  dateFrom?: string,
+  dateTo?: string,
+  factoryAddress?: string,
+) => {
+  const isLYM = factory === 'LYM';
+
+  const baseWhere = !isLYM
+    ? "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL"
+    : 'WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0 AND u.Address_Live IS NOT NULL';
+
+  const dateFilter = !isLYM
+    ? 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?'
+    : 'AND CONVERT(DATE ,dwt.CDate) BETWEEN ? AND ?';
+
+  const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const workCol = !isLYM ? 'WORKING_TIME' : 'workhours';
+
+  const table = !isLYM ? 'Data_Work_Time' : 'HR_Attendance';
+
+  const join = !isLYM
+    ? 'u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS'
+    : 'u.userId = dwt.UserNo';
+
+  const query = `SELECT TOP 30 *, N'${getFactory(factory)}' AS Factory_Name
+                  FROM (
+                        SELECT u.userId                       AS Staff_ID
+                              ,CASE 
+                                    WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                    ELSE u.Address_Live
+                              END                            AS Residential_address
+                              ,u.Vehicle                      AS Main_transportation_type
+                              ,'API Calculation'              AS km
+                              ,COUNT(${workCol})  AS Number_of_working_days
+                              ,'API Calculation'              AS PKT_p_km
+                              ,'${factoryAddress || 'N/A'}'       AS Factory_address
+                        FROM   ${table}                 AS dwt
+                              LEFT JOIN users                AS u
+                                    ON  ${join}
+                        ${where}
+                        GROUP BY
+                                u.userId
+                                ,u.Address_Live
+                                ,u.Vehicle
+                                ,u.Bus_Route
+                  ) as a`;
+
+  // console.log(query);
+  const countQuery = `SELECT COUNT(*) AS total
+                      FROM   (
+                                SELECT TOP 30 *
+                                FROM (
+                                      SELECT u.userId                       AS Staff_ID
+                                            ,CASE 
+                                                  WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                                  ELSE u.Address_Live
+                                            END                            AS Residential_address
+                                            ,u.Vehicle                      AS Main_transportation_type
+                                            ,'API Calculation'              AS km
+                                            ,COUNT(${workCol})  AS Number_of_working_days
+                                            ,'API Calculation'              AS PKT_p_km
+                                            ,'${factoryAddress || 'N/A'}'       AS Factory_address
+                                      FROM   ${table}                 AS dwt
+                                            LEFT JOIN users                AS u
+                                                  ON  ${join}
+                                      ${where}
+                                      GROUP BY
+                                              u.userId
+                                              ,u.Address_Live
+                                              ,u.Vehicle
+                                              ,u.Bus_Route
+                                ) as a	
+                      ) AS Sub`;
+  return { query, countQuery };
+};
+
+export const buildQueryAutoSentCmsLYV = async (
+  dateFrom?: string,
+  dateTo?: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = 'LYV'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  const baseWhere =
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+
+  const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
+
+  const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const query = `SELECT TOP 30*
+                        ,N'${getFactory('LYV')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE 
+                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                        ELSE u.Address_Live
+                                    END                    AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,CASE 
+                                        WHEN ISNULL(dds.Department_Name ,'')='' THEN dd.Department_Name
+                                        ELSE CONCAT(dd.Department_Name ,' - ' ,dds.Department_Name)
+                                    END                    AS Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
+                                            AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE 
+                                                Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                                    LEFT JOIN Data_Department_s AS dds
+                                        ON  dds.Department_Serial_Key = dp.Department_Serial_Keys
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                    ,u.Address_Live
+                                    ,u.Vehicle
+                                    ,u.Bus_Route
+                                    ,dd.Department_Name
+                                    ,dds.Department_Name
+                    ) AS a`;
+
+  // console.log(query);
+
+  return query;
+};
+
+export const buildQueryAutoSentCmsLHG = async (
+  dateFrom?: string,
+  dateTo?: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = 'LHG'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  const baseWhere =
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+
+  const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
+
+  const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const query = `SELECT TOP 30*
+                        ,N'${getFactory('LHG')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE 
+                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                        ELSE u.Address_Live
+                                    END                    AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE 
+                                            SQL_Latin1_General_CP1_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                  ,u.Address_Live
+                                  ,u.Vehicle
+                                  ,u.Bus_Route
+                                  ,dd.Department_Name
+                        ) AS a`;
+
+  // console.log(query);
+
+  return query;
+};
+
+export const buildQueryAutoSentCmsLVL = async (
+  dateFrom?: string,
+  dateTo?: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = 'LVL'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  const baseWhere =
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+
+  const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
+
+  const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const query = `SELECT TOP 30*
+                        ,N'${getFactory('LVL')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId                          AS Staff_ID
+                                  ,CASE 
+                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                        ELSE u.Address_Live
+                                    END                    AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE 
+                                            SQL_Latin1_General_CP1_CI_AS
+                                    LEFT JOIN Data_Department AS dd ON dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                  ,u.Address_Live
+                                  ,u.Vehicle
+                                  ,u.Bus_Route
+                                  ,dd.Department_Name
+                        )             AS a`;
+
+  // console.log(query);
+
+  return query;
+};
+
+export const buildQueryAutoSentCmsLYM = async (
+  dateFrom?: string,
+  dateTo?: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = 'LYM'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  const baseWhere =
+    'WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0 AND u.Address_Live IS NOT NULL';
+
+  const dateFilter = 'AND CONVERT(DATE ,dwt.CDate) BETWEEN ? AND ?';
+
+  const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const query = `SELECT TOP 30*
+                        ,N'${getFactory('LYM')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId                       AS Staff_ID
+                                  ,CASE 
+                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                        ELSE u.Address_Live
+                                    END                 AS Residential_address
+                                  ,u.Vehicle           AS Main_transportation_type
+                                  ,'API Calculation'   AS km
+                                  ,COUNT(workhours)    AS Number_of_working_days
+                                  ,'API Calculation'   AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,hu.Part
+                            FROM   HR_Attendance       AS dwt
+                                    LEFT JOIN users     AS u
+                                        ON  u.userId = dwt.UserNo
+                                    LEFT JOIN HR_Users  AS hu
+                                        ON  hu.UserNo = dwt.UserNo
+                                            AND hu.UserNo = u.userId
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                  ,u.Address_Live
+                                  ,u.Vehicle
+                                  ,u.Bus_Route
+                                  ,hu.Part
+                        )            AS a`;
+
+  // console.log(query);
+
+  return query;
+};
+
 export const buildQueryCustomExport = (
   dateFrom: string,
   dateTo: string,
@@ -180,21 +494,21 @@ export const buildQueryCustomExport = (
                           ,'${factory}'                         AS Factory
                           ,${factory !== 'LYM' ? 'c.Department_Name' : 'b.Part'}             AS Department
                           ,a.userId                      AS ID
-                          ,a.fullName                    AS FullName
+                          ,a.fullName                    AS Full_Name
                           ,CASE 
                                 WHEN a.Vehicle='Company shuttle bus' THEN ${factory !== 'LYM' ? 'd.Address_Live' : 'b.Addr_now'} COLLATE SQL_Latin1_General_CP1_CI_AS
                                 ELSE a.Address_Live COLLATE SQL_Latin1_General_CP1_CI_AS
-                          END                           AS CurrentAddress
-                          ,a.Vehicle                     AS TransportationMode
+                          END                           AS Current_Address
+                          ,a.Vehicle                     AS Transportation_Mode
                           ,CASE 
                                 WHEN a.Vehicle='Company shuttle bus' THEN a.Bus_Route COLLATE SQL_Latin1_General_CP1_CI_AS
                                 ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
-                          END                           AS BusRoute
+                          END                           AS Bus_Route
                           ,CASE 
                                 WHEN a.Vehicle='Company shuttle bus' THEN a.PickupDropoffStation COLLATE SQL_Latin1_General_CP1_CI_AS
                                 ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
-                          END                           AS PickupPoint
-                          ,COUNT(${factory !== 'LYM' ? 'e.WORKING_TIME' : 'c.workhours'})         AS Number_of_working_days
+                          END                           AS Pickup_Point
+                          ,COUNT(${factory !== 'LYM' ? 'e.WORKING_TIME' : 'c.workhours'})         AS Number_of_Working_Days
                     FROM   ${table}
                     ${where}
                     GROUP BY ${groupBy}`;
@@ -205,24 +519,80 @@ export const buildQueryCustomExport = (
                                       ,'${factory}'                         AS Factory
                                       ,${factory !== 'LYM' ? 'c.Department_Name' : 'b.Part'}             AS Department
                                       ,a.userId                      AS ID
-                                      ,a.fullName                    AS FullName
+                                      ,a.fullName                    AS Full_Name
                                       ,CASE 
                                             WHEN a.Vehicle='Company shuttle bus' THEN ${factory !== 'LYM' ? 'd.Address_Live' : 'b.Addr_now'} COLLATE SQL_Latin1_General_CP1_CI_AS
                                             ELSE a.Address_Live COLLATE SQL_Latin1_General_CP1_CI_AS
-                                      END                           AS CurrentAddress
-                                      ,a.Vehicle                     AS TransportationMode
+                                      END                           AS Current_Address
+                                      ,a.Vehicle                     AS Transportation_Mode
                                       ,CASE 
                                             WHEN a.Vehicle='Company shuttle bus' THEN a.Bus_Route COLLATE SQL_Latin1_General_CP1_CI_AS
                                             ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
-                                      END                           AS BusRoute
+                                      END                           AS Bus_Route
                                       ,CASE 
                                             WHEN a.Vehicle='Company shuttle bus' THEN a.PickupDropoffStation COLLATE SQL_Latin1_General_CP1_CI_AS
                                             ELSE 'N/A' COLLATE SQL_Latin1_General_CP1_CI_AS
-                                      END                           AS PickupPoint
-                                      ,COUNT(${factory !== 'LYM' ? 'e.WORKING_TIME' : 'c.workhours'})         AS Number_of_working_days
+                                      END                           AS Pickup_Point
+                                      ,COUNT(${factory !== 'LYM' ? 'e.WORKING_TIME' : 'c.workhours'})         AS Number_of_Working_Days
                                 FROM   ${table}
                                 ${where}
                                 GROUP BY ${groupBy}
                       ) AS Sub`;
   return { query, countQuery };
+};
+
+export const getADataCustomExport = async (
+  sheet: ExcelJS.Worksheet,
+  db: Sequelize,
+  dateFrom: string,
+  dateTo: string,
+  factory: string,
+  fields?: string[],
+) => {
+  const { query } = buildQueryCustomExport(dateFrom, dateTo, factory);
+  const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+  const data = await db.query(query, {
+    replacements,
+    type: QueryTypes.SELECT,
+  });
+  if(!data || data.length ===0) return
+
+  const allKeys = Object.keys(data[0])
+
+  const selectedFields = fields && fields.length > 0 ? fields : allKeys
+
+  sheet.columns = selectedFields.map((key) => ({header: key.replace(/_/g, ' '), key}))
+
+  data.forEach((item) => {
+    const rowData: Record<string, any> = {}
+    selectedFields.forEach((key) => {
+      rowData[key] = item[key] ?? ''
+    })
+    sheet.addRow(rowData)
+  })
+
+  // console.log(data);
+
+  sheet.columns.forEach((column) => {
+    let maxLength = 0;
+    if (typeof column.eachCell === 'function') {
+      column.eachCell({ includeEmpty: true }, (cell) => {
+        const cellValue = cell.value ? String(cell.value) : '';
+        maxLength = Math.max(maxLength, cellValue.length);
+      });
+    }
+    column.width = maxLength * 1.2;
+  });
+
+  sheet.eachRow({ includeEmpty: true }, (row) => {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+  });
 };

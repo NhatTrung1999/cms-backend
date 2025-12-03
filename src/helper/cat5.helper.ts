@@ -19,9 +19,12 @@ export const getADataExcelFactoryCat5 = async (
   }
 
   const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
+                        ,dwc.CONSOLIDATED_WASTE_CODE AS Consolidated_Waste
+                        ,dwc.WASTE_CODE AS Waste_Code
                         ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
                         ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
                         ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
+                        ,dwc.LOCATION_CODE AS Location_Code
                         ,CAST('0' AS INT)                   AS Transportation_Distance_km
                         ,CASE 
                               WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
@@ -60,6 +63,14 @@ export const getADataExcelFactoryCat5 = async (
       key: 'Waste_disposal_date',
     },
     {
+      header: 'Consolidated Waste',
+      key: 'Consolidated_Waste',
+    },
+    {
+      header: 'Waste Code',
+      key: 'Waste_Code',
+    },
+    {
       header: 'Vendor Name',
       key: 'Vendor_Name',
     },
@@ -70,6 +81,10 @@ export const getADataExcelFactoryCat5 = async (
     {
       header: 'Waste collection address',
       key: 'Waste_collection_address',
+    },
+    {
+      header: 'Location Code',
+      key: 'Location_Code',
     },
     {
       header: 'Transportation Distance (km)',

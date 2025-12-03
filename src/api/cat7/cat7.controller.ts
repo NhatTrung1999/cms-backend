@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { Cat7Service } from './cat7.service';
+import { Public } from 'src/decorators';
 
 @Controller('cat7')
 export class Cat7Controller {
@@ -45,5 +46,15 @@ export class Cat7Controller {
       sortField,
       sortOrder,
     );
+  }
+
+  @Public()
+  @Get('auto-sent-cms')
+  async autoSentCMS(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+  ) {
+    const data = await this.cat7Service.autoSentCMS(dateFrom, dateTo);
+    return data;
   }
 }

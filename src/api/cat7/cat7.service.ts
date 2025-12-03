@@ -5,11 +5,22 @@ import {
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { buildQuery, buildQueryCustomExport } from 'src/helper/cat7.helper';
+import {
+  buildQuery,
+  buildQueryAutoSentCMS,
+  buildQueryAutoSentCmsLHG,
+  buildQueryAutoSentCmsLVL,
+  buildQueryAutoSentCmsLYM,
+  buildQueryAutoSentCmsLYV,
+  buildQueryCustomExport,
+} from 'src/helper/cat7.helper';
+import dayjs from 'dayjs';
+dayjs().format();
 
 @Injectable()
 export class Cat7Service {
   constructor(
+    @Inject('EIP') private readonly EIP: Sequelize,
     @Inject('LYV_HRIS') private readonly LYV_HRIS: Sequelize,
     @Inject('LHG_HRIS') private readonly LHG_HRIS: Sequelize,
     @Inject('LVL_HRIS') private readonly LVL_HRIS: Sequelize,
@@ -393,7 +404,9 @@ export class Cat7Service {
         ),
       ]);
 
-      let data = dataResults.flat();
+      const allData = dataResults.flat();
+
+      let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
 
       data.sort((a, b) => {
         const aValue = a[sortField];
@@ -413,6 +426,87 @@ export class Cat7Service {
       const hasMore = offset + data.length < total;
 
       return { data, page, limit, total, hasMore };
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  // auto send cms
+
+  async autoSentCMS(dateFrom: string, dateTo: string) {
+    try {
+      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+      const [dataLYV, dataLHG, dataLVL, dataLYM] = await Promise.all([
+        await this.LYV_HRIS.query(
+          await buildQueryAutoSentCmsLYV(dateFrom, dateTo, this.EIP),
+          {
+            type: QueryTypes.SELECT,
+            replacements,
+          },
+        ),
+        await this.LHG_HRIS.query(
+          await buildQueryAutoSentCmsLHG(dateFrom, dateTo, this.EIP),
+          {
+            type: QueryTypes.SELECT,
+            replacements,
+          },
+        ),
+        await this.LVL_HRIS.query(
+          await buildQueryAutoSentCmsLVL(dateFrom, dateTo, this.EIP),
+          {
+            type: QueryTypes.SELECT,
+            replacements,
+          },
+        ),
+        await this.LYM_HRIS.query(
+          await buildQueryAutoSentCmsLYM(dateFrom, dateTo, this.EIP),
+          {
+            type: QueryTypes.SELECT,
+            replacements,
+          },
+        ),
+      ]);
+
+      // console.log(123);
+
+      const data = [...dataLYV, ...dataLHG, dataLVL, dataLYM].flat();
+      // console.log(data);
+
+      const formatData = data.map((item: any) => {
+        const staffId = item.Staff_ID;
+        const Residential_address = item.Residential_address;
+        const Main_transportation_type = item.Main_transportation_type;
+        const Number_of_working_days = item.Number_of_working_days;
+        const Factory_address = item.Factory_address;
+        const FactoryName = item.Factory_Name;
+        const DepartmentName = item.Department_Name;
+
+        return {
+          System: 'CMS Web', // Default
+          Corporation: 'LAI YIH', // Default
+          Factory: FactoryName,
+          Department: DepartmentName,
+          DocKey: staffId,
+          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+          ActivityType: '3.3 員工通勤', // Default
+          DataType: '2', // Default
+          DocType: '員工通勤', // Default
+          DocDate: dayjs().format('YYYY/MM/DD'),
+          DocDate2: dayjs().format('YYYY/MM/DD'),
+          UndDocNo: staffId,
+          TransType: Main_transportation_type,
+          Departure: Factory_address,
+          Destination: Residential_address,
+          Attendance: Number_of_working_days.toString(),
+          Memo: '',
+          CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+          Creator: '',
+        };
+      });
+
+      // console.log(formatData);
+      return formatData;
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }

@@ -207,11 +207,11 @@ export class Cat1andcat4Service {
                                         ,CAST('0' AS INT)             AS Land_Transport_Ton_Kilometers
                                         ,CAST('0' AS INT)             AS Sea_Transport_Ton_Kilometers
                                         ,CAST('0' AS INT)             AS Air_Transport_Ton_Kilometers
-                    FROM   CGZL              AS c
-                          INNER JOIN CGZLS  AS c2
-                                ON  c2.CGNO = c.CGNO
-                          LEFT JOIN zszl    AS z
-                                ON  z.zsdh = c.CGNO
+                                  FROM   CGZL              AS c
+                                        INNER JOIN CGZLS  AS c2
+                                              ON  c2.CGNO = c.CGNO
+                                        LEFT JOIN zszl    AS z
+                                              ON  z.zsdh = c.CGNO
                                   ${where}
                         ) AS Sub`;
       const [dataResults, countResults] = await Promise.all([

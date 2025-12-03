@@ -14,7 +14,12 @@ import { EventsGateway } from '../events/events.gateway';
 import { getADataExcelFactoryCat5 } from 'src/helper/cat5.helper';
 import { getADataExcelFactoryCat9AndCat12 } from 'src/helper/cat9andcat12.helper';
 import { getADataExcelFactoryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
-import { buildQuery, getADataExcelFactoryCat7 } from 'src/helper/cat7.helper';
+import {
+  buildQuery,
+  buildQueryCustomExport,
+  getADataCustomExport,
+  getADataExcelFactoryCat7,
+} from 'src/helper/cat7.helper';
 
 @Injectable()
 export class FilemanagementService {
@@ -110,6 +115,7 @@ export class FilemanagementService {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    fields: string[],
     userID: string,
   ) {
     const id = uuidv4();
@@ -120,7 +126,15 @@ export class FilemanagementService {
     }
     const filePath = path.join(folder, fileName);
 
-    await this.createFileExcel(id, module, filePath, dateFrom, dateTo, factory);
+    await this.createFileExcel(
+      id,
+      module,
+      filePath,
+      dateFrom,
+      dateTo,
+      factory,
+      fields,
+    );
 
     let statusWaiting = await this.fileExcelWaiting(
       id,
@@ -216,6 +230,7 @@ export class FilemanagementService {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    fields?: string[],
   ) {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(module);
@@ -235,6 +250,9 @@ export class FilemanagementService {
         break;
       case 'cat9andcat12':
         await this.fileExcelCat9AndCat12(sheet, dateFrom, dateTo, factory);
+        break;
+      case 'customexport':
+        await this.fileCustomExport(sheet, dateFrom, dateTo, factory, fields);
         break;
       default:
         console.log(`Unknown excel file module: ${module}`);
@@ -630,9 +648,12 @@ export class FilemanagementService {
       replacements.push(dateFrom, dateTo);
     }
     const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
+                          ,dwc.CONSOLIDATED_WASTE_CODE AS Consolidated_Waste
+                          ,dwc.WASTE_CODE AS Waste_Code
                           ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
                           ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
                           ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
+                          ,dwc.LOCATION_CODE AS Location_Code
                           ,CAST('0' AS INT)                   AS Transportation_Distance_km
                           ,CASE 
                                 WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
@@ -683,6 +704,14 @@ export class FilemanagementService {
         key: 'Waste_disposal_date',
       },
       {
+        header: 'Consolidated Waste',
+        key: 'Consolidated_Waste',
+      },
+      {
+        header: 'Waste Code',
+        key: 'Waste_Code',
+      },
+      {
         header: 'Vendor Name',
         key: 'Vendor_Name',
       },
@@ -693,6 +722,10 @@ export class FilemanagementService {
       {
         header: 'Waste collection address',
         key: 'Waste_collection_address',
+      },
+      {
+        header: 'Location Code',
+        key: 'Location_Code',
       },
       {
         header: 'Transportation Distance (km)',
@@ -950,6 +983,113 @@ export class FilemanagementService {
       { header: 'PKT (p-km)', key: 'PKT_p_km' },
     ];
     data.forEach((item) => sheet.addRow(item));
+
+    sheet.columns.forEach((column) => {
+      let maxLength = 0;
+      if (typeof column.eachCell === 'function') {
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? String(cell.value) : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+      }
+      column.width = maxLength * 1.2;
+    });
+
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
+  }
+
+  private async fileCustomExport(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    fields?: string[],
+  ) {
+    let db: Sequelize;
+    switch (factory.trim()) {
+      case 'LYV':
+        db = this.LYV_HRIS;
+        break;
+      case 'LHG':
+        db = this.LHG_HRIS;
+        break;
+      case 'LYM':
+        db = this.LYM_HRIS;
+        break;
+      case 'LVL':
+        db = this.LVL_HRIS;
+        break;
+      case 'JAZ':
+        db = this.JAZ_HRIS;
+        break;
+      case 'JZS':
+        db = this.JZS_HRIS;
+        break;
+      default:
+        return await this.getAllDataCustomExport(
+          sheet,
+          dateFrom,
+          dateTo,
+          fields,
+        );
+    }
+    await getADataCustomExport(sheet, db, dateFrom, dateTo, factory, fields);
+  }
+
+  private async getAllDataCustomExport(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    fields?: string[],
+  ) {
+    const connects: { facotryName: string; conn: Sequelize }[] = [
+      { facotryName: 'LYV', conn: this.LYV_HRIS },
+      { facotryName: 'LHG', conn: this.LHG_HRIS },
+      { facotryName: 'LVL', conn: this.LVL_HRIS },
+      { facotryName: 'LYM', conn: this.LYM_HRIS },
+      { facotryName: 'JAZ', conn: this.JAZ_HRIS },
+      { facotryName: 'JZS', conn: this.JZS_HRIS },
+    ];
+    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+    const dataResults = await Promise.all(
+      connects.map(({ facotryName, conn }) => {
+        const { query } = buildQueryCustomExport(dateFrom, dateTo, facotryName);
+        return conn.query(query, { type: QueryTypes.SELECT, replacements });
+      }),
+    );
+
+    const allData = dataResults.flat();
+
+    let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
+
+    if (!data || data.length === 0) return;
+    
+    const allKeys = Object.keys(data[0]);
+    const selectedFields = fields && fields.length > 0 ? fields : allKeys;
+
+    sheet.columns = selectedFields.map((key) => ({
+      header: key.replace(/_/g, ' '),
+      key,
+    }));
+
+    data.forEach((item) => {
+      const rowData: Record<string, any> = {};
+      selectedFields.forEach((key) => {
+        rowData[key] = item[key] ?? '';
+      });
+      sheet.addRow(rowData);
+    });
+
+    // console.log(data);
 
     sheet.columns.forEach((column) => {
       let maxLength = 0;
