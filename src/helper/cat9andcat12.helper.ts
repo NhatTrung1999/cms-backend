@@ -62,7 +62,24 @@ export const getADataExcelFactoryCat9AndCat12 = async (
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
                                     ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'SEA'                   AS Transport_Method
+                                    ,ISNULL(
+                                        ISNULL(
+                                            bg.SHPIDS
+                                          ,CASE 
+                                                WHEN (do.ShipMode='Air')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                                WHEN(do.ShipMode='Air Expres')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                                WHEN(do.ShipMode='Ocean')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
+                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
+                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
+                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
+                                                WHEN do.ShipMode_1 IS NULL THEN '' 
+                                                ELSE 'N/A' END
+                                        )
+                                      ,y.ShipMode
+                                    )                       AS Transport_Method
                                     ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
                                     ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
                                     ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
@@ -343,7 +360,24 @@ export const buildQueryAutoSentCMS = async (
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
                                     ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'SEA'                   AS Transport_Method
+                                    ,ISNULL(
+                                        ISNULL(
+                                            bg.SHPIDS
+                                          ,CASE 
+                                                WHEN (do.ShipMode='Air')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                                WHEN(do.ShipMode='Air Expres')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                                WHEN(do.ShipMode='Ocean')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
+                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
+                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
+                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
+                                                WHEN do.ShipMode_1 IS NULL THEN '' 
+                                                ELSE 'N/A' END
+                                        )
+                                      ,y.ShipMode
+                                    )                       AS Transport_Method
                                     ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
                                     ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
                                     ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers

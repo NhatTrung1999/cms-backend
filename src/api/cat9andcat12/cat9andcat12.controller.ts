@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Request,
   Query,
   UseInterceptors,
   BadRequestException,
@@ -9,11 +8,8 @@ import {
   Post,
 } from '@nestjs/common';
 import { Cat9andcat12Service } from './cat9andcat12.service';
-import { getUserId } from 'src/helper/common.helper';
 import { Public } from 'src/decorators';
 import { FileInterceptor } from '@nestjs/platform-express';
-import * as multer from 'multer';
-import * as ExcelJS from 'exceljs';
 
 @Controller('cat9-and-cat12')
 export class Cat9andcat12Controller {
@@ -29,7 +25,6 @@ export class Cat9andcat12Controller {
     @Query('sortField') sortField: string,
     @Query('sortOrder') sortOrder: string,
   ) {
-    // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
     return await this.cat9andcat12Service.getData(
       dateFrom,
       dateTo,

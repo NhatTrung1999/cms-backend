@@ -433,6 +433,124 @@ export const buildQueryAutoSentCmsLYM = async (
   return query;
 };
 
+export const buildQueryAutoSentCmsJAZ = async (
+  dateFrom?: string,
+  dateTo?: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = 'JAZ'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  const baseWhere =
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+
+  const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
+
+  const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const query = `SELECT TOP 30*
+                        ,N'${getFactory('JAZ')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE 
+                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                        ELSE u.Address_Live
+                                    END                    AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
+                                            AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE 
+                                                Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                    ,u.Address_Live
+                                    ,u.Vehicle
+                                    ,u.Bus_Route
+                                    ,dd.Department_Name
+                    ) AS a`;
+
+  // console.log(query);
+
+  return query;
+};
+
+export const buildQueryAutoSentCmsJZS = async (
+  dateFrom?: string,
+  dateTo?: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = 'JZS'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  const baseWhere =
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+
+  const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
+
+  const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
+
+  const query = `SELECT TOP 30*
+                        ,N'${getFactory('JZS')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE 
+                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                        ELSE u.Address_Live
+                                    END                    AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
+                                            AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE 
+                                                Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                    ,u.Address_Live
+                                    ,u.Vehicle
+                                    ,u.Bus_Route
+                                    ,dd.Department_Name
+                    ) AS a`;
+
+  // console.log(query);
+
+  return query;
+};
+
 export const buildQueryCustomExport = (
   dateFrom: string,
   dateTo: string,

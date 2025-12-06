@@ -2,6 +2,261 @@ import * as ExcelJS from 'exceljs';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 
+export const buildQuery = async (
+  dateFrom: string,
+  dateTo: string,
+  factory: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = '${factory}'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  let where = 'WHERE 1=1';
+  const replacements: any[] = [];
+  if (dateFrom && dateTo) {
+    where += ` AND CONVERT(DATE ,cgzl.CGDate) BETWEEN ? AND ?`;
+    replacements.push(dateFrom, dateTo);
+  }
+  const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY cgzl.CGDate) AS INT) AS [No]
+                        ,cgzl.CGDate          PurDate
+                        ,kcrk.ModifyDate      RKDate
+                        ,c.CGNO               PurNo
+                        ,kcrk.RKNO            ReceivedNo
+                        ,c.CLBH               MatID
+                        ,clzl.ywpm            MatName
+                        ,ZLCLSL.CLSL          Qty_Usage
+                        ,KCRKS.Qty            Qty_Receive
+                        ,ISNULL(
+                              ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                            ,SN74A.UnitWeight
+                          )                    UnitWeight
+                        ,(
+                              ISNULL(
+                                  ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                                ,SN74A.UnitWeight
+                              )*KCRKS.Qty
+                          )                    Weight_Unitkg
+                        ,ISNULL(z.ZSDH ,CGZL.ZSBH) SupplierCode
+                        ,ISNULL(P.Style ,ZSZL.Style) Style
+                        ,CASE 
+                              WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
+                              WHEN (
+                                        '${factory}' IN ('LYV' ,'LVL' ,'LHG')
+                                        AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                                    )
+                                    OR (
+                                        '${factory}'='LYF'
+                                        AND ZSZL.Country='Indonesia'
+                                    )
+                                    OR (
+                                        '${factory}' IN ('LYM' ,'POL')
+                                        AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
+                                    ) THEN 'Land'
+                              ELSE 'SEA + Land'
+                          END                  Transportationmethod
+                        ,isi.SupplierFullAddress AS Departure
+                        ,CASE 
+                              WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN '0'
+                              ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
+                          END                  ThirdCountryLandTransport
+                        ,isi.PortOfDeparture
+                        ,isi.PortOfArrival
+                        ,isi.Factory_Port  AS FactoryDomesticLandTransport
+                        ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}'  AS Destination
+                        ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) LandTransportDistance
+                        ,isi.SeaTransportDistance
+                        ,isi.AirTransportDistance
+                        ,CAST('0' AS INT)  AS LandTransortTonKilometers
+                        ,CAST('0' AS INT)  AS SeaTransortTonKilometers
+                        ,CAST('0' AS INT)  AS AirTransortTonKilometers
+                  FROM   CGZLS             AS c
+                          LEFT JOIN cgzl
+                              ON  cgzl.CGNO = c.CGNO
+                          LEFT JOIN ZSZL
+                              ON  CGZL.ZSBH = ZSZL.ZSDH
+                          LEFT JOIN ZSZL_Prod P
+                              ON  P.ZSDH = ZSZL.zsdh
+                                  AND P.GSBH = cgzl.GSBH
+                          LEFT JOIN ZSZL z
+                              ON  z.zsdh = ISNULL(P.MZSDH ,ZSZL.MZSDH)
+                          LEFT JOIN Imp_SuppIDCombine AS isi
+                              ON  isi.ZSDH = ZSZL.zsdh
+                          LEFT JOIN clzl
+                              ON  cldh = c.CLBH
+                          LEFT JOIN kcrk
+                              ON  kcrk.ZSNO = c.CGNO
+                          LEFT JOIN kcrks
+                              ON  kcrks.RKNO = kcrk.RKNO
+                                  AND kcrks.CLBH = c.CLBH
+                                  AND ISNULL(KCRKS.RKSB ,'')<>'DL'
+                                  AND ISNULL(KCRKS.RKSB ,'')<>'NG'
+                          LEFT JOIN (
+                                  SELECT smi2.CLBH
+                                        ,zszl.zsdh
+                                        ,MAX(smi2.Supplier_Material_ID) Supplier_Material_ID
+                                  FROM   SuppMatID AS smi2
+                                          LEFT JOIN zszl
+                                              ON  zszl.Zsdh_TW = smi2.CSBH
+                                          INNER JOIN Imp_MaterialWeight
+                                              ON  Imp_MaterialWeight.Supplier_Material_ID = smi2.Supplier_Material_ID
+                                  WHERE  ISNULL(Total_Weight ,0)<>0
+                                  GROUP BY
+                                          smi2.CLBH
+                                        ,zszl.zsdh
+                              ) A
+                              ON  A.CLBH = c.CLBH
+                                  AND A.zsdh = CGZL.ZSBH
+                          LEFT JOIN Imp_MaterialWeight imw
+                              ON  imw.Supplier_Material_ID = A.Supplier_Material_ID
+                          LEFT JOIN Setup_UnitWeight AS SN223_UnitWeight
+                              ON  SN223_UnitWeight.FormID = 'SN223'
+                                  AND SN223_UnitWeight.SupplierID = CGZL.ZSBH
+                                  AND SN223_UnitWeight.MatID = c.CLBH
+                          LEFT JOIN Setup_UnitWeight AS SN74A
+                              ON  SN74A.FormID = 'SN74A'
+                                  AND SN74A.SupplierID = 'ZZZZ'
+                                  AND SN74A.MatID = c.CLBH
+                          LEFT JOIN (
+                                  SELECT SS.CGNO
+                                        ,S2.CLBH
+                                        ,ISNULL(SUM(S2.CLSL) ,0) AS CLSL
+                                  FROM   ZLZLS2 S2
+                                          LEFT JOIN CGZLSS SS
+                                              ON  SS.ZLBH = S2.ZLBH
+                                                  AND SS.CLBH = S2.CLBH
+                                  GROUP BY
+                                          SS.CGNO
+                                        ,S2.CLBH
+                              )ZLCLSL
+                              ON  ZLCLSL.CGNO = c.CGNO
+                                  AND ZLCLSL.CLBH = c.CLBH
+                  ${where}`;
+  const countQuery = `SELECT COUNT([No]) as total
+                      FROM (
+                            SELECT CAST(ROW_NUMBER() OVER(ORDER BY cgzl.CGDate) AS INT) AS [No]
+                                  ,cgzl.CGDate          PurDate
+                                  ,kcrk.ModifyDate      RKDate
+                                  ,c.CGNO               PurNo
+                                  ,kcrk.RKNO            ReceivedNo
+                                  ,c.CLBH               MatID
+                                  ,clzl.ywpm            MatName
+                                  ,ZLCLSL.CLSL          Qty_Usage
+                                  ,KCRKS.Qty            Qty_Receive
+                                  ,ISNULL(
+                                        ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                                      ,SN74A.UnitWeight
+                                    )                    UnitWeight
+                                  ,(
+                                        ISNULL(
+                                            ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                                          ,SN74A.UnitWeight
+                                        )*KCRKS.Qty
+                                    )                    Weight_Unitkg
+                                  ,ISNULL(z.ZSDH ,CGZL.ZSBH) SupplierCode
+                                  ,ISNULL(P.Style ,ZSZL.Style) Style
+                                  ,CASE 
+                                        WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
+                                        WHEN (
+                                                  '${factory}' IN ('LYV' ,'LVL' ,'LHG')
+                                                  AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                                              )
+                                              OR (
+                                                  '${factory}'='LYF'
+                                                  AND ZSZL.Country='Indonesia'
+                                              )
+                                              OR (
+                                                  '${factory}' IN ('LYM' ,'POL')
+                                                  AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
+                                              ) THEN 'Land'
+                                        ELSE 'SEA + Land'
+                                    END                  Transportationmethod
+                                  ,isi.SupplierFullAddress AS Departure
+                                  ,CASE 
+                                        WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN '0'
+                                        ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
+                                    END                  ThirdCountryLandTransport
+                                  ,isi.PortOfDeparture
+                                  ,isi.PortOfArrival
+                                  ,isi.Factory_Port  AS FactoryDomesticLandTransport
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}'  AS Destination
+                                  ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) LandTransportDistance
+                                  ,isi.SeaTransportDistance
+                                  ,isi.AirTransportDistance
+                                  ,CAST('0' AS INT)  AS LandTransortTonKilometers
+                                  ,CAST('0' AS INT)  AS SeaTransortTonKilometers
+                                  ,CAST('0' AS INT)  AS AirTransortTonKilometers
+                            FROM   CGZLS             AS c
+                                    LEFT JOIN cgzl
+                                        ON  cgzl.CGNO = c.CGNO
+                                    LEFT JOIN ZSZL
+                                        ON  CGZL.ZSBH = ZSZL.ZSDH
+                                    LEFT JOIN ZSZL_Prod P
+                                        ON  P.ZSDH = ZSZL.zsdh
+                                            AND P.GSBH = cgzl.GSBH
+                                    LEFT JOIN ZSZL z
+                                        ON  z.zsdh = ISNULL(P.MZSDH ,ZSZL.MZSDH)
+                                    LEFT JOIN Imp_SuppIDCombine AS isi
+                                        ON  isi.ZSDH = ZSZL.zsdh
+                                    LEFT JOIN clzl
+                                        ON  cldh = c.CLBH
+                                    LEFT JOIN kcrk
+                                        ON  kcrk.ZSNO = c.CGNO
+                                    LEFT JOIN kcrks
+                                        ON  kcrks.RKNO = kcrk.RKNO
+                                            AND kcrks.CLBH = c.CLBH
+                                            AND ISNULL(KCRKS.RKSB ,'')<>'DL'
+                                            AND ISNULL(KCRKS.RKSB ,'')<>'NG'
+                                    LEFT JOIN (
+                                            SELECT smi2.CLBH
+                                                  ,zszl.zsdh
+                                                  ,MAX(smi2.Supplier_Material_ID) Supplier_Material_ID
+                                            FROM   SuppMatID AS smi2
+                                                    LEFT JOIN zszl
+                                                        ON  zszl.Zsdh_TW = smi2.CSBH
+                                                    INNER JOIN Imp_MaterialWeight
+                                                        ON  Imp_MaterialWeight.Supplier_Material_ID = smi2.Supplier_Material_ID
+                                            WHERE  ISNULL(Total_Weight ,0)<>0
+                                            GROUP BY
+                                                    smi2.CLBH
+                                                  ,zszl.zsdh
+                                        ) A
+                                        ON  A.CLBH = c.CLBH
+                                            AND A.zsdh = CGZL.ZSBH
+                                    LEFT JOIN Imp_MaterialWeight imw
+                                        ON  imw.Supplier_Material_ID = A.Supplier_Material_ID
+                                    LEFT JOIN Setup_UnitWeight AS SN223_UnitWeight
+                                        ON  SN223_UnitWeight.FormID = 'SN223'
+                                            AND SN223_UnitWeight.SupplierID = CGZL.ZSBH
+                                            AND SN223_UnitWeight.MatID = c.CLBH
+                                    LEFT JOIN Setup_UnitWeight AS SN74A
+                                        ON  SN74A.FormID = 'SN74A'
+                                            AND SN74A.SupplierID = 'ZZZZ'
+                                            AND SN74A.MatID = c.CLBH
+                                    LEFT JOIN (
+                                            SELECT SS.CGNO
+                                                  ,S2.CLBH
+                                                  ,ISNULL(SUM(S2.CLSL) ,0) AS CLSL
+                                            FROM   ZLZLS2 S2
+                                                    LEFT JOIN CGZLSS SS
+                                                        ON  SS.ZLBH = S2.ZLBH
+                                                            AND SS.CLBH = S2.CLBH
+                                            GROUP BY
+                                                    SS.CGNO
+                                                  ,S2.CLBH
+                                        )ZLCLSL
+                                        ON  ZLCLSL.CGNO = c.CGNO
+                                            AND ZLCLSL.CLBH = c.CLBH
+                            ${where}
+                      ) as Sub`;
+  return { query, countQuery };
+};
+
 export const getADataExcelFactoryCat1AndCat4 = async (
   sheet: ExcelJS.Worksheet,
   db: Sequelize,
