@@ -30,7 +30,7 @@ export const buildQuery = (
 
   const query = `SELECT u.userId                       AS Staff_ID
                         ,CASE 
-                              WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                              WHEN u.Address_Live IS NULL THEN u.PickupDropoffStation
                               ELSE u.Address_Live
                         END                            AS Residential_address
                         ,u.Vehicle                      AS Main_transportation_type
@@ -45,14 +45,14 @@ export const buildQuery = (
                           u.userId
                           ,u.Address_Live
                           ,u.Vehicle
-                          ,u.Bus_Route`;
+                          ,u.PickupDropoffStation`;
 
   // console.log(query);
   const countQuery = `SELECT COUNT(*) AS total
                       FROM   (
                                 SELECT u.userId                       AS Staff_ID
                                       ,CASE 
-                                            WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                            WHEN u.Address_Live IS NULL THEN u.PickupDropoffStation
                                             ELSE u.Address_Live
                                       END                            AS Residential_address
                                       ,u.Vehicle                      AS Main_transportation_type
@@ -67,7 +67,7 @@ export const buildQuery = (
                                         u.userId
                                         ,u.Address_Live
                                         ,u.Vehicle
-                                        ,u.Bus_Route	
+                                        ,u.PickupDropoffStation	
                       ) AS Sub`;
   return { query, countQuery };
 };
@@ -150,7 +150,7 @@ export const buildQueryAutoSentCMS = (
                   FROM (
                         SELECT u.userId                       AS Staff_ID
                               ,CASE 
-                                    WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                    WHEN u.Address_Live IS NULL THEN u.PickupDropoffStation
                                     ELSE u.Address_Live
                               END                            AS Residential_address
                               ,u.Vehicle                      AS Main_transportation_type
@@ -166,7 +166,7 @@ export const buildQueryAutoSentCMS = (
                                 u.userId
                                 ,u.Address_Live
                                 ,u.Vehicle
-                                ,u.Bus_Route
+                                ,u.PickupDropoffStation
                   ) as a`;
 
   // console.log(query);
@@ -176,7 +176,7 @@ export const buildQueryAutoSentCMS = (
                                 FROM (
                                       SELECT u.userId                       AS Staff_ID
                                             ,CASE 
-                                                  WHEN u.Address_Live IS NULL THEN u.Bus_Route
+                                                  WHEN u.Address_Live IS NULL THEN u.PickupDropoffStation
                                                   ELSE u.Address_Live
                                             END                            AS Residential_address
                                             ,u.Vehicle                      AS Main_transportation_type
@@ -192,7 +192,7 @@ export const buildQueryAutoSentCMS = (
                                               u.userId
                                               ,u.Address_Live
                                               ,u.Vehicle
-                                              ,u.Bus_Route
+                                              ,u.PickupDropoffStation
                                 ) as a	
                       ) AS Sub`;
   return { query, countQuery };
@@ -213,20 +213,22 @@ export const buildQueryAutoSentCmsLYV = async (
     })) || [];
 
   const baseWhere =
-    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.lock = '0'";
+    // "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
 
   const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 30*
+  const query = `SELECT TOP 200*
                         ,N'${getFactory('LYV')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
                                   ,CASE 
-                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
-                                        ELSE u.Address_Live
-                                    END                    AS Residential_address
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
                                   ,u.Vehicle              AS Main_transportation_type
                                   ,'API Calculation'      AS km
                                   ,COUNT(WORKING_TIME)    AS Number_of_working_days
@@ -253,9 +255,11 @@ export const buildQueryAutoSentCmsLYV = async (
                                     u.userId
                                     ,u.Address_Live
                                     ,u.Vehicle
-                                    ,u.Bus_Route
+                                    ,u.PickupDropoffStation
                                     ,dd.Department_Name
                                     ,dds.Department_Name
+                                    ,u.lat
+                                    ,u.long
                     ) AS a`;
 
   // console.log(query);
@@ -278,20 +282,22 @@ export const buildQueryAutoSentCmsLHG = async (
     })) || [];
 
   const baseWhere =
-    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.lock = '0'";
+    // "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
 
   const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 30*
+  const query = `SELECT TOP 200*
                         ,N'${getFactory('LHG')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
                                   ,CASE 
-                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
-                                        ELSE u.Address_Live
-                                    END                    AS Residential_address
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
                                   ,u.Vehicle              AS Main_transportation_type
                                   ,'API Calculation'      AS km
                                   ,COUNT(WORKING_TIME)    AS Number_of_working_days
@@ -312,8 +318,10 @@ export const buildQueryAutoSentCmsLHG = async (
                                     u.userId
                                   ,u.Address_Live
                                   ,u.Vehicle
-                                  ,u.Bus_Route
+                                  ,u.PickupDropoffStation
                                   ,dd.Department_Name
+                                  ,u.lat
+                                  ,u.long
                         ) AS a`;
 
   // console.log(query);
@@ -336,20 +344,22 @@ export const buildQueryAutoSentCmsLVL = async (
     })) || [];
 
   const baseWhere =
-    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.lock = '0'";
+    // "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
 
   const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 30*
+  const query = `SELECT TOP 200*
                         ,N'${getFactory('LVL')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId                          AS Staff_ID
                                   ,CASE 
-                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
-                                        ELSE u.Address_Live
-                                    END                    AS Residential_address
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
                                   ,u.Vehicle              AS Main_transportation_type
                                   ,'API Calculation'      AS km
                                   ,COUNT(WORKING_TIME)    AS Number_of_working_days
@@ -366,11 +376,13 @@ export const buildQueryAutoSentCmsLVL = async (
                                     LEFT JOIN Data_Department AS dd ON dd.Department_Serial_Key = dp.Department_Serial_Key
                             ${where}
                             GROUP BY
-                                    u.userId
+                                  u.userId
                                   ,u.Address_Live
                                   ,u.Vehicle
-                                  ,u.Bus_Route
+                                  ,u.PickupDropoffStation
                                   ,dd.Department_Name
+                                  ,u.lat
+                                  ,u.long
                         )             AS a`;
 
   // console.log(query);
@@ -392,27 +404,30 @@ export const buildQueryAutoSentCmsLYM = async (
       type: QueryTypes.SELECT,
     })) || [];
 
-  const baseWhere =
-    'WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0 AND u.Address_Live IS NOT NULL';
+  // const baseWhere =
+  //   'WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0 AND u.Address_Live IS NOT NULL';
+
+  const baseWhere = `WHERE 1=1 AND dwt.workhours > 0 AND u.lock = '0'`;
 
   const dateFilter = 'AND CONVERT(DATE ,dwt.CDate) BETWEEN ? AND ?';
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 30*
+  const query = `SELECT TOP 200*
                         ,N'${getFactory('LYM')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId                       AS Staff_ID
                                   ,CASE 
-                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
-                                        ELSE u.Address_Live
-                                    END                 AS Residential_address
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
                                   ,u.Vehicle           AS Main_transportation_type
                                   ,'API Calculation'   AS km
                                   ,COUNT(workhours)    AS Number_of_working_days
                                   ,'API Calculation'   AS PKT_p_km
                                   ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-                                  ,hu.Part
+                                  ,hu.Part AS Department_Name
                             FROM   HR_Attendance       AS dwt
                                     LEFT JOIN users     AS u
                                         ON  u.userId = dwt.UserNo
@@ -421,11 +436,13 @@ export const buildQueryAutoSentCmsLYM = async (
                                             AND hu.UserNo = u.userId
                             ${where}
                             GROUP BY
-                                    u.userId
+                                  u.userId
                                   ,u.Address_Live
                                   ,u.Vehicle
-                                  ,u.Bus_Route
+                                  ,u.PickupDropoffStation
                                   ,hu.Part
+                                  ,u.lat
+                                  ,u.long
                         )            AS a`;
 
   // console.log(query);
@@ -448,20 +465,22 @@ export const buildQueryAutoSentCmsJAZ = async (
     })) || [];
 
   const baseWhere =
-    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.lock = '0'";
+    // "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
 
   const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 30*
+  const query = `SELECT TOP 200*
                         ,N'${getFactory('JAZ')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
                                   ,CASE 
-                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
-                                        ELSE u.Address_Live
-                                    END                    AS Residential_address
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
                                   ,u.Vehicle              AS Main_transportation_type
                                   ,'API Calculation'      AS km
                                   ,COUNT(WORKING_TIME)    AS Number_of_working_days
@@ -483,8 +502,10 @@ export const buildQueryAutoSentCmsJAZ = async (
                                     u.userId
                                     ,u.Address_Live
                                     ,u.Vehicle
-                                    ,u.Bus_Route
+                                    ,u.PickupDropoffStation
                                     ,dd.Department_Name
+                                    ,u.lat
+                                    ,u.long
                     ) AS a`;
 
   // console.log(query);
@@ -507,20 +528,22 @@ export const buildQueryAutoSentCmsJZS = async (
     })) || [];
 
   const baseWhere =
-    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
+    "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.lock = '0'";
+    // "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.Address_Live IS NOT NULL";
 
   const dateFilter = 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?';
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 30*
+  const query = `SELECT TOP 200*
                         ,N'${getFactory('JZS')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
                                   ,CASE 
-                                        WHEN u.Address_Live IS NULL THEN u.Bus_Route
-                                        ELSE u.Address_Live
-                                    END                    AS Residential_address
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
                                   ,u.Vehicle              AS Main_transportation_type
                                   ,'API Calculation'      AS km
                                   ,COUNT(WORKING_TIME)    AS Number_of_working_days
@@ -542,8 +565,10 @@ export const buildQueryAutoSentCmsJZS = async (
                                     u.userId
                                     ,u.Address_Live
                                     ,u.Vehicle
-                                    ,u.Bus_Route
+                                    ,u.PickupDropoffStation
                                     ,dd.Department_Name
+                                    ,u.lat
+                                    ,u.long
                     ) AS a`;
 
   // console.log(query);
@@ -674,21 +699,24 @@ export const getADataCustomExport = async (
     replacements,
     type: QueryTypes.SELECT,
   });
-  if(!data || data.length ===0) return
+  if (!data || data.length === 0) return;
 
-  const allKeys = Object.keys(data[0])
+  const allKeys = Object.keys(data[0]);
 
-  const selectedFields = fields && fields.length > 0 ? fields : allKeys
+  const selectedFields = fields && fields.length > 0 ? fields : allKeys;
 
-  sheet.columns = selectedFields.map((key) => ({header: key.replace(/_/g, ' '), key}))
+  sheet.columns = selectedFields.map((key) => ({
+    header: key.replace(/_/g, ' '),
+    key,
+  }));
 
   data.forEach((item) => {
-    const rowData: Record<string, any> = {}
+    const rowData: Record<string, any> = {};
     selectedFields.forEach((key) => {
-      rowData[key] = item[key] ?? ''
-    })
-    sheet.addRow(rowData)
-  })
+      rowData[key] = item[key] ?? '';
+    });
+    sheet.addRow(rowData);
+  });
 
   // console.log(data);
 

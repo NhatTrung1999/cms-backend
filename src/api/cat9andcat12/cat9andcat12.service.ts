@@ -1200,8 +1200,8 @@ export class Cat9andcat12Service {
     const connects = [
       // { factory: 'LYV', db: this.LYV_ERP },
       // { factory: 'LHG', db: this.LHG_ERP },
-      // { factory: 'LYM', db: this.LYM_ERP },
-      { factory: 'LVL', db: this.LVL_ERP },
+      { factory: 'LYM', db: this.LYM_ERP },
+      // { factory: 'LVL', db: this.LVL_ERP },
       // { factory: 'LYF', db: this.LYF_ERP },
       // { factory: 'JAZ', db: this.JAZ_ERP },
       // { factory: 'JZS', db: this.JZS_ERP },
@@ -1213,7 +1213,7 @@ export class Cat9andcat12Service {
           dateFrom,
           dateTo,
           conn.factory,
-          this.EIP
+          this.EIP,
         );
         return conn.db.query(query, {
           type: QueryTypes.SELECT,

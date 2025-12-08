@@ -486,12 +486,12 @@ export class Cat7Service {
       // console.log(123);
 
       const data = [
-        ...dataLYV,
-        ...dataLHG,
-        ...dataLVL,
+        // ...dataLYV,
+        // ...dataLHG,
+        // ...dataLVL,
         ...dataLYM,
-        ...dataJAZ,
-        ...dataJZS,
+        // ...dataJAZ,
+        // ...dataJZS,
       ].flat();
       // const data = [...dataLYV].flat();
       // console.log(data);
@@ -536,3 +536,4 @@ export class Cat7Service {
     }
   }
 }
+
