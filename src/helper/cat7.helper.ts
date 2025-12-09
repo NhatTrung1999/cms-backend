@@ -220,7 +220,7 @@ export const buildQueryAutoSentCmsLYV = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 200*
+  const query = `SELECT TOP 100*
                         ,N'${getFactory('LYV')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
@@ -289,7 +289,7 @@ export const buildQueryAutoSentCmsLHG = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 200*
+  const query = `SELECT TOP 100*
                         ,N'${getFactory('LHG')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
@@ -472,7 +472,7 @@ export const buildQueryAutoSentCmsJAZ = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 200*
+  const query = `SELECT TOP 100*
                         ,N'${getFactory('JAZ')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
@@ -535,7 +535,7 @@ export const buildQueryAutoSentCmsJZS = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 200*
+  const query = `SELECT TOP 100*
                         ,N'${getFactory('JZS')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
