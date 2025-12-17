@@ -20,12 +20,10 @@ export class Cat6Service {
   ) {
     const offset = (page - 1) * limit;
     const query = `SELECT *
-                    FROM CDS_HRBUSS_BusTripData
-                    --WHERE DOC_NBR = 'LYV-HR-BT251100017'`;
+                    FROM CDS_HRBUSS_BusTripData`;
 
     const countQuery = `SELECT COUNT(*) as total
-                        FROM CDS_HRBUSS_BusTripData
-                        --WHERE DOC_NBR = 'LYV-HR-BT251100017'`;
+                        FROM CDS_HRBUSS_BusTripData`;
 
     const [dataResults, countResults] = await Promise.all([
       this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<
@@ -36,13 +34,46 @@ export class Cat6Service {
       }) as Promise<{ total: number }[]>,
     ]);
 
-    const records: ICat6Query[] = dataResults.map((item) => ({
+    const records: ICat6Record[] = dataResults.map((item) => ({
       ...item,
-      Routes: JSON.parse(item.Routes),
-      Accommodation: JSON.parse(item.Accommodation)
+      Routes: item.Routes ? JSON.parse(item.Routes) : [],
+      Accommodation: item.Accommodation ? JSON.parse(item.Accommodation) : [],
     }));
 
-    return { records };
+    const data = records.map((item) => ({
+      Document_Date: item.CreatedAt,
+      Document_Number: item.DOC_NBR,
+      Staff_ID: item.UserCreate,
+      Round_trip_One_way: item.TypeTravel,
+      Start_Time: item.DateStart,
+      End_Time: item.DateEnd,
+      Business_Trip_Type: item.Factory,
+      Place_of_Departure: '',
+      Departure_Airport: '',
+      Land_Transport_Distance_km_A: 'API Calculation',
+      Land_Trasportation_Type_A: 'Company Shuttle Car',
+      Destination_Airport: 'Coming soon...',
+      Third_country_transfer_Destination: 'Coming soon...',
+      Land_Transport_Distance_km_B: 'API Calculation',
+      Land_Transportation_Type_B: 'Company Shuttle Car',
+      // Third_country_transfer: '',
+      Destination_2: '',
+      Destination_3: '',
+      Destination_4: '',
+      Destination_5: '',
+      Destination_6: '',
+      Land_Transport_Distance_km: '',
+      Land_Transportation_Type: 'Company Shuttle Car',
+      Air_Transport_Distance_km: 'API Calculation',
+      Number_of_nights_stayed: item.Accommodation.reduce(
+        (prev, curr) => Number(prev) + Number(curr.nights),
+        0,
+      ),
+    }));
+
+    // console.log(records);
+    return records;
+    // return data
 
     // let data: ICat6Data[] = records.map((item) => {
     //   const routes = item.Routes.filter((item) => item.isAirport === true);

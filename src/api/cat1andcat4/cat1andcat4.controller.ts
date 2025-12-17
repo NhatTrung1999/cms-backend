@@ -1,5 +1,14 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { Cat1andcat4Service } from './cat1andcat4.service';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('cat1andcat4')
 export class Cat1andcat4Controller {
@@ -24,5 +33,24 @@ export class Cat1andcat4Controller {
       sortField,
       sortOrder,
     );
+  }
+
+  @Get('get-port-code')
+  async getPortCode(
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.cat1andcat4Service.getPortCode(sortField, sortOrder);
+  }
+
+  @Post('import-excel-port-code')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }),
+  )
+  async importExcelPortCode(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded!');
+
+    const data = await this.cat1andcat4Service.importExcelPortCode(file);
+    return data;
   }
 }

@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { Cat5Service } from './cat5.service';
+import { Public } from 'src/decorators';
 
 @Controller('cat5')
 export class Cat5Controller {
@@ -26,4 +27,14 @@ export class Cat5Controller {
       sortOrder,
     );
   }
+
+  @Public()
+    @Get('auto-sent-cms')
+    async autoSentCMS(
+      @Query('dateFrom') dateFrom: string,
+      @Query('dateTo') dateTo: string,
+    ) {
+      const data = await this.cat5Service.autoSentCMS(dateFrom, dateTo);
+      return data;
+    }
 }

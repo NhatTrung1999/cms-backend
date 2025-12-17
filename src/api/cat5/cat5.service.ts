@@ -5,10 +5,14 @@ import {
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
+import { buildQueryAutoSentCMS } from 'src/helper/cat5.helper';
+import dayjs from 'dayjs';
+dayjs().format();
 
 @Injectable()
 export class Cat5Service {
   constructor(
+    @Inject('EIP') private readonly EIP: Sequelize,
     @Inject('LYV_WMS') private readonly LYV_WMS: Sequelize,
     @Inject('LHG_WMS') private readonly LHG_WMS: Sequelize,
     @Inject('LYM_WMS') private readonly LYM_WMS: Sequelize,
@@ -285,6 +289,85 @@ export class Cat5Service {
       const hasMore = offset + data.length < total;
 
       return { data, page, limit, total, hasMore };
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  async autoSentCMS(dateFrom: string, dateTo: string) {
+    try {
+      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+      const connects = [
+        // this.LYV_WMS,
+        // this.LHG_WMS,
+        // this.LYM_WMS,
+        // this.LVL_WMS,
+        this.JAZ_WMS,
+        // this.JZS_WMS,
+      ];
+
+      const dataResult = await Promise.all(
+        connects.map(async (conn) => {
+          return conn.query(await buildQueryAutoSentCMS(dateFrom, dateTo, this.EIP), {
+            type: QueryTypes.SELECT,
+            replacements,
+          });
+        }),
+      );
+
+      // console.log(dataResult);
+      const data = dataResult.flat();
+
+      const formatData = data.map((item: any) => {
+        const custVenName = item.Vendor_ID;
+        const departure = item.Factory_address;
+        const destination = item.Waste_collection_address;
+        const product = `${item.The_type_of_waste} - ${item.Waste_type}`;
+        const activityData = item.Weight_of_waste_treated_Unit_kg;
+        const memo = item.Waste_Treatment_method;
+        const factoryName = item.Factory_Name;
+
+        return {
+          System: 'CMS', //default
+          Corporation: 'LAI YIH', //default
+          Factory: factoryName,
+          Department: '',
+          DocKey: 'S3.C5', //default
+          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+          ActivityType: '3.6', //default
+          DataType: '1', //default
+          DocType: 'CMS Web', //default
+          UndDoc: '',
+          DocFlow: '',
+          DocDate: '',
+          DocDate2: '',
+          DocNo: '',
+          UndDocNo: '',
+          CustVenName: custVenName,
+          InvoiceNo: '',
+          TransType: '陸運', //default
+          Departure: departure,
+          Destination: destination,
+          PortType: '',
+          StPort: '',
+          ThPort: '',
+          EndPort: '',
+          Product: product,
+          Quity: '',
+          Amount: '',
+          ActivityData: activityData,
+          ActivityUnit: 'KG', //default
+          Unit: '',
+          UnitWeight: '',
+          Memo: memo,
+          CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+          Creator: '',
+        };
+      });
+
+      return formatData;
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }

@@ -6,6 +6,10 @@ import {
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { buildQuery } from 'src/helper/cat1andcat4.helper';
+import { IDataPortCodeCat1AndCat4 } from 'src/types/cat1andcat4';
+import * as ExcelJS from 'exceljs';
+import * as fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class Cat1andcat4Service {
@@ -153,6 +157,20 @@ export class Cat1andcat4Service {
     // }
   }
 
+  async getPortCode(
+    sortField: string = 'SupplierID',
+    sortOrder: string = 'asc',
+  ): Promise<IDataPortCodeCat1AndCat4[]> {
+    const records: IDataPortCodeCat1AndCat4[] = await this.EIP.query(
+      `SELECT *
+        FROM CMW_PortCode_Cat1_4
+        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+        `,
+      { type: QueryTypes.SELECT },
+    );
+    return records;
+  }
+
   private async getAFactoryData(
     db: Sequelize,
     dateFrom: string,
@@ -264,6 +282,154 @@ export class Cat1andcat4Service {
       return { data, page, limit, total, hasMore };
     } catch (error: any) {
       throw new InternalServerErrorException(error);
+    }
+  }
+
+  async importExcelPortCode(file: Express.Multer.File) {
+    try {
+      let insertCount = 0;
+      let updateCount = 0;
+      if (!file.path || !fs.existsSync(file.path)) {
+        throw new Error('File path not found!');
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(file.path);
+      const worksheet = workbook.getWorksheet(1);
+      if (!worksheet) {
+        throw new Error('No worksheet found in the Excel file');
+      }
+
+      const headerRow = worksheet.getRow(1);
+      // console.log(headerRow);
+      const headers: string[] = [];
+      headerRow.eachCell((cell) => {
+        if (cell.value) {
+          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
+        }
+      });
+
+      console.log(headers);
+      const requiredHeaders = ['Supplier_ID', 'Transport_Method', 'Port_Code'];
+      const missingHeaders = requiredHeaders.filter(
+        (h) => !headers.includes(h),
+      );
+
+      if (missingHeaders.length > 0) {
+        throw new Error(
+          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
+        );
+      }
+
+      const data: {
+        Supplier_ID: string;
+        Transport_Method: string;
+        Port_Code: string;
+      }[] = [];
+
+      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        if (rowNumber === 1 && row.cellCount > 0) return;
+
+        const rowData: any = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const headerCell = headerRow.getCell(colNumber);
+          const headerValue = headerCell.value;
+          if (headerValue !== null && headerValue !== undefined) {
+            const key = headerValue.toString().trim().replace(/\s+/g, '_');
+            rowData[key] = cell.value;
+            // console.log(cell.value);
+          }
+        });
+        if (
+          rowData?.Supplier_ID &&
+          rowData?.Transport_Method &&
+          rowData?.Port_Code
+        ) {
+          data.push(rowData);
+        }
+      });
+      // console.log(data);
+      // return { data, length: data.length };
+
+      for (let item of data) {
+        const id = uuidv4();
+        const records: { total: number }[] = await this.EIP.query(
+          `SELECT COUNT(*) total
+            FROM CMW_PortCode_Cat1_4
+            WHERE SupplierID = ? AND TransportMethod = ?`,
+          {
+            replacements: [item.Supplier_ID, item.Transport_Method],
+            type: QueryTypes.SELECT,
+          },
+        );
+
+        if (records[0].total > 0) {
+          await this.EIP.query(
+            `UPDATE CMW_PortCode_Cat1_4
+            SET
+                  PortCode = ?,
+                  UpdatedBy = ?,
+                  UpdatedFactory = ?,
+                  UpdatedDate = GETDATE()
+            WHERE SupplierID = ? AND TransportMethod = ?`,
+            {
+              replacements: [
+                item.Port_Code,
+                'admin',
+                'LYV',
+                item.Supplier_ID,
+                item.Transport_Method,
+              ],
+              type: QueryTypes.SELECT,
+            },
+          );
+          updateCount++;
+        } else {
+          await this.EIP.query(
+            `INSERT INTO CMW_PortCode_Cat1_4
+                    (
+                          Id,
+                          SupplierID,
+                          PortCode,
+                          TransportMethod,
+                          CreatedBy,
+                          CreatedFactory,
+                          CreatedDate
+                    )
+                    VALUES
+                    (
+                          ?,
+                          ?,
+                          ?,
+                          ?,
+                          ?,
+                          ?,
+                          GETDATE()
+                    )`,
+            {
+              replacements: [
+                id,
+                item.Supplier_ID,
+                item.Port_Code,
+                item.Transport_Method,
+                'admin',
+                'LYV',
+              ],
+              type: QueryTypes.INSERT,
+            },
+          );
+          insertCount++;
+        }
+      }
+      const records: any = await this.EIP.query(
+        `SELECT *
+          FROM CMW_PortCode_Cat1_4`,
+        { type: QueryTypes.SELECT },
+      );
+      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      return { message, records };
+    } catch (error: any) {
+      throw new InternalServerErrorException(`${error.message}`);
     }
   }
 }
