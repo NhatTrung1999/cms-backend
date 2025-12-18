@@ -22,10 +22,12 @@ export interface ICat6Query {
 export interface ICat6Record
   extends Omit<ICat6Query, 'Routes' | 'Accommodation'> {
   Routes: {
-    AddressName: string;
+    AddressName?: string;
     Transport: string;
-    AddressDetail: string;
+    AddressDetail?: string;
     isAirport: boolean;
+    From?: string
+    To?: string
   }[];
 
   Accommodation: {

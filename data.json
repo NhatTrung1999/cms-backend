@@ -1,0 +1,146 @@
+[
+    {
+        "TripID": 67,
+        "DOC_NBR": "LYV_HR_BT251200012",
+        "Factory": "outside_oversea",
+        "Departure": "LYM",
+        "Destination": "HongKong",
+        "TypeTravel": "oneway",
+        "Routes": [
+            {
+                "AddressName": "LYM",
+                "Transport": "Company Shuttle Car",
+                "AddressDetail": "Plot No.X3-X6, Block No.20, Sabei Street, Anawratha Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar",
+                "isAirport": false
+            },
+            {
+                "Transport": "Flight",
+                "isAirport": true,
+                "From": "RGN",
+                "To": "AAH"
+            },
+            {
+                "AddressName": "Cong ty JULIEN",
+                "Transport": "Company Shuttle Car",
+                "AddressDetail": "???ng s? 6 KCN Nh?n Tr?ch 1, xa Ph??c Thi?n, Nh?n Tr?ch, ??ng Nai",
+                "isAirport": false
+            },
+            {
+                "AddressName": "Cong ty TNHH MTV SIAM CITY CEMENT VI?T NAM",
+                "Transport": "Company Shuttle Car",
+                "AddressDetail": "Nha may Hon Chong, xa Binh An, huy?n Kien L??ng, t?nh Kien Giang",
+                "isAirport": false
+            }
+        ],
+        "DuringDay": 0,
+        "Distance": null,
+        "TotalMoney": null,
+        "Accommodation": [
+            {
+                "id": "1",
+                "isSameAsAbove": false,
+                "type": "hotel",
+                "address": "Công ty JULIEN",
+                "nights": 1
+            },
+            {
+                "id": "2",
+                "isSameAsAbove": true,
+                "type": "hotel",
+                "address": "Công ty JULIEN",
+                "nights": 1
+            },
+            {
+                "id": "4",
+                "isSameAsAbove": false,
+                "type": "hotel",
+                "address": "Hotel Address 1",
+                "nights": 6
+            },
+            {
+                "id": "99",
+                "isSameAsAbove": false,
+                "type": "hotel",
+                "address": "Hotel Address 2",
+                "nights": 1
+            }
+        ],
+        "CreatedAt": "2025-12-18T13:14:51.350Z",
+        "UserCreate": "34114",
+        "BPMStatus": "D    ",
+        "YN": 0,
+        "Factory_User": "IT ",
+        "DateStart": "2025-12-10T00:00:00.000Z",
+        "DateEnd": "2025-12-18T00:00:00.000Z",
+        "StayNight": null
+    },
+    {
+        "TripID": 67,
+        "DOC_NBR": "LYV_HR_BT251200012",
+        "Factory": "outside_oversea",
+        "Departure": "LYM",
+        "Destination": "HongKong",
+        "TypeTravel": "oneway",
+        "Routes": [
+            {
+                "Transport": "Flight",
+                "isAirport": true,
+                "From": "AAH",
+                "To": "ABD"
+            },
+            {
+                "AddressName": "CONG TY TNHH SHING SHEN",
+                "Transport": "Car",
+                "AddressDetail": "72 ???NG DT747B, KHU PH? KHANH LONG, PH??NG TAN PH??C KHANH, TP HCM, VI?T NAM",
+                "isAirport": false
+            },
+            {
+                "AddressName": "HongKong",
+                "Transport": "Company Shuttle Car",
+                "AddressDetail": "77 Hoi Bun Rd, Kwun Tong, Hong Kong ",
+                "isAirport": false
+            }
+        ],
+        "DuringDay": 0,
+        "Distance": null,
+        "TotalMoney": null,
+        "Accommodation": [
+            {
+                "id": "1",
+                "isSameAsAbove": false,
+                "type": "hotel",
+                "address": "Công ty JULIEN",
+                "nights": 1
+            },
+            {
+                "id": "2",
+                "isSameAsAbove": true,
+                "type": "hotel",
+                "address": "Công ty JULIEN",
+                "nights": 1
+            },
+            {
+                "id": "4",
+                "isSameAsAbove": false,
+                "type": "hotel",
+                "address": "Hotel Address 1",
+                "nights": 6
+            },
+            {
+                "id": "99",
+                "isSameAsAbove": false,
+                "type": "hotel",
+                "address": "Hotel Address 2",
+                "nights": 1
+            }
+        ],
+        "CreatedAt": "2025-12-18T13:14:51.350Z",
+        "UserCreate": "34114",
+        "BPMStatus": "D    ",
+        "YN": 0,
+        "Factory_User": "IT ",
+        "DateStart": "2025-12-10T00:00:00.000Z",
+        "DateEnd": "2025-12-18T00:00:00.000Z",
+        "StayNight": null
+    }
+]
