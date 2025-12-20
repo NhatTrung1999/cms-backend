@@ -438,30 +438,30 @@ export class Cat7Service {
   async autoSentCMS(dateFrom: string, dateTo: string) {
     try {
       const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-      const [dataLYV, dataLHG, dataLVL, dataLYM, dataJAZ, dataJZS] =
+      const [dataLYV] =
         await Promise.all([
           // const [dataLYV, dataLHG, dataLVL, dataLYM, dataJAZ, dataJZS] = await Promise.all([
-          await this.LYV_HRIS.query(
-            await buildQueryAutoSentCmsLYV(dateFrom, dateTo, this.EIP),
-            {
-              type: QueryTypes.SELECT,
-              replacements,
-            },
-          ),
-          await this.LHG_HRIS.query(
-            await buildQueryAutoSentCmsLHG(dateFrom, dateTo, this.EIP),
-            {
-              type: QueryTypes.SELECT,
-              replacements,
-            },
-          ),
-          await this.LVL_HRIS.query(
-            await buildQueryAutoSentCmsLVL(dateFrom, dateTo, this.EIP),
-            {
-              type: QueryTypes.SELECT,
-              replacements,
-            },
-          ),
+          // await this.LYV_HRIS.query(
+          //   await buildQueryAutoSentCmsLYV(dateFrom, dateTo, this.EIP),
+          //   {
+          //     type: QueryTypes.SELECT,
+          //     replacements,
+          //   },
+          // ),
+          // await this.LHG_HRIS.query(
+          //   await buildQueryAutoSentCmsLHG(dateFrom, dateTo, this.EIP),
+          //   {
+          //     type: QueryTypes.SELECT,
+          //     replacements,
+          //   },
+          // ),
+          // await this.LVL_HRIS.query(
+          //   await buildQueryAutoSentCmsLVL(dateFrom, dateTo, this.EIP),
+          //   {
+          //     type: QueryTypes.SELECT,
+          //     replacements,
+          //   },
+          // ),
           await this.LYM_HRIS.query(
             await buildQueryAutoSentCmsLYM(dateFrom, dateTo, this.EIP),
             {
@@ -469,27 +469,27 @@ export class Cat7Service {
               replacements,
             },
           ),
-          await this.JAZ_HRIS.query(
-            await buildQueryAutoSentCmsJAZ(dateFrom, dateTo, this.EIP),
-            {
-              type: QueryTypes.SELECT,
-              replacements,
-            },
-          ),
-          await this.JZS_HRIS.query(
-            await buildQueryAutoSentCmsJZS(dateFrom, dateTo, this.EIP),
-            {
-              type: QueryTypes.SELECT,
-              replacements,
-            },
-          ),
+          // await this.JAZ_HRIS.query(
+          //   await buildQueryAutoSentCmsJAZ(dateFrom, dateTo, this.EIP),
+          //   {
+          //     type: QueryTypes.SELECT,
+          //     replacements,
+          //   },
+          // ),
+          // await this.JZS_HRIS.query(
+          //   await buildQueryAutoSentCmsJZS(dateFrom, dateTo, this.EIP),
+          //   {
+          //     type: QueryTypes.SELECT,
+          //     replacements,
+          //   },
+          // ),
         ]);
 
       // console.log(123);
 
       const data = [
-        // ...dataLYV,
-        ...dataLHG,
+        ...dataLYV,
+        // ...dataLHG,
         // ...dataLVL,
         // ...dataLYM,
         // ...dataJAZ,

@@ -5,14 +5,14 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
 
-type Route = {
+interface Route {
   AddressName?: string;
-  Transport: string;
   AddressDetail?: string;
+  Transport: string;
   isAirport: boolean;
   From?: string;
   To?: string;
-};
+}
 
 @Injectable()
 export class Cat6Service {
@@ -30,11 +30,11 @@ export class Cat6Service {
     const offset = (page - 1) * limit;
     const query = `SELECT *
                     FROM CDS_HRBUSS_BusTripData
-                    WHERE DOC_NBR = 'LYV_HR_BT251200012'`;
+                    WHERE DOC_NBR = 'LYV_HR_BT251200014'`;
 
     const countQuery = `SELECT COUNT(*) as total
                         FROM CDS_HRBUSS_BusTripData
-                        WHERE DOC_NBR = 'LYV_HR_BT251200012'`;
+                        WHERE DOC_NBR = 'LYV_HR_BT251200014'`;
 
     const [dataResults, countResults] = await Promise.all([
       this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<
@@ -48,41 +48,41 @@ export class Cat6Service {
     const records: ICat6Record[] = dataResults
       .map((item) => ({
         ...item,
-        Routes: item.Routes ? JSON.parse(item.Routes) : [],
+        Routes: item.Routes
+          ? JSON.parse(item.Routes).map((r: any) => this.normalizeRoute(r))
+          : [],
         Accommodation: item.Accommodation ? JSON.parse(item.Accommodation) : [],
       }))
-      // .flatMap((record) => this.splitTripByFlights(record));
+      .flatMap((record) => this.splitRecordByAirport(record));
 
-    // const data = records.map((item) => ({
-    //   Document_Date: item.CreatedAt,
-    //   Document_Number: item.DOC_NBR,
-    //   Staff_ID: item.UserCreate,
-    //   Round_trip_One_way: item.TypeTravel,
-    //   Start_Time: item.DateStart,
-    //   End_Time: item.DateEnd,
-    //   Business_Trip_Type: item.Factory,
-    //   Place_of_Departure: '',
-    //   Departure_Airport: '',
-    //   Land_Transport_Distance_km_A: 'API Calculation',
-    //   Land_Trasportation_Type_A: 'Company Shuttle Car',
-    //   Destination_Airport: 'Coming soon...',
-    //   Third_country_transfer_Destination: 'Coming soon...',
-    //   Land_Transport_Distance_km_B: 'API Calculation',
-    //   Land_Transportation_Type_B: 'Company Shuttle Car',
-    //   // Third_country_transfer: '',
-    //   Destination_2: '',
-    //   Destination_3: '',
-    //   Destination_4: '',
-    //   Destination_5: '',
-    //   Destination_6: '',
-    //   Land_Transport_Distance_km: '',
-    //   Land_Transportation_Type: 'Company Shuttle Car',
-    //   Air_Transport_Distance_km: 'API Calculation',
-    //   Number_of_nights_stayed: item.Accommodation.reduce(
-    //     (prev, curr) => Number(prev) + Number(curr.nights),
-    //     0,
-    //   ),
-    // }));
+    // const data = records.map((item) => {
+    //   return {
+    //     Document_Date: item.CreatedAt,
+    //     Document_Number: item.DOC_NBR,
+    //     Staff_ID: item.UserCreate,
+    //     Round_trip_One_way: item.TypeTravel,
+    //     Start_Time: item.DateStart,
+    //     End_Time: item.DateEnd,
+    //     Business_Trip_Type: item.Factory,
+    //     Place_of_Departure: item.Routes[0].AddressDetail,
+    //     Departure_Airport: item.Routes[1].From,
+    //     Land_Transport_Distance_km_A: 'API Calculation',
+    //     Land_Trasportation_Type_A: item.Routes[0].Transport,
+    //     Destination_Airport: item.Routes[1].To,
+    //     Third_country_transfer_Destination: item.Routes[2].AddressDetail,
+    //     Land_Transport_Distance_km_B: 'API Calculation',
+    //     Land_Transportation_Type_B: item.Routes[2].Transport,
+    //     Destination_2: item.Routes[3].AddressDetail,
+    //     Destination_3: '',
+    //     Destination_4: '',
+    //     Destination_5: '',
+    //     Destination_6: '',
+    //     Land_Transport_Distance_km: 'API Calculation',
+    //     Land_Transportation_Type: item.Routes[2].Transport,
+    //     Air_Transport_Distance_km: 'API Calculation',
+    //     Number_of_nights_stayed: 0,
+    //   };
+    // });
 
     // console.log(records);
     return records;
@@ -149,37 +149,46 @@ export class Cat6Service {
     // return { data, page, limit, total, hasMore };
   }
 
-  private splitTripByFlights<T extends { Routes: Route[] }>(
-    trip: T,
-  ): T[] {
-    const routes = trip.Routes;
-    const result: T[] = [];
-  
-    let buffer: Route[] = [];
-  
+  private splitRecordByAirport(record: ICat6Record): ICat6Record[] {
+    const routes = record.Routes;
+    const result: ICat6Record[] = [];
+
+    let startIndex = 0;
+    let airportCount = 0;
+
     for (let i = 0; i < routes.length; i++) {
-      const current = routes[i];
-  
-      if (current.isAirport && buffer.some(r => r.isAirport)) {
-        result.push({
-          ...trip,
-          Routes: buffer,
-        });
-        buffer = [];
+      if (routes[i].isAirport) {
+        airportCount++;
+
+        if (airportCount > 1) {
+          const cutIndex = i - 1;
+
+          result.push({
+            ...record,
+            Routes: routes.slice(startIndex, cutIndex + 1),
+          });
+
+          startIndex = cutIndex;
+        }
       }
-  
-      buffer.push(current);
     }
-  
-    if (buffer.length) {
-      result.push({
-        ...trip,
-        Routes: buffer,
-      });
-    }
-  
+
+    result.push({
+      ...record,
+      Routes: routes.slice(startIndex),
+    });
+
     return result;
   }
+
+  private normalizeRoute(route: any): Route {
+    return {
+      AddressName: route.AddressName ?? null,
+      AddressDetail: route.AddressDetail ?? null,
+      Transport: route.Transport,
+      isAirport: route.isAirport,
+      From: route.From ?? null,
+      To: route.To ?? null,
+    };
+  }
 }
-
-
