@@ -37,18 +37,14 @@ export class Cat1andcat4Service {
         break;
       case 'LHG':
         db = this.LHG_ERP;
-      // return 'LHG coming soon...';
-      // break;
+        break;
       case 'LYM':
         db = this.LYM_ERP;
-      // return 'LYM coming soon...';
-      // break;
+        break;
       case 'LVL':
         db = this.LVL_ERP;
-      // return 'LHG coming soon...';
-      // break;
+        break;
       default:
-        // return 'Coming soon...';
         return await this.getAllFactoryData(
           dateFrom,
           dateTo,

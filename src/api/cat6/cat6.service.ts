@@ -30,11 +30,11 @@ export class Cat6Service {
     const offset = (page - 1) * limit;
     const query = `SELECT *
                     FROM CDS_HRBUSS_BusTripData
-                    WHERE DOC_NBR = 'LYV_HR_BT251200014'`;
+                    WHERE DOC_NBR = 'LYV_HR_BT251200015'`;
 
     const countQuery = `SELECT COUNT(*) as total
                         FROM CDS_HRBUSS_BusTripData
-                        WHERE DOC_NBR = 'LYV_HR_BT251200014'`;
+                        WHERE DOC_NBR = 'LYV_HR_BT251200015'`;
 
     const [dataResults, countResults] = await Promise.all([
       this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<

@@ -329,7 +329,7 @@ export class Cat5Service {
         const factoryName = item.Factory_Name;
 
         return {
-          System: 'CMS', //default
+          System: 'CMW', //default
           Corporation: 'LAI YIH', //default
           Factory: factoryName,
           Department: '',
