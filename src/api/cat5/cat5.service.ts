@@ -301,23 +301,28 @@ export class Cat5Service {
       const connects = [
         // this.LYV_WMS,
         // this.LHG_WMS,
-        // this.LYM_WMS,
+        this.LYM_WMS,
         // this.LVL_WMS,
-        this.JAZ_WMS,
+        // this.JAZ_WMS,
         // this.JZS_WMS,
       ];
 
       const dataResult = await Promise.all(
         connects.map(async (conn) => {
-          return conn.query(await buildQueryAutoSentCMS(dateFrom, dateTo, this.EIP), {
-            type: QueryTypes.SELECT,
-            replacements,
-          });
+          return conn.query(
+            await buildQueryAutoSentCMS(dateFrom, dateTo, this.EIP),
+            {
+              type: QueryTypes.SELECT,
+              replacements,
+            },
+          );
         }),
       );
 
       // console.log(dataResult);
       const data = dataResult.flat();
+
+      // console.log(data);
 
       const formatData = data.map((item: any) => {
         const custVenName = item.Vendor_ID;
@@ -327,6 +332,7 @@ export class Cat5Service {
         const activityData = item.Weight_of_waste_treated_Unit_kg;
         const memo = item.Waste_Treatment_method;
         const factoryName = item.Factory_Name;
+        const wasteDisposalDate = item.Waste_disposal_date;
 
         return {
           System: 'CMW', //default
@@ -341,8 +347,8 @@ export class Cat5Service {
           DocType: 'CMS Web', //default
           UndDoc: '',
           DocFlow: '',
-          DocDate: '',
-          DocDate2: '',
+          DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
+          DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
           DocNo: '',
           UndDocNo: '',
           CustVenName: custVenName,

@@ -150,7 +150,7 @@ export const buildQueryAutoSentCMS = async (
 ) => {
   const queryAddress = `SELECT [Address]
                         FROM CMW_Info_Factory
-                        WHERE CreatedFactory = 'JAZ'`;
+                        WHERE CreatedFactory = 'LYM'`;
 
   const factoryAddress =
     (await db?.query(queryAddress, {
@@ -186,7 +186,7 @@ export const buildQueryAutoSentCMS = async (
                           ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
                           ,CAST('0' AS INT)                   AS TKT_Ton_km
                           ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-                          ,N'${getFactory('JAZ')}'  AS Factory_Name
+                          ,N'${getFactory('LYM')}'  AS Factory_Name
                     FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
                           LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
                                 ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
