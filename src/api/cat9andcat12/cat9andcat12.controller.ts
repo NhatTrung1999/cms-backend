@@ -64,4 +64,25 @@ export class Cat9andcat12Controller {
     const data = await this.cat9andcat12Service.autoSentCMS(dateFrom, dateTo);
     return data;
   }
+
+  @Get('get-logging-cat9-and-cat12')
+  async getLoggingCat7(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.cat9andcat12Service.getLoggingCat9AndCat12(
+      dateFrom,
+      dateTo,
+      factory,
+      +page,
+      +limit,
+      sortField,
+      sortOrder,
+    );
+  }
 }

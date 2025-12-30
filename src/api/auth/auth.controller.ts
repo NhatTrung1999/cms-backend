@@ -12,7 +12,7 @@ export class AuthController {
   @Post('login')
   async login(@Request() req) {
     const response = await this.authService.login(req.user);
-    return response
+    return response;
   }
 
   // @UseGuards(JwtAuthGuard)

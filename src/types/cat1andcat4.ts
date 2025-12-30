@@ -5,6 +5,7 @@ export interface IDataPortCodeCat1AndCat4 {
   TWSupplierName: string;
   Country: string;
   PortCode: string;
+  FactoryCode: string;
   CreatedBy: string;
   CreatedFactory: string;
   CreatedDate: string;

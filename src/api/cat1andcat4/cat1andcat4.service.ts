@@ -281,7 +281,11 @@ export class Cat1andcat4Service {
     }
   }
 
-  async importExcelPortCode(file: Express.Multer.File) {
+  async importExcelPortCode(
+    file: Express.Multer.File,
+    userid: string,
+    factory: string,
+  ) {
     try {
       let insertCount = 0;
       let updateCount = 0;
@@ -297,7 +301,6 @@ export class Cat1andcat4Service {
       }
 
       const headerRow = worksheet.getRow(1);
-      // console.log(headerRow);
       const headers: string[] = [];
       headerRow.eachCell((cell) => {
         if (cell.value) {
@@ -305,8 +308,12 @@ export class Cat1andcat4Service {
         }
       });
 
-      console.log(headers);
-      const requiredHeaders = ['Supplier_ID', 'Transport_Method', 'Port_Code'];
+      const requiredHeaders = [
+        'Supplier_ID',
+        'Transport_Method',
+        'Port_Code',
+        'Factory_Code',
+      ];
       const missingHeaders = requiredHeaders.filter(
         (h) => !headers.includes(h),
       );
@@ -321,6 +328,7 @@ export class Cat1andcat4Service {
         Supplier_ID: string;
         Transport_Method: string;
         Port_Code: string;
+        Factory_Code: string;
       }[] = [];
 
       worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
@@ -333,28 +341,31 @@ export class Cat1andcat4Service {
           if (headerValue !== null && headerValue !== undefined) {
             const key = headerValue.toString().trim().replace(/\s+/g, '_');
             rowData[key] = cell.value;
-            // console.log(cell.value);
           }
         });
         if (
           rowData?.Supplier_ID &&
           rowData?.Transport_Method &&
-          rowData?.Port_Code
+          rowData?.Port_Code &&
+          rowData?.Factory_Code
         ) {
           data.push(rowData);
         }
       });
-      // console.log(data);
-      // return { data, length: data.length };
 
       for (let item of data) {
         const id = uuidv4();
         const records: { total: number }[] = await this.EIP.query(
           `SELECT COUNT(*) total
             FROM CMW_PortCode_Cat1_4
-            WHERE SupplierID = ? AND TransportMethod = ?`,
+            WHERE SupplierID = ? AND TransportMethod = ? AND PortCode = ? AND FactoryCode = ?`,
           {
-            replacements: [item.Supplier_ID, item.Transport_Method],
+            replacements: [
+              item.Supplier_ID,
+              item.Transport_Method,
+              item.Port_Code,
+              item.Factory_Code,
+            ],
             type: QueryTypes.SELECT,
           },
         );
@@ -364,6 +375,7 @@ export class Cat1andcat4Service {
             `UPDATE CMW_PortCode_Cat1_4
             SET
                   PortCode = ?,
+                  FactoryCode = ?,
                   UpdatedBy = ?,
                   UpdatedFactory = ?,
                   UpdatedDate = GETDATE()
@@ -371,8 +383,9 @@ export class Cat1andcat4Service {
             {
               replacements: [
                 item.Port_Code,
-                'admin',
-                'LYV',
+                item.Factory_Code,
+                userid,
+                factory,
                 item.Supplier_ID,
                 item.Transport_Method,
               ],
@@ -387,6 +400,7 @@ export class Cat1andcat4Service {
                           Id,
                           SupplierID,
                           PortCode,
+                          FactoryCode,
                           TransportMethod,
                           CreatedBy,
                           CreatedFactory,
@@ -400,6 +414,7 @@ export class Cat1andcat4Service {
                           ?,
                           ?,
                           ?,
+                          ?,
                           GETDATE()
                     )`,
             {
@@ -407,9 +422,10 @@ export class Cat1andcat4Service {
                 id,
                 item.Supplier_ID,
                 item.Port_Code,
+                item.Factory_Code,
                 item.Transport_Method,
-                'admin',
-                'LYV',
+                userid,
+                factory,
               ],
               type: QueryTypes.INSERT,
             },

@@ -4,11 +4,13 @@ import {
   Get,
   Post,
   Query,
+  Request,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { Cat1andcat4Service } from './cat1andcat4.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { getFactortyID, getUserId } from 'src/helper/common.helper';
 
 @Controller('cat1andcat4')
 export class Cat1andcat4Controller {
@@ -47,10 +49,19 @@ export class Cat1andcat4Controller {
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }),
   )
-  async importExcelPortCode(@UploadedFile() file: Express.Multer.File) {
+  async importExcelPortCode(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    const factory = getFactortyID(req);
+    const userid = getUserId(req);
     if (!file) throw new BadRequestException('No file uploaded!');
 
-    const data = await this.cat1andcat4Service.importExcelPortCode(file);
+    const data = await this.cat1andcat4Service.importExcelPortCode(
+      file,
+      userid,
+      factory,
+    );
     return data;
   }
 }

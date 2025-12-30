@@ -29,12 +29,33 @@ export class Cat5Controller {
   }
 
   @Public()
-    @Get('auto-sent-cms')
-    async autoSentCMS(
-      @Query('dateFrom') dateFrom: string,
-      @Query('dateTo') dateTo: string,
-    ) {
-      const data = await this.cat5Service.autoSentCMS(dateFrom, dateTo);
-      return data;
-    }
+  @Get('auto-sent-cms')
+  async autoSentCMS(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+  ) {
+    const data = await this.cat5Service.autoSentCMS(dateFrom, dateTo);
+    return data;
+  }
+
+  @Get('get-logging-cat5')
+  async getLoggingCat7(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.cat5Service.getLoggingCat5(
+      dateFrom,
+      dateTo,
+      factory,
+      +page,
+      +limit,
+      sortField,
+      sortOrder,
+    );
+  }
 }

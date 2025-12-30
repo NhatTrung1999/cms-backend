@@ -299,9 +299,9 @@ export class Cat5Service {
       const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
 
       const connects = [
-        // this.LYV_WMS,
+        this.LYV_WMS,
         // this.LHG_WMS,
-        this.LYM_WMS,
+        // this.LYM_WMS,
         // this.LVL_WMS,
         // this.JAZ_WMS,
         // this.JZS_WMS,
@@ -377,5 +377,61 @@ export class Cat5Service {
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
+  }
+
+  //logging
+  async getLoggingCat5(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    page: number = 1,
+    limit: number = 20,
+    sortField: string = 'System',
+    sortOrder: string = 'asc',
+  ) {
+    const offset = (page - 1) * limit;
+    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+    const [dataResults, countResults] = await Promise.all([
+      this.EIP.query(
+        `SELECT *
+        FROM CMW_Category_5_Log`,
+        { type: QueryTypes.SELECT },
+      ),
+      this.EIP.query(
+        `SELECT COUNT(*) AS total
+        FROM CMW_Category_5_Log`,
+        {
+          type: QueryTypes.SELECT,
+        },
+      ),
+    ]);
+
+    let data = dataResults;
+    data.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    data = data.slice(offset, offset + limit);
+
+    const total = (countResults[0] as { total: number })?.total || 0;
+
+    const hasMore = offset + data.length < total;
+
+    return { data, page, limit, total, hasMore };
+    // const records: any[] = await this.EIP.query(
+    //   `SELECT *
+    //     FROM CMW_Category_7_Log
+    //     ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+    //         `,
+    //   { type: QueryTypes.SELECT },
+    // );
+    // return records;
   }
 }

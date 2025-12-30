@@ -438,52 +438,51 @@ export class Cat7Service {
   async autoSentCMS(dateFrom: string, dateTo: string) {
     try {
       const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-      const [dataLYV] =
-        await Promise.all([
-          // const [dataLYV, dataLHG, dataLVL, dataLYM, dataJAZ, dataJZS] = await Promise.all([
-          // await this.LYV_HRIS.query(
-          //   await buildQueryAutoSentCmsLYV(dateFrom, dateTo, this.EIP),
-          //   {
-          //     type: QueryTypes.SELECT,
-          //     replacements,
-          //   },
-          // ),
-          // await this.LHG_HRIS.query(
-          //   await buildQueryAutoSentCmsLHG(dateFrom, dateTo, this.EIP),
-          //   {
-          //     type: QueryTypes.SELECT,
-          //     replacements,
-          //   },
-          // ),
-          // await this.LVL_HRIS.query(
-          //   await buildQueryAutoSentCmsLVL(dateFrom, dateTo, this.EIP),
-          //   {
-          //     type: QueryTypes.SELECT,
-          //     replacements,
-          //   },
-          // ),
-          await this.LYM_HRIS.query(
-            await buildQueryAutoSentCmsLYM(dateFrom, dateTo, this.EIP),
-            {
-              type: QueryTypes.SELECT,
-              replacements,
-            },
-          ),
-          // await this.JAZ_HRIS.query(
-          //   await buildQueryAutoSentCmsJAZ(dateFrom, dateTo, this.EIP),
-          //   {
-          //     type: QueryTypes.SELECT,
-          //     replacements,
-          //   },
-          // ),
-          // await this.JZS_HRIS.query(
-          //   await buildQueryAutoSentCmsJZS(dateFrom, dateTo, this.EIP),
-          //   {
-          //     type: QueryTypes.SELECT,
-          //     replacements,
-          //   },
-          // ),
-        ]);
+      const [dataLYV] = await Promise.all([
+        // const [dataLYV, dataLHG, dataLVL, dataLYM, dataJAZ, dataJZS] = await Promise.all([
+        // await this.LYV_HRIS.query(
+        //   await buildQueryAutoSentCmsLYV(dateFrom, dateTo, this.EIP),
+        //   {
+        //     type: QueryTypes.SELECT,
+        //     replacements,
+        //   },
+        // ),
+        // await this.LHG_HRIS.query(
+        //   await buildQueryAutoSentCmsLHG(dateFrom, dateTo, this.EIP),
+        //   {
+        //     type: QueryTypes.SELECT,
+        //     replacements,
+        //   },
+        // ),
+        // await this.LVL_HRIS.query(
+        //   await buildQueryAutoSentCmsLVL(dateFrom, dateTo, this.EIP),
+        //   {
+        //     type: QueryTypes.SELECT,
+        //     replacements,
+        //   },
+        // ),
+        await this.LYM_HRIS.query(
+          await buildQueryAutoSentCmsLYM(dateFrom, dateTo, this.EIP),
+          {
+            type: QueryTypes.SELECT,
+            replacements,
+          },
+        ),
+        // await this.JAZ_HRIS.query(
+        //   await buildQueryAutoSentCmsJAZ(dateFrom, dateTo, this.EIP),
+        //   {
+        //     type: QueryTypes.SELECT,
+        //     replacements,
+        //   },
+        // ),
+        // await this.JZS_HRIS.query(
+        //   await buildQueryAutoSentCmsJZS(dateFrom, dateTo, this.EIP),
+        //   {
+        //     type: QueryTypes.SELECT,
+        //     replacements,
+        //   },
+        // ),
+      ]);
 
       // console.log(123);
 
@@ -536,5 +535,61 @@ export class Cat7Service {
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
+  }
+
+  //logging
+  async getLoggingCat7(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    page: number = 1,
+    limit: number = 20,
+    sortField: string = 'System',
+    sortOrder: string = 'asc',
+  ) {
+    const offset = (page - 1) * limit;
+    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+    const [dataResults, countResults] = await Promise.all([
+      this.EIP.query(
+        `SELECT *
+        FROM CMW_Category_7_Log`,
+        { type: QueryTypes.SELECT },
+      ),
+      this.EIP.query(
+        `SELECT COUNT(*) AS total
+        FROM CMW_Category_7_Log`,
+        {
+          type: QueryTypes.SELECT,
+        },
+      ),
+    ]);
+
+    let data = dataResults;
+    data.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    data = data.slice(offset, offset + limit);
+
+    const total = (countResults[0] as { total: number })?.total || 0;
+
+    const hasMore = offset + data.length < total;
+
+    return { data, page, limit, total, hasMore };
+    // const records: any[] = await this.EIP.query(
+    //   `SELECT *
+    //     FROM CMW_Category_7_Log
+    //     ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+    //         `,
+    //   { type: QueryTypes.SELECT },
+    // );
+    // return records;
   }
 }

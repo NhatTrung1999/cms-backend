@@ -43,6 +43,7 @@ export const buildQuery = async (
                             )*KCRKS.Qty
                         )                               Weight_Unitkg
                         ,ISNULL(z.ZSDH ,CGZL.ZSBH)       SupplierCode
+                        ,pc.FactoryCode
                         ,ISNULL(P.Style ,ZSZL.Style)     Style
                         ,CASE 
                               WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
@@ -137,6 +138,12 @@ export const buildQuery = async (
                               )ZLCLSL
                               ON  ZLCLSL.CGNO = c.CGNO
                                   AND ZLCLSL.CLBH = c.CLBH
+                         LEFT JOIN (
+                                  SELECT *
+                                  FROM   CMW.CMW.dbo.CMW_PortCode_Cat1_4
+                                  WHERE  FactoryCode = '${factory}'
+                              )                       AS pc
+                              ON  pc.SupplierID = ISNULL(z.ZSDH ,CGZL.ZSBH) COLLATE SQL_Latin1_General_CP1_CI_AS
                   ${where}`;
   const countQuery = `SELECT COUNT([No]) as total
                       FROM (
@@ -352,6 +359,10 @@ export const getADataExcelFactoryCat1AndCat4 = async (
     {
       header: 'Supplier Code',
       key: 'SupplierCode',
+    },
+    {
+      header: 'Factory Code',
+      key: 'FactoryCode',
     },
     {
       header: 'Style',
