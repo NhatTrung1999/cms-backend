@@ -17,18 +17,20 @@ import { Cat7Module } from './api/cat7/cat7.module';
 import { Cat6Module } from './api/cat6/cat6.module';
 import { Cat1andcat4Module } from './api/cat1andcat4/cat1andcat4.module';
 import { InfofactoryModule } from './api/infofactory/infofactory.module';
+import { HrModule } from './api/hr/hr.module';
 
 @Module({
   imports: [
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'frontend', 'dist'),
-    }),
+    // ServeStaticModule.forRoot({
+    //   rootPath: join(__dirname, '..', 'frontend', 'dist'),
+    // }),
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,
     UsersModule,
     EventsModule,
     FilemanagementModule,
+    HrModule,
     InfofactoryModule,
     Cat9andcat12Module,
     Cat5Module,
