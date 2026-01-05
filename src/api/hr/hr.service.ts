@@ -2,6 +2,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
@@ -142,39 +143,69 @@ export class HrService {
         default:
           throw new Error('Invalid factory code');
       }
-      const records: { total: number }[] = await db.query(
-        `SELECT COUNT(*) total
-          FROM users
-          WHERE userId = ?`,
-        {
-          replacements: [id],
-          type: QueryTypes.SELECT,
-        },
-      );
-      if (records[0].total > 0) {
-        await db.query(
-          `UPDATE users
-            SET
-              Address_Live = ?,
-              Vehicle = ?,
-              UpdatedBy = ?,
-              UpdatedAt = GETDATE()
-            WHERE userId = ?`,
-          {
-            replacements: [
-              updateDto.CurrentAddress,
-              updateDto.TransportationMethod,
-              userid,
-              id,
-            ],
-            type: QueryTypes.SELECT,
-          },
-        );
-      }
+      // const records: { total: number }[] = await db.query(
+      //   `SELECT COUNT(*) total
+      //     FROM users
+      //     WHERE userId = ?`,
+      //   {
+      //     replacements: [id],
+      //     type: QueryTypes.SELECT,
+      //   },
+      // );
+      // if (records[0].total > 0) {
+      //   await db.query(
+      //     `UPDATE users
+      //       SET
+      //         Address_Live = ?,
+      //         Vehicle = ?,
+      //         UpdatedBy = ?,
+      //         UpdatedAt = GETDATE()
+      //       WHERE userId = ?`,
+      //     {
+      //       replacements: [
+      //         updateDto.CurrentAddress,
+      //         updateDto.TransportationMethod,
+      //         userid,
+      //         id,
+      //       ],
+      //       type: QueryTypes.SELECT,
+      //     },
+      //   );
+      // }
 
-      return 'Updated successfully!';
+      // return 'Updated successfully!';
+      const query = `
+        UPDATE users
+        SET
+          Address_Live = :address,
+          Vehicle = :vehicle,
+          UpdatedBy = :updatedBy,
+          UpdatedAt = GETDATE()
+        OUTPUT 
+          INSERTED.userId as id, 
+          INSERTED.Address_Live as CurrentAddress, 
+          INSERTED.Vehicle as TransportationMethod
+        WHERE userId = :id
+      `;
+
+      const results = await db.query(query, {
+        replacements: {
+          address: updateDto.CurrentAddress,
+          vehicle: updateDto.TransportationMethod,
+          updatedBy: userid,
+          id: id,
+        },
+        type: QueryTypes.SELECT,
+      });
+      if (!results || results.length === 0) {
+        throw new NotFoundException('User not found or ID is incorrect');
+      }
+      return results[0];
     } catch (error) {
-      throw new InternalServerErrorException(`${error.message}`);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(error.message);
     }
   }
 
@@ -350,7 +381,14 @@ export class HrService {
       default:
         throw new Error('Invalid factory code');
     }
-    const { query } = await buildQueryHRModule(dateFrom, dateTo, fullName, id, department, factory);
+    const { query } = await buildQueryHRModule(
+      dateFrom,
+      dateTo,
+      fullName,
+      id,
+      department,
+      factory,
+    );
     const replacements: any = [];
     if (dateFrom && dateTo) {
       replacements.push(dateFrom, dateTo);
