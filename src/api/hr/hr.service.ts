@@ -23,6 +23,9 @@ export class HrService {
   async findAll(
     dateFrom: string,
     dateTo: string,
+    fullName: string,
+    id: string,
+    department: string,
     factory: string,
     page: number = 1,
     limit: number = 20,
@@ -53,8 +56,30 @@ export class HrService {
         throw new Error('Invalid factory code');
     }
     const offset = (page - 1) * limit;
-    const { query, countQuery } = buildQueryHRModule(dateFrom, dateTo, factory);
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+    const { query, countQuery } = buildQueryHRModule(
+      dateFrom,
+      dateTo,
+      fullName,
+      id,
+      department,
+      factory,
+    );
+    const replacements: any = [];
+    if (dateFrom && dateTo) {
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (fullName) {
+      replacements.push(`%${fullName}%`);
+    }
+
+    if (id) {
+      replacements.push(`%${id}%`);
+    }
+
+    if (department) {
+      replacements.push(`%${department}%`);
+    }
 
     const [dataResults, countResults] = await Promise.all([
       db.query(query, { replacements, type: QueryTypes.SELECT }),
@@ -63,10 +88,7 @@ export class HrService {
         replacements,
       }),
     ]);
-    //ID, FullName, Department, PermanentAddress, CurrentAddress, TransportationMode, NumberOfWorkingDays
-    // const results = await db.query(`SELECT * FROM users`, {
-    //   type: QueryTypes.SELECT,
-    // });
+
     let data = dataResults;
 
     data.sort((a, b) => {
@@ -85,6 +107,75 @@ export class HrService {
 
     const hasMore = offset + data.length < total;
     return { data, page, limit, total, hasMore };
+  }
+
+  async update(
+    id: string,
+    updateDto: {
+      CurrentAddress: string;
+      TransportationMethod: string;
+    },
+    factory: string,
+    userid: string,
+  ) {
+    try {
+      let db: Sequelize;
+      switch (factory.trim().toUpperCase()) {
+        case 'LYV':
+          db = this.LYV_HRIS;
+          break;
+        case 'LHG':
+          db = this.LHG_HRIS;
+          break;
+        case 'LVL':
+          db = this.LVL_HRIS;
+          break;
+        case 'LYM':
+          db = this.LYM_HRIS;
+          break;
+        case 'JAZ':
+          db = this.JAZ_HRIS;
+          break;
+        case 'JZS':
+          db = this.JZS_HRIS;
+          break;
+        default:
+          throw new Error('Invalid factory code');
+      }
+      const records: { total: number }[] = await db.query(
+        `SELECT COUNT(*) total
+          FROM users
+          WHERE userId = ?`,
+        {
+          replacements: [id],
+          type: QueryTypes.SELECT,
+        },
+      );
+      if (records[0].total > 0) {
+        await db.query(
+          `UPDATE users
+            SET
+              Address_Live = ?,
+              Vehicle = ?,
+              UpdatedBy = ?,
+              UpdatedAt = GETDATE()
+            WHERE userId = ?`,
+          {
+            replacements: [
+              updateDto.CurrentAddress,
+              updateDto.TransportationMethod,
+              userid,
+              id,
+            ],
+            type: QueryTypes.SELECT,
+          },
+        );
+      }
+
+      return 'Updated successfully!';
+    } catch (error) {
+      throw new InternalServerErrorException(`${error.message}`);
+    }
   }
 
   async importFromExcel(
@@ -226,5 +317,112 @@ export class HrService {
     } catch (error) {
       throw new InternalServerErrorException(`${error.message}`);
     }
+  }
+
+  async exportToExcel(
+    dateFrom: string,
+    dateTo: string,
+    fullName: string,
+    id: string,
+    department: string,
+    factory: string,
+  ) {
+    let db: Sequelize;
+    switch (factory.trim().toUpperCase()) {
+      case 'LYV':
+        db = this.LYV_HRIS;
+        break;
+      case 'LHG':
+        db = this.LHG_HRIS;
+        break;
+      case 'LVL':
+        db = this.LVL_HRIS;
+        break;
+      case 'LYM':
+        db = this.LYM_HRIS;
+        break;
+      case 'JAZ':
+        db = this.JAZ_HRIS;
+        break;
+      case 'JZS':
+        db = this.JZS_HRIS;
+        break;
+      default:
+        throw new Error('Invalid factory code');
+    }
+    const { query } = await buildQueryHRModule(dateFrom, dateTo, fullName, id, department, factory);
+    const replacements: any = [];
+    if (dateFrom && dateTo) {
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (fullName) {
+      replacements.push(`%${fullName}%`);
+    }
+
+    if (id) {
+      replacements.push(`%${id}%`);
+    }
+
+    if (department) {
+      replacements.push(`%${department}%`);
+    }
+    const data = await db.query(query, {
+      type: QueryTypes.SELECT,
+      replacements,
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('List');
+
+    worksheet.columns = [
+      {
+        header: 'ID',
+        key: 'ID',
+      },
+      {
+        header: 'Full Name',
+        key: 'FullName',
+      },
+      {
+        header: 'Department',
+        key: 'Department',
+      },
+      {
+        header: 'Permanent Address',
+        key: 'PermanentAddress',
+      },
+      {
+        header: 'Current Address',
+        key: 'CurrentAddress',
+      },
+      {
+        header: 'Transportation Method',
+        key: 'TransportationMethod',
+      },
+      {
+        header: 'Number of Working Days',
+        key: 'Number_of_Working_Days',
+      },
+    ];
+
+    worksheet.addRows(data);
+
+    worksheet.columns.forEach((column, index) => {
+      let maxLength = 10;
+      if (typeof column.eachCell === 'function') {
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? cell.value.toString() : '';
+          const cellLength = cellValue.length;
+
+          if (cellLength > maxLength) {
+            maxLength = cellLength;
+          }
+        });
+      }
+      column.width = Math.min(maxLength + 4, 50);
+    });
+
+    return await workbook.xlsx.writeBuffer();
   }
 }
