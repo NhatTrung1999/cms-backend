@@ -49,6 +49,12 @@ export class HrController {
     );
   }
 
+  @Get('department')
+  async findAllDepartment(@Request() req) {
+    const factory = getFactortyID(req);
+    return this.hrService.findAllDepartment(factory);
+  }
+
   @Patch(':id')
   async update(
     @Param('id') id: string,

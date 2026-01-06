@@ -33,13 +33,14 @@ export class Cat5Controller {
   async autoSentCMS(
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
   ) {
-    const data = await this.cat5Service.autoSentCMS(dateFrom, dateTo);
+    const data = await this.cat5Service.autoSentCMS(dateFrom, dateTo, factory);
     return data;
   }
 
   @Get('get-logging-cat5')
-  async getLoggingCat7(
+  async getLoggingCat5(
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,

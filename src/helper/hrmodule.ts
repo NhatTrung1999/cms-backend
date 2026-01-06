@@ -26,18 +26,8 @@ export const buildQueryHRModule = (
   }
 
   if (department && !isLYM) {
-    conditions.push(`c.Department_Name LIKE ?`);
+    conditions.push(`c.Department_Serial_Key LIKE ?`);
   }
-
-  // const fullNameFilter = factory !== 'LYM' ? ` AND a.fullName LIKE ?` : '';
-  // const idFilter = factory !== 'LYM' ? ` AND a.userId LIKE ?` : '';
-  // const departmentFilter =
-  //   factory !== 'LYM' ? ` AND c.Department_Name LIKE ?` : '';
-
-  // const dateFilter: string =
-  //   factory !== 'LYM'
-  //     ? ` AND CONVERT(DATE ,e.Check_Day) BETWEEN ? AND ?`
-  //     : ` AND CONVERT(DATE ,c.CDate) BETWEEN ? AND ?`;
 
   const select: string = isLYM
     ? `a.userId                 AS ID

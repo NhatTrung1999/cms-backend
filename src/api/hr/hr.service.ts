@@ -110,6 +110,43 @@ export class HrService {
     return { data, page, limit, total, hasMore };
   }
 
+  async findAllDepartment(factory: string) {
+    try {
+      let db: Sequelize;
+      switch (factory.trim().toUpperCase()) {
+        case 'LYV':
+          db = this.LYV_HRIS;
+          break;
+        case 'LHG':
+          db = this.LHG_HRIS;
+          break;
+        case 'LVL':
+          db = this.LVL_HRIS;
+          break;
+        case 'LYM':
+          db = this.LYM_HRIS;
+          break;
+        case 'JAZ':
+          db = this.JAZ_HRIS;
+          break;
+        case 'JZS':
+          db = this.JZS_HRIS;
+          break;
+        default:
+          throw new Error('Invalid factory code');
+      }
+
+      const results = await db.query(
+        `SELECT DISTINCT Department_Name as name, Department_Serial_Key as value 
+          FROM Data_Department`,
+        { type: QueryTypes.SELECT },
+      );
+      return results;
+    } catch (error) {
+      throw new InternalServerErrorException(error?.message);
+    }
+  }
+
   async update(
     id: string,
     updateDto: {
@@ -143,37 +180,7 @@ export class HrService {
         default:
           throw new Error('Invalid factory code');
       }
-      // const records: { total: number }[] = await db.query(
-      //   `SELECT COUNT(*) total
-      //     FROM users
-      //     WHERE userId = ?`,
-      //   {
-      //     replacements: [id],
-      //     type: QueryTypes.SELECT,
-      //   },
-      // );
-      // if (records[0].total > 0) {
-      //   await db.query(
-      //     `UPDATE users
-      //       SET
-      //         Address_Live = ?,
-      //         Vehicle = ?,
-      //         UpdatedBy = ?,
-      //         UpdatedAt = GETDATE()
-      //       WHERE userId = ?`,
-      //     {
-      //       replacements: [
-      //         updateDto.CurrentAddress,
-      //         updateDto.TransportationMethod,
-      //         userid,
-      //         id,
-      //       ],
-      //       type: QueryTypes.SELECT,
-      //     },
-      //   );
-      // }
 
-      // return 'Updated successfully!';
       const query = `
         UPDATE users
         SET
@@ -310,9 +317,10 @@ export class HrService {
         }
       });
 
+      const updatedRecords: any[] = [];
       for (let item of data) {
-        const records: { total: number }[] = await db.query(
-          `SELECT COUNT(*) total
+        const records: any[] = await db.query(
+          `SELECT userId
           FROM users
           WHERE userId = ?`,
           {
@@ -321,30 +329,59 @@ export class HrService {
           },
         );
 
-        if (records[0].total > 0) {
-          await db.query(
-            `UPDATE users
-            SET
-              Address_Live = ?,
-              Vehicle = ?,
-              UpdatedBy = ?,
-              UpdatedAt = GETDATE()
-            WHERE userId = ?`,
-            {
-              replacements: [
-                item.Current_Address,
-                item.Transportation_Method,
-                userid,
-                String(item.ID),
-              ],
-              type: QueryTypes.SELECT,
+        if (records && records.length > 0) {
+          const queryUpdate = `UPDATE users
+                                SET
+                                  Address_Live = :address,
+                                  Vehicle = :vehicle,
+                                  UpdatedBy = :updatedBy,
+                                  UpdatedAt = GETDATE()
+                                OUTPUT 
+                                  INSERTED.userId as id, 
+                                  INSERTED.Address_Live as CurrentAddress, 
+                                  INSERTED.Vehicle as TransportationMethod
+                                WHERE userId = :id`;
+          const updateResults: any[] = await db.query(queryUpdate, {
+            replacements: {
+              address: item.Current_Address,
+              vehicle: item.Transportation_Method,
+              updatedBy: userid,
+              id: String(item.ID),
             },
-          );
-          updateCount++;
+            type: QueryTypes.SELECT,
+          });
+
+          if (updateResults && updateResults.length > 0) {
+            updatedRecords.push(updateResults[0]);
+          }
         }
+        // if (records[0].total > 0) {
+        //   await db.query(
+        //     `UPDATE users
+        //     SET
+        //       Address_Live = ?,
+        //       Vehicle = ?,
+        //       UpdatedBy = ?,
+        //       UpdatedAt = GETDATE()
+        //     WHERE userId = ?`,
+        //     {
+        //       replacements: [
+        //         item.Current_Address,
+        //         item.Transportation_Method,
+        //         userid,
+        //         String(item.ID),
+        //       ],
+        //       type: QueryTypes.SELECT,
+        //     },
+        //   );
+        //   updateCount++;
+        // }
       }
-      const message = `Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
-      return { message };
+      // const message = `Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      return {
+        message: `Updated: ${updatedRecords.length} records. Total rows processed: ${data.length}.`,
+        updatedData: updatedRecords,
+      };
     } catch (error) {
       throw new InternalServerErrorException(`${error.message}`);
     }

@@ -294,7 +294,7 @@ export class Cat5Service {
     }
   }
 
-  async autoSentCMS(dateFrom: string, dateTo: string) {
+  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
     try {
       const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
 
