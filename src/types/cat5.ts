@@ -9,3 +9,7 @@ export interface IDataCat5 {
   Weight_of_waste_treated_Unit_kg: string;
   TKT_Ton_km: string;
 }
+
+
+export const ACTIVITY_TYPES = ['3.6', '4.4'] as const
+export type ActivityType = typeof ACTIVITY_TYPES[number]

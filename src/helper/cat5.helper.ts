@@ -146,11 +146,12 @@ export const getAllDataExcelFactoryCat5 = async () => {};
 export const buildQueryAutoSentCMS = async (
   dateFrom?: string,
   dateTo?: string,
+  factory?: string,
   db?: Sequelize,
 ) => {
   const queryAddress = `SELECT [Address]
                         FROM CMW_Info_Factory
-                        WHERE CreatedFactory = 'LYV'`;
+                        WHERE CreatedFactory = '${factory}'`;
 
   const factoryAddress =
     (await db?.query(queryAddress, {
@@ -186,7 +187,7 @@ export const buildQueryAutoSentCMS = async (
                           ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
                           ,CAST('0' AS INT)                   AS TKT_Ton_km
                           ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-                          ,N'${getFactory('LYV')}'  AS Factory_Name
+                          ,N'${getFactory(factory || 'unknow_factory')}'  AS Factory_Name
                     FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
                           LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
                                 ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER

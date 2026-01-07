@@ -21,9 +21,9 @@ import { HrModule } from './api/hr/hr.module';
 
 @Module({
   imports: [
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'frontend', 'dist'),
-    }),
+    // ServeStaticModule.forRoot({
+    //   rootPath: join(__dirname, '..', 'frontend', 'dist'),
+    // }),
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,

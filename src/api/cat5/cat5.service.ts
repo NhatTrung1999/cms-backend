@@ -7,6 +7,8 @@ import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { buildQueryAutoSentCMS } from 'src/helper/cat5.helper';
 import dayjs from 'dayjs';
+import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
+import { ACTIVITY_TYPES, ActivityType } from 'src/types/cat5';
 dayjs().format();
 
 @Injectable()
@@ -294,89 +296,210 @@ export class Cat5Service {
     }
   }
 
+  // auto sent cms
   async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
     try {
-      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+      if (factory.trim().toUpperCase() === 'ALL') {
+        return this.autoSentCMSAllFactories(dateFrom, dateTo);
+      }
 
-      const connects = [
-        this.LYV_WMS,
-        // this.LHG_WMS,
-        // this.LYM_WMS,
-        // this.LVL_WMS,
-        // this.JAZ_WMS,
-        // this.JZS_WMS,
-      ];
+      return this.getCMSByFactory(factory as FactoryCode, dateFrom, dateTo);
+      // let db: Sequelize;
+      // switch (factory) {
+      //   case 'LYV':
+      //     db = this.LYV_WMS;
+      //     break;
+      //   case 'LHG':
+      //     db = this.LHG_WMS;
+      //     break;
+      //   case 'LYM':
+      //     db = this.LYM_WMS;
+      //     break;
+      //   case 'LVL':
+      //     db = this.LVL_WMS;
+      //     break;
+      //   case 'JAZ':
+      //     db = this.JAZ_WMS;
+      //     break;
+      //   case 'JZS':
+      //     db = this.JZS_WMS;
+      //     break;
+      //   default:
+      //     return;
+      // }
 
-      const dataResult = await Promise.all(
-        connects.map(async (conn) => {
-          return conn.query(
-            await buildQueryAutoSentCMS(dateFrom, dateTo, this.EIP),
-            {
-              type: QueryTypes.SELECT,
-              replacements,
-            },
-          );
-        }),
-      );
+      // const query = await buildQueryAutoSentCMS(
+      //   dateFrom,
+      //   dateTo,
+      //   factory,
+      //   this.EIP,
+      // );
 
-      // console.log(dataResult);
-      const data = dataResult.flat();
+      // const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
 
-      // console.log(data);
+      // const dataResult = await db.query(query, {
+      //   type: QueryTypes.SELECT,
+      //   replacements,
+      // });
 
-      const formatData = data.map((item: any) => {
-        const custVenName = item.Vendor_ID;
-        const departure = item.Factory_address;
-        const destination = item.Waste_collection_address;
-        const product = `${item.The_type_of_waste} - ${item.Waste_type}`;
-        const activityData = item.Weight_of_waste_treated_Unit_kg;
-        const memo = item.Waste_Treatment_method;
-        const factoryName = item.Factory_Name;
-        const wasteDisposalDate = item.Waste_disposal_date;
+      // const data = dataResult.flat();
 
-        return {
-          System: 'CMW', //default
-          Corporation: 'LAI YIH', //default
-          Factory: factoryName,
-          Department: '',
-          DocKey: 'S3.C5', //default
-          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-          ActivityType: '3.6', //default
-          DataType: '1', //default
-          DocType: 'CMS Web', //default
-          UndDoc: '',
-          DocFlow: '',
-          DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-          DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-          DocNo: '',
-          UndDocNo: '',
-          CustVenName: custVenName,
-          InvoiceNo: '',
-          TransType: '陸運', //default
-          Departure: departure,
-          Destination: destination,
-          PortType: '',
-          StPort: '',
-          ThPort: '',
-          EndPort: '',
-          Product: product,
-          Quity: '',
-          Amount: '',
-          ActivityData: activityData,
-          ActivityUnit: 'KG', //default
-          Unit: '',
-          UnitWeight: '',
-          Memo: memo,
-          CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-          Creator: '',
-        };
-      });
+      // const formatData = data.map((item: any) => {
+      // const custVenName = item.Vendor_ID;
+      // const departure = item.Factory_address;
+      // const destination = item.Waste_collection_address;
+      // const product = `${item.The_type_of_waste} - ${item.Waste_type}`;
+      // const activityData = item.Weight_of_waste_treated_Unit_kg;
+      // const memo = item.Waste_Treatment_method;
+      // const factoryName = item.Factory_Name;
+      // const wasteDisposalDate = item.Waste_disposal_date;
 
-      return formatData;
+      //   return {
+      //     System: 'CMW', //default
+      //     Corporation: 'LAI YIH', //default
+      //     Factory: factoryName,
+      //     Department: '',
+      //     DocKey: 'S3.C5', //default
+      //     SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      //     EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      //     ActivityType: '3.6', //default
+      //     DataType: '1', //default
+      //     DocType: 'CMS Web', //default
+      //     UndDoc: '',
+      //     DocFlow: '',
+      //     DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
+      //     DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
+      //     DocNo: '',
+      //     UndDocNo: '',
+      //     CustVenName: custVenName,
+      //     InvoiceNo: '',
+      //     TransType: '陸運', //default
+      //     Departure: departure,
+      //     Destination: destination,
+      //     PortType: '',
+      //     StPort: '',
+      //     ThPort: '',
+      //     EndPort: '',
+      //     Product: product,
+      //     Quity: '',
+      //     Amount: '',
+      //     ActivityData: activityData,
+      //     ActivityUnit: 'KG', //default
+      //     Unit: '',
+      //     UnitWeight: '',
+      //     Memo: memo,
+      //     CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      //     Creator: '',
+      //   };
+      // });
+
+      // return formatData;
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
+  }
+
+  private async autoSentCMSAllFactories(dateFrom: string, dateTo: string) {
+    const results = await Promise.all(
+      FACTORY_LIST.map((factory) =>
+        this.getCMSByFactory(factory, dateFrom, dateTo),
+      ),
+    );
+
+    return results.flat();
+  }
+
+  private async getCMSByFactory(
+    factory: FactoryCode,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    const db = this.getDbByFactory(factory);
+    if (!db) return [];
+
+    const query = await buildQueryAutoSentCMS(
+      dateFrom,
+      dateTo,
+      factory,
+      this.EIP,
+    );
+
+    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+    const data = await db.query<any>(query, {
+      type: QueryTypes.SELECT,
+      replacements,
+    });
+
+    return data.flatMap((item) =>
+      this.mapToCMSFormat(item, dateFrom, dateTo),
+    );
+  }
+
+  private getDbByFactory(factory: FactoryCode): Sequelize | null {
+    const dbMap: Record<FactoryCode, Sequelize> = {
+      LYV: this.LYV_WMS,
+      LHG: this.LHG_WMS,
+      LVL: this.LVL_WMS,
+      LYM: this.LYM_WMS,
+      JAZ: this.JAZ_WMS,
+      JZS: this.JZS_WMS,
+    };
+
+    return dbMap[factory] ?? null;
+  }
+
+  private mapToCMSFormat(
+    item: any,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    const custVenName = item.Vendor_ID;
+    const departure = item.Factory_address;
+    const destination = item.Waste_collection_address;
+    const product = `${item.The_type_of_waste} - ${item.Waste_type}`;
+    const activityData = item.Weight_of_waste_treated_Unit_kg;
+    const memo = item.Waste_Treatment_method;
+    const factoryName = item.Factory_Name;
+    const wasteDisposalDate = item.Waste_disposal_date;
+
+    return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
+      System: 'CMW', //default
+      Corporation: 'LAI YIH', //default
+      Factory: factoryName,
+      Department: '',
+      DocKey: 'S3.C5', //default
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: activityType, //default
+      DataType: '1', //default
+      DocType: 'CMS Web', //default
+      UndDoc: '',
+      DocFlow: '',
+      DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
+      DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
+      DocNo: '',
+      UndDocNo: '',
+      CustVenName: custVenName,
+      InvoiceNo: '',
+      TransType: '陸運', //default
+      Departure: departure,
+      Destination: destination,
+      PortType: '',
+      StPort: '',
+      ThPort: '',
+      EndPort: '',
+      Product: product,
+      Quity: '',
+      Amount: '',
+      ActivityData: activityData,
+      ActivityUnit: 'KG', //default
+      Unit: '',
+      UnitWeight: '',
+      Memo: memo,
+      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      Creator: '',
+    }));
   }
 
   //logging
