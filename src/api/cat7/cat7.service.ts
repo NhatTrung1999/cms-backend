@@ -17,7 +17,15 @@ import {
   buildQueryCustomExport,
 } from 'src/helper/cat7.helper';
 import dayjs from 'dayjs';
+import { ACTIVITY_TYPES, ActivityType } from 'src/types/cat7';
+import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
 dayjs().format();
+
+type BuildQueryFn = (
+  dateFrom: string,
+  dateTo: string,
+  eip: Sequelize,
+) => Promise<string>;
 
 @Injectable()
 export class Cat7Service {
@@ -30,6 +38,15 @@ export class Cat7Service {
     @Inject('JAZ_HRIS') private readonly JAZ_HRIS: Sequelize,
     @Inject('JZS_HRIS') private readonly JZS_HRIS: Sequelize,
   ) {}
+
+  private readonly buildQueryMap: Record<FactoryCode, BuildQueryFn> = {
+    LYV: buildQueryAutoSentCmsLYV,
+    LHG: buildQueryAutoSentCmsLHG,
+    LVL: buildQueryAutoSentCmsLVL,
+    LYM: buildQueryAutoSentCmsLYM,
+    JAZ: buildQueryAutoSentCmsJAZ,
+    JZS: buildQueryAutoSentCmsJZS,
+  };
 
   async getDataCat7(
     dateFrom: string,
@@ -435,108 +452,190 @@ export class Cat7Service {
 
   // auto send cms
 
-  async autoSentCMS(dateFrom: string, dateTo: string) {
+  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
     try {
-      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-      const [dataLYV] = await Promise.all([
-        // const [dataLYV, dataLHG, dataLVL, dataLYM, dataJAZ, dataJZS] = await Promise.all([
-        // await this.LYV_HRIS.query(
-        //   await buildQueryAutoSentCmsLYV(dateFrom, dateTo, this.EIP),
-        //   {
-        //     type: QueryTypes.SELECT,
-        //     replacements,
-        //   },
-        // ),
-        // await this.LHG_HRIS.query(
-        //   await buildQueryAutoSentCmsLHG(dateFrom, dateTo, this.EIP),
-        //   {
-        //     type: QueryTypes.SELECT,
-        //     replacements,
-        //   },
-        // ),
-        // await this.LVL_HRIS.query(
-        //   await buildQueryAutoSentCmsLVL(dateFrom, dateTo, this.EIP),
-        //   {
-        //     type: QueryTypes.SELECT,
-        //     replacements,
-        //   },
-        // ),
-        await this.LYM_HRIS.query(
-          await buildQueryAutoSentCmsLYM(dateFrom, dateTo, this.EIP),
-          {
-            type: QueryTypes.SELECT,
-            replacements,
-          },
-        ),
-        // await this.JAZ_HRIS.query(
-        //   await buildQueryAutoSentCmsJAZ(dateFrom, dateTo, this.EIP),
-        //   {
-        //     type: QueryTypes.SELECT,
-        //     replacements,
-        //   },
-        // ),
-        // await this.JZS_HRIS.query(
-        //   await buildQueryAutoSentCmsJZS(dateFrom, dateTo, this.EIP),
-        //   {
-        //     type: QueryTypes.SELECT,
-        //     replacements,
-        //   },
-        // ),
-      ]);
+      if (factory.trim().toUpperCase() === 'ALL') {
+        return this.autoSentCMSAllFactories(dateFrom, dateTo);
+      }
 
-      // console.log(123);
-
-      const data = [
-        ...dataLYV,
-        // ...dataLHG,
-        // ...dataLVL,
-        // ...dataLYM,
-        // ...dataJAZ,
-        // ...dataJZS,
-      ].flat();
-      // const data = [...dataLYV].flat();
-      // console.log(data);
-
-      const formatData = data.map((item: any) => {
-        const staffId = item.Staff_ID;
-        const Residential_address = item.Residential_address;
-        const Main_transportation_type = item.Main_transportation_type;
-        const Number_of_working_days = item.Number_of_working_days;
-        const Factory_address = item.Factory_address;
-        const FactoryName = item.Factory_Name;
-        const DepartmentName = item.Department_Name;
-
-        return {
-          System: 'CMS Web', // Default
-          Corporation: 'LAI YIH', // Default
-          Factory: FactoryName,
-          Department: DepartmentName,
-          DocKey: staffId,
-          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-          ActivityType: '3.3 員工通勤', // Default
-          DataType: '2', // Default
-          DocType: '員工通勤', // Default
-          DocDate: dayjs().format('YYYY/MM/DD'),
-          DocDate2: dayjs().format('YYYY/MM/DD'),
-          UndDocNo: staffId,
-          TransType: Main_transportation_type,
-          Departure: Factory_address ? Factory_address : '',
-          Destination: Residential_address ? Residential_address : '',
-          Attendance: Number_of_working_days.toString(),
-          Memo: '',
-          CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-          Creator: '',
-        };
-      });
-
-      // console.log(formatData);
-      return formatData;
+      return this.getCMSByFactory(factory as FactoryCode, dateFrom, dateTo);
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
+    // try {
+    //   const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+    //   const [dataLYV] = await Promise.all([
+    //     // const [dataLYV, dataLHG, dataLVL, dataLYM, dataJAZ, dataJZS] = await Promise.all([
+    //     // await this.LYV_HRIS.query(
+    //     //   await buildQueryAutoSentCmsLYV(dateFrom, dateTo, this.EIP),
+    //     //   {
+    //     //     type: QueryTypes.SELECT,
+    //     //     replacements,
+    //     //   },
+    //     // ),
+    //     // await this.LHG_HRIS.query(
+    //     //   await buildQueryAutoSentCmsLHG(dateFrom, dateTo, this.EIP),
+    //     //   {
+    //     //     type: QueryTypes.SELECT,
+    //     //     replacements,
+    //     //   },
+    //     // ),
+    //     // await this.LVL_HRIS.query(
+    //     //   await buildQueryAutoSentCmsLVL(dateFrom, dateTo, this.EIP),
+    //     //   {
+    //     //     type: QueryTypes.SELECT,
+    //     //     replacements,
+    //     //   },
+    //     // ),
+    //     await this.LYM_HRIS.query(
+    //       await buildQueryAutoSentCmsLYM(dateFrom, dateTo, this.EIP),
+    //       {
+    //         type: QueryTypes.SELECT,
+    //         replacements,
+    //       },
+    //     ),
+    //     // await this.JAZ_HRIS.query(
+    //     //   await buildQueryAutoSentCmsJAZ(dateFrom, dateTo, this.EIP),
+    //     //   {
+    //     //     type: QueryTypes.SELECT,
+    //     //     replacements,
+    //     //   },
+    //     // ),
+    //     // await this.JZS_HRIS.query(
+    //     //   await buildQueryAutoSentCmsJZS(dateFrom, dateTo, this.EIP),
+    //     //   {
+    //     //     type: QueryTypes.SELECT,
+    //     //     replacements,
+    //     //   },
+    //     // ),
+    //   ]);
+    //   // console.log(123);
+    //   const data = [
+    //     ...dataLYV,
+    //     // ...dataLHG,
+    //     // ...dataLVL,
+    //     // ...dataLYM,
+    //     // ...dataJAZ,
+    //     // ...dataJZS,
+    //   ].flat();
+    //   // const data = [...dataLYV].flat();
+    //   // console.log(data);
+    //   const formatData = data.map((item: any) => {
+    //     const staffId = item.Staff_ID;
+    //     const Residential_address = item.Residential_address;
+    //     const Main_transportation_type = item.Main_transportation_type;
+    //     const Number_of_working_days = item.Number_of_working_days;
+    //     const Factory_address = item.Factory_address;
+    //     const FactoryName = item.Factory_Name;
+    //     const DepartmentName = item.Department_Name;
+    //     return {
+    //       System: 'CMS Web', // Default
+    //       Corporation: 'LAI YIH', // Default
+    //       Factory: FactoryName,
+    //       Department: DepartmentName,
+    //       DocKey: staffId,
+    //       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+    //       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+    //       ActivityType: '3.3 員工通勤', // Default
+    //       DataType: '2', // Default
+    //       DocType: '員工通勤', // Default
+    //       DocDate: dayjs().format('YYYY/MM/DD'),
+    //       DocDate2: dayjs().format('YYYY/MM/DD'),
+    //       UndDocNo: staffId,
+    //       TransType: Main_transportation_type,
+    //       Departure: Factory_address ? Factory_address : '',
+    //       Destination: Residential_address ? Residential_address : '',
+    //       Attendance: Number_of_working_days.toString(),
+    //       Memo: '',
+    //       CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+    //       Creator: '',
+    //     };
+    //   });
+    //   // console.log(formatData);
+    //   return formatData;
+    // } catch (error: any) {
+    //   throw new InternalServerErrorException(error);
+    // }
   }
 
+  private async autoSentCMSAllFactories(dateFrom: string, dateTo: string) {
+    const results = await Promise.all(
+      FACTORY_LIST.map((factory) =>
+        this.getCMSByFactory(factory, dateFrom, dateTo),
+      ),
+    );
+
+    return results.flat();
+  }
+
+  private async getCMSByFactory(
+    factory: FactoryCode,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    const db = this.getDbByFactory(factory);
+    if (!db) return [];
+
+    const buildQuery = this.buildQueryMap[factory];
+    if (!buildQuery) return [];
+
+    const query = await buildQuery(dateFrom, dateTo, this.EIP);
+
+    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+    const data = await db.query<any>(query, {
+      type: QueryTypes.SELECT,
+      replacements,
+    });
+
+    return data.flatMap((item) => this.mapToCMSFormat(item, dateFrom, dateTo));
+  }
+
+  private getDbByFactory(factory: FactoryCode): Sequelize | null {
+    const dbMap: Record<FactoryCode, Sequelize> = {
+      LYV: this.LYV_HRIS,
+      LHG: this.LHG_HRIS,
+      LVL: this.LVL_HRIS,
+      LYM: this.LYM_HRIS,
+      JAZ: this.JAZ_HRIS,
+      JZS: this.JZS_HRIS,
+    };
+
+    return dbMap[factory] ?? null;
+  }
+
+  private mapToCMSFormat(item: any, dateFrom: string, dateTo: string) {
+    const staffId = item.Staff_ID;
+    const Residential_address = item.Residential_address;
+    const Main_transportation_type = item.Main_transportation_type;
+    const Number_of_working_days = item.Number_of_working_days;
+    const Factory_address = item.Factory_address;
+    const FactoryName = item.Factory_Name;
+    const DepartmentName = item.Department_Name;
+
+    return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
+      System: 'CMS Web', // Default
+      Corporation: 'LAI YIH', // Default
+      Factory: FactoryName,
+      Department: DepartmentName,
+      DocKey: staffId,
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: activityType, // Default
+      DataType: '2', // Default
+      DocType: '員工通勤', // Default
+      DocDate: dayjs().format('YYYY/MM/DD'),
+      DocDate2: dayjs().format('YYYY/MM/DD'),
+      UndDocNo: staffId,
+      TransType: Main_transportation_type,
+      Departure: Factory_address ? Factory_address : '',
+      Destination: Residential_address ? Residential_address : '',
+      Attendance: Number_of_working_days.toString(),
+      Memo: '',
+      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      Creator: '',
+    }));
+  }
   //logging
   async getLoggingCat7(
     dateFrom: string,

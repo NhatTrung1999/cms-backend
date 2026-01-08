@@ -60,8 +60,13 @@ export class Cat9andcat12Controller {
   async autoSentCMS(
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
   ) {
-    const data = await this.cat9andcat12Service.autoSentCMS(dateFrom, dateTo);
+    const data = await this.cat9andcat12Service.autoSentCMS(
+      dateFrom,
+      dateTo,
+      factory,
+    );
     return data;
   }
 

@@ -70,9 +70,9 @@ export const buildQuery = async (
                         ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) LandTransportDistance
                         ,isi.SeaTransportDistance
                         ,isi.AirTransportDistance
-                        ,CAST('0' AS INT)             AS LandTransortTonKilometers
-                        ,CAST('0' AS INT)             AS SeaTransortTonKilometers
-                        ,CAST('0' AS INT)             AS AirTransortTonKilometers
+                        ,CAST('0' AS INT)             AS LandTransportTonKilometers
+                        ,CAST('0' AS INT)             AS SeaTransportTonKilometers
+                        ,CAST('0' AS INT)             AS AirTransportTonKilometers
                   FROM   CGZLS                        AS c
                         LEFT JOIN cgzl
                               ON  cgzl.CGNO = c.CGNO

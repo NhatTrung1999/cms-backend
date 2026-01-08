@@ -220,385 +220,385 @@ export const buildQueryAutoSentCmsLYV = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  // const query = `SELECT TOP 100*
-  //                       ,N'${getFactory('LYV')}'  AS Factory_Name
-  //                 FROM   (
-  //                           SELECT u.userId               AS Staff_ID
-  //                                 ,CASE
-  //                                     WHEN ISNULL(u.lat ,'')<>''
-  //                                           AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
-  //                                     ELSE u.Address_Live
-  //                                 END                 AS Residential_address
-  //                                 ,u.Vehicle              AS Main_transportation_type
-  //                                 ,'API Calculation'      AS km
-  //                                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-  //                                 ,'API Calculation'      AS PKT_p_km
-  //                                 ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-  //                                 ,CASE
-  //                                       WHEN ISNULL(dds.Department_Name ,'')='' THEN dd.Department_Name
-  //                                       ELSE CONCAT(dd.Department_Name ,' - ' ,dds.Department_Name)
-  //                                   END                    AS Department_Name
-  //                           FROM   Data_Work_Time         AS dwt
-  //                                   LEFT JOIN users        AS u
-  //                                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-  //                                           Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Person  AS dp
-  //                                       ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
-  //                                           AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE
-  //                                               Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Department AS dd
-  //                                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-  //                                   LEFT JOIN Data_Department_s AS dds
-  //                                       ON  dds.Department_Serial_Key = dp.Department_Serial_Keys
-  //                           ${where}
-  //                           GROUP BY
-  //                                   u.userId
-  //                                   ,u.Address_Live
-  //                                   ,u.Vehicle
-  //                                   ,u.PickupDropoffStation
-  //                                   ,dd.Department_Name
-  //                                   ,dds.Department_Name
-  //                                   ,u.lat
-  //                                   ,u.long
-  //                   ) AS a`;
+  const query = `SELECT TOP 100*
+                        ,N'${getFactory('LYV')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,CASE
+                                        WHEN ISNULL(dds.Department_Name ,'')='' THEN dd.Department_Name
+                                        ELSE CONCAT(dd.Department_Name ,' - ' ,dds.Department_Name)
+                                    END                    AS Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
+                                            AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE
+                                                Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                                    LEFT JOIN Data_Department_s AS dds
+                                        ON  dds.Department_Serial_Key = dp.Department_Serial_Keys
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                    ,u.Address_Live
+                                    ,u.Vehicle
+                                    ,u.PickupDropoffStation
+                                    ,dd.Department_Name
+                                    ,dds.Department_Name
+                                    ,u.lat
+                                    ,u.long
+                    ) AS a`;
 
   // console.log(query);
 
-  const query = `SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bicycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Car'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Company shuttle bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Electric motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Subway'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億 - LYV'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Walking'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a`;
+//   const query = `SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bicycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Car'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Company shuttle bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Electric motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Subway'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億 - LYV'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'3-5 Ten Lua Street, An Lac Ward, Ho Chi Minh City' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Walking'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a`;
   return query;
 };
 
@@ -624,375 +624,375 @@ export const buildQueryAutoSentCmsLHG = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  // const query = `SELECT TOP 100*
-  //                       ,N'${getFactory('LHG')}'  AS Factory_Name
-  //                 FROM   (
-  //                           SELECT u.userId               AS Staff_ID
-  //                                 ,CASE
-  //                                     WHEN ISNULL(u.lat ,'')<>''
-  //                                           AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
-  //                                     ELSE u.Address_Live
-  //                                 END                 AS Residential_address
-  //                                 ,u.Vehicle              AS Main_transportation_type
-  //                                 ,'API Calculation'      AS km
-  //                                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-  //                                 ,'API Calculation'      AS PKT_p_km
-  //                                 ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-  //                                 ,dd.Department_Name
-  //                           FROM   Data_Work_Time         AS dwt
-  //                                   LEFT JOIN users        AS u
-  //                                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-  //                                           Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Person  AS dp
-  //                                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-  //                                           SQL_Latin1_General_CP1_CI_AS
-  //                                   LEFT JOIN Data_Department AS dd
-  //                                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-  //                           ${where}
-  //                           GROUP BY
-  //                                   u.userId
-  //                                 ,u.Address_Live
-  //                                 ,u.Vehicle
-  //                                 ,u.PickupDropoffStation
-  //                                 ,dd.Department_Name
-  //                                 ,u.lat
-  //                                 ,u.long
-  //                       ) AS a`;
-  const query = `SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bicycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Car'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Company shuttle bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Electric motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Subway'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'樂億II - LHG'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Walking'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a`;
+  const query = `SELECT TOP 100*
+                        ,N'${getFactory('LHG')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+                                            SQL_Latin1_General_CP1_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                  ,u.Address_Live
+                                  ,u.Vehicle
+                                  ,u.PickupDropoffStation
+                                  ,dd.Department_Name
+                                  ,u.lat
+                                  ,u.long
+                        ) AS a`;
+//   const query = `SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bicycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Car'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Company shuttle bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Electric motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Subway'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'樂億II - LHG'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô B1, B2, Khu Công nghiệp Tân Phú Thạnh - giai đoạn 1, Xã Thạnh Xuân, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Walking'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a`;
   // console.log(query);
 
   return query;
@@ -1020,377 +1020,377 @@ export const buildQueryAutoSentCmsLVL = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  // const query = `SELECT TOP 200*
-  //                       ,N'${getFactory('LVL')}'  AS Factory_Name
-  //                 FROM   (
-  //                           SELECT u.userId                          AS Staff_ID
-  //                                 ,CASE 
-  //                                     WHEN ISNULL(u.lat ,'')<>''
-  //                                           AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
-  //                                     ELSE u.Address_Live
-  //                                 END                 AS Residential_address
-  //                                 ,u.Vehicle              AS Main_transportation_type
-  //                                 ,'API Calculation'      AS km
-  //                                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-  //                                 ,'API Calculation'      AS PKT_p_km
-  //                                 ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-  //                                 ,dd.Department_Name
-  //                           FROM   Data_Work_Time         AS dwt
-  //                                   LEFT JOIN users        AS u
-  //                                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
-  //                                           Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Person  AS dp
-  //                                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE 
-  //                                           SQL_Latin1_General_CP1_CI_AS
-  //                                   LEFT JOIN Data_Department AS dd ON dd.Department_Serial_Key = dp.Department_Serial_Key
-  //                           ${where}
-  //                           GROUP BY
-  //                                 u.userId
-  //                                 ,u.Address_Live
-  //                                 ,u.Vehicle
-  //                                 ,u.PickupDropoffStation
-  //                                 ,dd.Department_Name
-  //                                 ,u.lat
-  //                                 ,u.long
-  //                       )             AS a`;
+  const query = `SELECT TOP 200*
+                        ,N'${getFactory('LVL')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId                          AS Staff_ID
+                                  ,CASE 
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE 
+                                            SQL_Latin1_General_CP1_CI_AS
+                                    LEFT JOIN Data_Department AS dd ON dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                  u.userId
+                                  ,u.Address_Live
+                                  ,u.Vehicle
+                                  ,u.PickupDropoffStation
+                                  ,dd.Department_Name
+                                  ,u.lat
+                                  ,u.long
+                        )             AS a`;
 
   // console.log(query);
 
-  const query = `SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bicycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Car'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Company shuttle bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Electric motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Subway'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'億春B - LVL'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Walking'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a`;
+//   const query = `SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bicycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Car'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Company shuttle bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Electric motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Subway'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'億春B - LVL'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Hoa Phu Industrial Park, Thanh Hung Hamlet, Hoa Phu Commune, Long Ho District, Vinh Long Province' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Walking'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a`;
   return query;
 };
 
@@ -1419,326 +1419,326 @@ export const buildQueryAutoSentCmsLYM = async (
 
   // N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
 
-  // const query = `SELECT TOP 200*
-  //                       ,N'${getFactory('LYM')}'  AS Factory_Name
-  //                 FROM   (
-  //                           SELECT u.userId                       AS Staff_ID
-  //                                 ,CASE 
-  //                                     WHEN ISNULL(u.lat ,'')<>''
-  //                                           AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
-  //                                     ELSE u.Address_Live
-  //                                 END                 AS Residential_address
-  //                                 ,u.Vehicle           AS Main_transportation_type
-  //                                 ,'API Calculation'   AS km
-  //                                 ,COUNT(workhours)    AS Number_of_working_days
-  //                                 ,'API Calculation'   AS PKT_p_km
-  //                                 ,N'16.879079, 96.001965' AS Factory_address
-  //                                 ,hu.Part AS Department_Name
-  //                           FROM   HR_Attendance       AS dwt
-  //                                   LEFT JOIN users     AS u
-  //                                       ON  u.userId = dwt.UserNo
-  //                                   LEFT JOIN HR_Users  AS hu
-  //                                       ON  hu.UserNo = dwt.UserNo
-  //                                           AND hu.UserNo = u.userId
-  //                           ${where}
-  //                           GROUP BY
-  //                                 u.userId
-  //                                 ,u.Address_Live
-  //                                 ,u.Vehicle
-  //                                 ,u.PickupDropoffStation
-  //                                 ,hu.Part
-  //                                 ,u.lat
-  //                                 ,u.long
-  //                       )            AS a`;
+  const query = `SELECT TOP 200*
+                        ,N'${getFactory('LYM')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId                       AS Staff_ID
+                                  ,CASE 
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
+                                  ,u.Vehicle           AS Main_transportation_type
+                                  ,'API Calculation'   AS km
+                                  ,COUNT(workhours)    AS Number_of_working_days
+                                  ,'API Calculation'   AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,hu.Part AS Department_Name
+                            FROM   HR_Attendance       AS dwt
+                                    LEFT JOIN users     AS u
+                                        ON  u.userId = dwt.UserNo
+                                    LEFT JOIN HR_Users  AS hu
+                                        ON  hu.UserNo = dwt.UserNo
+                                            AND hu.UserNo = u.userId
+                            ${where}
+                            GROUP BY
+                                  u.userId
+                                  ,u.Address_Live
+                                  ,u.Vehicle
+                                  ,u.PickupDropoffStation
+                                  ,hu.Part
+                                  ,u.lat
+                                  ,u.long
+                        )            AS a`;
 
   // console.log(query);
-  const query = `SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bicycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Car'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Company shuttle bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Electric motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Subway'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'昌億 - LYM'  AS Factory_Name
-FROM   (
-           SELECT u.userId                       AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                 AS Residential_address
-                 ,u.Vehicle           AS Main_transportation_type
-                 ,'API Calculation'   AS km
-                 ,COUNT(workhours)    AS Number_of_working_days
-                 ,'API Calculation'   AS PKT_p_km
-                 ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
-                 ,hu.Part             AS Department_Name
-           FROM   HR_Attendance       AS dwt
-                  LEFT JOIN users     AS u
-                       ON  u.userId = dwt.UserNo
-                  LEFT JOIN HR_Users  AS hu
-                       ON  hu.UserNo = dwt.UserNo
-                           AND hu.UserNo = u.userId
-           WHERE  1 = 1
-                  AND dwt.workhours>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Walking'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,hu.Part
-                 ,u.lat
-                 ,u.long
-       )            AS a`
+//   const query = `SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bicycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Car'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Company shuttle bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Electric motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Subway'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'昌億 - LYM'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                       AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                 AS Residential_address
+//                  ,u.Vehicle           AS Main_transportation_type
+//                  ,'API Calculation'   AS km
+//                  ,COUNT(workhours)    AS Number_of_working_days
+//                  ,'API Calculation'   AS PKT_p_km
+//                  ,N'Plot No.X3-X6, Block No.20, Sabei Street, Anawrahta Industrial Zone, Hlaingtharya Township, Yangon Region, Myanmar - Myanmar' AS Factory_address
+//                  ,hu.Part             AS Department_Name
+//            FROM   HR_Attendance       AS dwt
+//                   LEFT JOIN users     AS u
+//                        ON  u.userId = dwt.UserNo
+//                   LEFT JOIN HR_Users  AS hu
+//                        ON  hu.UserNo = dwt.UserNo
+//                            AND hu.UserNo = u.userId
+//            WHERE  1 = 1
+//                   AND dwt.workhours>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.CDate) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Walking'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,hu.Part
+//                  ,u.lat
+//                  ,u.long
+//        )            AS a`
 
   return query;
 };
@@ -1765,379 +1765,379 @@ export const buildQueryAutoSentCmsJAZ = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  // const query = `SELECT TOP 100*
-  //                       ,N'${getFactory('JAZ')}'  AS Factory_Name
-  //                 FROM   (
-  //                           SELECT u.userId               AS Staff_ID
-  //                                 ,CASE 
-  //                                     WHEN ISNULL(u.lat ,'')<>''
-  //                                           AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
-  //                                     ELSE u.Address_Live
-  //                                 END                 AS Residential_address
-  //                                 ,u.Vehicle              AS Main_transportation_type
-  //                                 ,'API Calculation'      AS km
-  //                                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-  //                                 ,'API Calculation'      AS PKT_p_km
-  //                                 ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-  //                                 ,dd.Department_Name
-  //                           FROM   Data_Work_Time         AS dwt
-  //                                   LEFT JOIN users        AS u
-  //                                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
-  //                                           Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Person  AS dp
-  //                                       ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
-  //                                           AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE 
-  //                                               Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Department AS dd
-  //                                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-  //                           ${where}
-  //                           GROUP BY
-  //                                   u.userId
-  //                                   ,u.Address_Live
-  //                                   ,u.Vehicle
-  //                                   ,u.PickupDropoffStation
-  //                                   ,dd.Department_Name
-  //                                   ,u.lat
-  //                                   ,u.long
-  //                   ) AS a`;
+  const query = `SELECT TOP 100*
+                        ,N'${getFactory('JAZ')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE 
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
+                                            AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE 
+                                                Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                    ,u.Address_Live
+                                    ,u.Vehicle
+                                    ,u.PickupDropoffStation
+                                    ,dd.Department_Name
+                                    ,u.lat
+                                    ,u.long
+                    ) AS a`;
 
   // console.log(query);
 
-  const query = `SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bicycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Car'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Company shuttle bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Electric motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Subway'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-1'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Walking'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a`
+//   const query = `SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bicycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Car'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Company shuttle bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Electric motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Subway'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-1'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô A4, Cụm Công nghiệp, Tiểu thủ công nghiệp TP. Vị Thanh, Phường Vị Thanh, Thành phố Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Walking'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a`
   return query;
 };
 
@@ -2163,379 +2163,379 @@ export const buildQueryAutoSentCmsJZS = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  // const query = `SELECT TOP 100*
-  //                       ,N'${getFactory('JZS')}'  AS Factory_Name
-  //                 FROM   (
-  //                           SELECT u.userId               AS Staff_ID
-  //                                 ,CASE 
-  //                                     WHEN ISNULL(u.lat ,'')<>''
-  //                                           AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
-  //                                     ELSE u.Address_Live
-  //                                 END                 AS Residential_address
-  //                                 ,u.Vehicle              AS Main_transportation_type
-  //                                 ,'API Calculation'      AS km
-  //                                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-  //                                 ,'API Calculation'      AS PKT_p_km
-  //                                 ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
-  //                                 ,dd.Department_Name
-  //                           FROM   Data_Work_Time         AS dwt
-  //                                   LEFT JOIN users        AS u
-  //                                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
-  //                                           Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Person  AS dp
-  //                                       ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
-  //                                           AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE 
-  //                                               Chinese_Taiwan_Stroke_CI_AS
-  //                                   LEFT JOIN Data_Department AS dd
-  //                                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-  //                           ${where}
-  //                           GROUP BY
-  //                                   u.userId
-  //                                   ,u.Address_Live
-  //                                   ,u.Vehicle
-  //                                   ,u.PickupDropoffStation
-  //                                   ,dd.Department_Name
-  //                                   ,u.lat
-  //                                   ,u.long
-  //                   ) AS a`;
+  const query = `SELECT TOP 100*
+                        ,N'${getFactory('JZS')}'  AS Factory_Name
+                  FROM   (
+                            SELECT u.userId               AS Staff_ID
+                                  ,CASE 
+                                      WHEN ISNULL(u.lat ,'')<>''
+                                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat, ', ',u.long)
+                                      ELSE u.Address_Live
+                                  END                 AS Residential_address
+                                  ,u.Vehicle              AS Main_transportation_type
+                                  ,'API Calculation'      AS km
+                                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+                                  ,'API Calculation'      AS PKT_p_km
+                                  ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                                  ,dd.Department_Name
+                            FROM   Data_Work_Time         AS dwt
+                                    LEFT JOIN users        AS u
+                                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE 
+                                            Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Person  AS dp
+                                        ON  dp.Person_Serial_Key = dwt.Person_Serial_Key
+                                            AND dp.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = u.Person_Serial_Key COLLATE 
+                                                Chinese_Taiwan_Stroke_CI_AS
+                                    LEFT JOIN Data_Department AS dd
+                                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+                            ${where}
+                            GROUP BY
+                                    u.userId
+                                    ,u.Address_Live
+                                    ,u.Vehicle
+                                    ,u.PickupDropoffStation
+                                    ,dd.Department_Name
+                                    ,u.lat
+                                    ,u.long
+                    ) AS a`;
 
   // console.log(query);
 
-  const query = `SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bicycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Car'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Company shuttle bus'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Electric motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Motorcycle'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Subway'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a
-UNION ALL
-SELECT TOP 20*
-      ,N'Jiazhi-2'  AS Factory_Name
-FROM   (
-           SELECT u.userId                          AS Staff_ID
-                 ,CASE 
-                       WHEN ISNULL(u.lat ,'')<>''
-                            AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
-                       ELSE u.Address_Live
-                  END                    AS Residential_address
-                 ,u.Vehicle              AS Main_transportation_type
-                 ,'API Calculation'      AS km
-                 ,COUNT(WORKING_TIME)    AS Number_of_working_days
-                 ,'API Calculation'      AS PKT_p_km
-                 ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
-                  Factory_address
-                 ,dd.Department_Name
-           FROM   Data_Work_Time         AS dwt
-                  LEFT JOIN users        AS u
-                       ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
-                           Chinese_Taiwan_Stroke_CI_AS
-                  LEFT JOIN Data_Person  AS dp
-                       ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
-                           SQL_Latin1_General_CP1_CI_AS
-                  LEFT JOIN Data_Department AS dd
-                       ON  dd.Department_Serial_Key = dp.Department_Serial_Key
-           WHERE  1 = 1
-                  AND Work_Or_Not<>'2'
-                  AND u.Vehicle IS NOT NULL
-                  AND dwt.Working_Time>0
-                  AND u.lock = '0'
-                  AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
-                  AND u.Vehicle = 'Walking'
-           GROUP BY
-                  u.userId
-                 ,u.Address_Live
-                 ,u.Vehicle
-                 ,u.PickupDropoffStation
-                 ,dd.Department_Name
-                 ,u.lat
-                 ,u.long
-       )              AS a`
+//   const query = `SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bicycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Car'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Company shuttle bus'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Electric motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Motorcycle'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Subway'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a
+// UNION ALL
+// SELECT TOP 20*
+//       ,N'Jiazhi-2'  AS Factory_Name
+// FROM   (
+//            SELECT u.userId                          AS Staff_ID
+//                  ,CASE 
+//                        WHEN ISNULL(u.lat ,'')<>''
+//                             AND ISNULL(u.long ,'')<>'' THEN CONCAT(u.lat ,', ' ,u.long)
+//                        ELSE u.Address_Live
+//                   END                    AS Residential_address
+//                  ,u.Vehicle              AS Main_transportation_type
+//                  ,'API Calculation'      AS km
+//                  ,COUNT(WORKING_TIME)    AS Number_of_working_days
+//                  ,'API Calculation'      AS PKT_p_km
+//                  ,N'Lô R, KCN An Nghiệp, Xã An Ninh, TP Cần Thơ, Việt Nam' AS 
+//                   Factory_address
+//                  ,dd.Department_Name
+//            FROM   Data_Work_Time         AS dwt
+//                   LEFT JOIN users        AS u
+//                        ON  u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE
+//                            Chinese_Taiwan_Stroke_CI_AS
+//                   LEFT JOIN Data_Person  AS dp
+//                        ON  dp.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = u.Person_Serial_Key COLLATE
+//                            SQL_Latin1_General_CP1_CI_AS
+//                   LEFT JOIN Data_Department AS dd
+//                        ON  dd.Department_Serial_Key = dp.Department_Serial_Key
+//            WHERE  1 = 1
+//                   AND Work_Or_Not<>'2'
+//                   AND u.Vehicle IS NOT NULL
+//                   AND dwt.Working_Time>0
+//                   AND u.lock = '0'
+//                   AND CONVERT(DATE ,dwt.Check_Day) BETWEEN N'2025-11-01' AND N'2025-11-30'
+//                   AND u.Vehicle = 'Walking'
+//            GROUP BY
+//                   u.userId
+//                  ,u.Address_Live
+//                  ,u.Vehicle
+//                  ,u.PickupDropoffStation
+//                  ,dd.Department_Name
+//                  ,u.lat
+//                  ,u.long
+//        )              AS a`
   return query;
 };
 

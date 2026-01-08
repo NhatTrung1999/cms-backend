@@ -53,8 +53,9 @@ export class Cat7Controller {
   async autoSentCMS(
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
   ) {
-    const data = await this.cat7Service.autoSentCMS(dateFrom, dateTo);
+    const data = await this.cat7Service.autoSentCMS(dateFrom, dateTo, factory);
     return data;
   }
 
