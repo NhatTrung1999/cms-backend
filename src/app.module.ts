@@ -18,6 +18,7 @@ import { Cat6Module } from './api/cat6/cat6.module';
 import { Cat1andcat4Module } from './api/cat1andcat4/cat1andcat4.module';
 import { InfofactoryModule } from './api/infofactory/infofactory.module';
 import { HrModule } from './api/hr/hr.module';
+import { LogcatModule } from './api/logcat/logcat.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { HrModule } from './api/hr/hr.module';
     FilemanagementModule,
     HrModule,
     InfofactoryModule,
+    LogcatModule,
     Cat9andcat12Module,
     Cat5Module,
     Cat7Module,
