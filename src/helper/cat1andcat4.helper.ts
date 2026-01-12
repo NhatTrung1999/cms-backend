@@ -43,7 +43,7 @@ export const buildQuery = async (
                             )*KCRKS.Qty
                         )                               Weight_Unitkg
                         ,ISNULL(z.ZSDH ,CGZL.ZSBH)       SupplierCode
-                        ,pc.FactoryCode
+                        ,'${factory}' as FactoryCode
                         ,ISNULL(P.Style ,ZSZL.Style)     Style
                         ,CASE 
                               WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
