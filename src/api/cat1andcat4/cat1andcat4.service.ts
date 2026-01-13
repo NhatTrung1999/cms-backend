@@ -56,7 +56,7 @@ export class Cat1andcat4Service {
         );
     }
 
-    return await this.getAFactoryData(
+    return await this.getAFactoryDataTest(
       db,
       dateFrom,
       dateTo,
@@ -66,6 +66,16 @@ export class Cat1andcat4Service {
       sortField,
       sortOrder,
     );
+    // return await this.getAFactoryData(
+    //   db,
+    //   dateFrom,
+    //   dateTo,
+    //   factory,
+    //   page,
+    //   limit,
+    //   sortField,
+    //   sortOrder,
+    // );
     // try {
     //   const offset = (page - 1) * limit;
 
@@ -167,55 +177,55 @@ export class Cat1andcat4Service {
     return records;
   }
 
-  private async getAFactoryData(
-    db: Sequelize,
-    dateFrom: string,
-    dateTo: string,
-    factory: string,
-    page: number,
-    limit: number,
-    sortField: string,
-    sortOrder: string,
-  ) {
-    try {
-      const offset = (page - 1) * limit;
+  // private async getAFactoryData(
+  //   db: Sequelize,
+  //   dateFrom: string,
+  //   dateTo: string,
+  //   factory: string,
+  //   page: number,
+  //   limit: number,
+  //   sortField: string,
+  //   sortOrder: string,
+  // ) {
+  //   try {
+  //     const offset = (page - 1) * limit;
 
-      const { query, countQuery } = await buildQuery(
-        dateFrom,
-        dateTo,
-        factory,
-        this.EIP,
-      );
-      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-      const [dataResults, countResults] = await Promise.all([
-        db.query(query, {
-          replacements,
-          type: QueryTypes.SELECT,
-        }),
-        db.query(countQuery, {
-          replacements,
-          type: QueryTypes.SELECT,
-        }),
-      ]);
-      // console.log(dataResults);
-      let data = dataResults;
-      data.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        if (sortOrder === 'asc') {
-          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-        } else {
-          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-        }
-      });
-      data = data.slice(offset, offset + limit);
-      const total = (countResults[0] as { total: number })?.total || 0;
-      const hasMore = offset + data.length < total;
-      return { data, page, limit, total, hasMore };
-    } catch (error: any) {
-      throw new InternalServerErrorException(error);
-    }
-  }
+  //     const { query, countQuery } = await buildQuery(
+  //       dateFrom,
+  //       dateTo,
+  //       factory,
+  //       this.EIP,
+  //     );
+  //     const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+  //     const [dataResults, countResults] = await Promise.all([
+  //       db.query(query, {
+  //         replacements,
+  //         type: QueryTypes.SELECT,
+  //       }),
+  //       db.query(countQuery, {
+  //         replacements,
+  //         type: QueryTypes.SELECT,
+  //       }),
+  //     ]);
+  //     // console.log(dataResults);
+  //     let data = dataResults;
+  //     data.sort((a, b) => {
+  //       const aValue = a[sortField];
+  //       const bValue = b[sortField];
+  //       if (sortOrder === 'asc') {
+  //         return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+  //       } else {
+  //         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+  //       }
+  //     });
+  //     data = data.slice(offset, offset + limit);
+  //     const total = (countResults[0] as { total: number })?.total || 0;
+  //     const hasMore = offset + data.length < total;
+  //     return { data, page, limit, total, hasMore };
+  //   } catch (error: any) {
+  //     throw new InternalServerErrorException(error);
+  //   }
+  // }
 
   private async getAllFactoryData(
     dateFrom: string,
@@ -444,4 +454,211 @@ export class Cat1andcat4Service {
       throw new InternalServerErrorException(`${error.message}`);
     }
   }
+
+  private async getAFactoryDataTest(
+    db: Sequelize,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    page: number,
+    limit: number,
+    sortField: string = 'No',
+    sortOrder: string = 'asc',
+  ) {
+    try {
+      const offset = (page - 1) * limit;
+
+      const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = '${factory}'`;
+
+      const factoryAddress =
+        (await this.EIP.query(queryAddress, {
+          type: QueryTypes.SELECT,
+        })) || [];
+
+      const replacements = {
+        startDate: dateFrom,
+        endDate: dateTo,
+        offset,
+        limit,
+      };
+      const data: any[] = await db.query(
+        `IF OBJECT_ID('tempdb..#PurN233_CGZL') IS NOT NULL
+              DROP TABLE #PurN233_CGZL
+
+          SELECT cgzl.CGDate     PurDate
+                ,c.CGNO          PurNo
+                ,c.CLBH          MatID
+                ,cgzl.ZSBH
+                ,cgzl.GSBH
+          INTO   #PurN233_CGZL
+          FROM   CGZLS AS c
+                LEFT JOIN cgzl
+                      ON  cgzl.CGNO = c.CGNO
+          WHERE  CONVERT(VARCHAR ,CGDate ,23) BETWEEN :startDate AND :endDate
+
+          DECLARE @TotalRows INT;
+
+
+          SELECT @TotalRows = COUNT(*)
+          FROM   #PurN233_CGZL CGZL
+                LEFT JOIN ZSZL
+                      ON  CGZL.ZSBH = ZSZL.ZSDH
+                LEFT JOIN clzl
+                      ON  cldh = CGZL.MatID
+                LEFT JOIN kcrk
+                      ON  kcrk.ZSNO = CGZL.PurNo
+                LEFT JOIN kcrks
+                      ON  kcrks.RKNO = kcrk.RKNO
+                          AND kcrks.CLBH = CGZL.MatID
+                          AND ISNULL(KCRKS.RKSB ,'') NOT IN ('DL' ,'NG');
+
+
+          SELECT @TotalRows                   AS TotalRowsCount
+                ,CAST(ROW_NUMBER() OVER(ORDER BY kcrk.ModifyDate) AS INT) AS [No]
+                ,'${factory}'                 AS FactoryCode
+                ,CGZL.PurDate                 AS PurDate
+                ,kcrk.ModifyDate              AS RKDate
+                ,CGZL.PurNo                   AS PurNo
+                ,kcrk.RKNO                    AS ReceivedNo
+                ,CGZL.MatID                   AS MatID
+                ,clzl.ywpm                    AS MatName
+                ,ZLCLSL.CLSL                  AS QtyUsage
+                ,KCRKS.Qty                    AS QtyReceive
+                ,ISNULL(
+                    ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                    ,SN74A.UnitWeight
+                )                               UnitWeight
+                ,(
+                    ISNULL(
+                        ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                        ,SN74A.UnitWeight
+                    )*KCRKS.Qty
+                )                               WeightUnitkg
+                ,ISNULL(z.ZSDH ,CGZL.ZSBH)       SupplierCode
+                ,ISNULL(P.Style ,ZSZL.Style)     Style
+                ,CASE 
+                      WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
+                      WHEN (
+                              '${factory}' IN ('LYV' ,'LVL' ,'LHG')
+                              AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                          ) 
+                          OR (
+                              '${factory}'='LYF'
+                              AND ZSZL.Country='Indonesia'
+                          ) 
+                          OR (
+                              '${factory}' IN ('LYM' ,'POL')
+                              AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
+                          ) THEN 'Land'
+                      ELSE 'SEA + Land'
+                END                             TransportationMethod
+                ,isi.SupplierFullAddress      AS Departure
+                ,CASE 
+                      WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN 'N/A'
+                      ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
+                END                             ThirdCountryLandTransport
+                ,isi.PortOfDeparture          AS PortOfDeparture
+                ,isi.PortOfArrival            AS PortOfArrival
+                ,isi.Factory_Port             AS FactoryDomesticLandTransport
+                ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Destination
+                ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) AS LandTransportDistance
+                ,isi.SeaTransportDistance     AS SeaTransportDistance
+                ,isi.AirTransportDistance     AS AirTransportDistance
+                ,CAST('0' AS INT)             AS LandTransportTonKilometers
+                ,CAST('0' AS INT)             AS SeaTransportTonKilometers
+                ,CAST('0' AS INT)             AS AirTransportTonKilometers
+          FROM   #PurN233_CGZL CGZL
+                LEFT JOIN ZSZL
+                      ON  CGZL.ZSBH = ZSZL.ZSDH
+                LEFT JOIN ZSZL_Prod P
+                      ON  P.ZSDH = ZSZL.zsdh
+                          AND P.GSBH = cgzl.GSBH
+                LEFT JOIN ZSZL z
+                      ON  z.zsdh = ISNULL(P.MZSDH ,ZSZL.MZSDH)
+                LEFT JOIN Imp_SuppIDCombine  AS isi
+                      ON  isi.ZSDH = ZSZL.zsdh
+                LEFT JOIN clzl
+                      ON  cldh = CGZL.MatID
+                LEFT JOIN (
+                          SELECT smi2.CLBH
+                                ,zszl.zsdh
+                                ,MAX(smi2.Supplier_Material_ID) Supplier_Material_ID
+                          FROM   SuppMatID AS smi2
+                                LEFT JOIN zszl
+                                      ON  zszl.Zsdh_TW = smi2.CSBH
+                                INNER JOIN Imp_MaterialWeight
+                                      ON  Imp_MaterialWeight.Supplier_Material_ID = REPLACE(
+                                              REPLACE(smi2.Supplier_Material_ID ,CHAR(10) ,'')
+                                            ,CHAR(13)
+                                            ,''
+                                          )
+                          WHERE  ISNULL(Total_Weight ,0)<>0
+                          GROUP BY
+                                smi2.CLBH
+                                ,zszl.zsdh
+                      ) A
+                      ON  A.CLBH = CGZL.MatID
+                          AND A.zsdh = CGZL.ZSBH
+                LEFT JOIN Imp_MaterialWeight imw
+                      ON  imw.Supplier_Material_ID = A.Supplier_Material_ID
+                LEFT JOIN Setup_UnitWeight   AS SN223_UnitWeight
+                      ON  SN223_UnitWeight.FormID = 'SN223'
+                          AND SN223_UnitWeight.SupplierID = CGZL.ZSBH
+                          AND SN223_UnitWeight.MatID = CGZL.MatID
+                LEFT JOIN Setup_UnitWeight   AS SN74A
+                      ON  SN74A.FormID = 'SN74A'
+                          AND SN74A.SupplierID = 'ZZZZ'
+                          AND SN74A.MatID = CGZL.MatID
+                LEFT JOIN kcrk
+                      ON  kcrk.ZSNO = CGZL.PurNo
+                LEFT JOIN kcrks
+                      ON  kcrks.RKNO = kcrk.RKNO
+                          AND kcrks.CLBH = CGZL.MatID
+                          AND ISNULL(KCRKS.RKSB ,'') NOT IN ('DL' ,'NG')
+                LEFT JOIN (
+                          SELECT SS.CGNO
+                                ,S2.CLBH
+                                ,ISNULL(SUM(S2.CLSL) ,0) AS CLSL
+                          FROM   ZLZLS2 S2
+                                LEFT JOIN CGZLSS SS
+                                      ON  SS.ZLBH = S2.ZLBH
+                                          AND SS.CLBH = S2.CLBH
+                          GROUP BY
+                                SS.CGNO
+                                ,S2.CLBH
+                      ) ZLCLSL
+                      ON  ZLCLSL.CGNO = CGZL.PurNo
+                          AND ZLCLSL.CLBH = CGZL.MatID
+          ORDER BY
+                ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+                OFFSET :offset                  ROWS
+
+          FETCH NEXT :limit ROWS ONLY;`,
+        {
+          replacements,
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      const total = data[0].TotalRowsCount || 0;
+      const hasMore = offset + data.length < total;
+      return { data, page, limit, total, hasMore };
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
+  // private async getAllFactoryDataTest(
+  //   dateFrom: string,
+  //   dateTo: string,
+  //   factory: string,
+  //   page: number,
+  //   limit: number,
+  //   sortField: string,
+  //   sortOrder: string,
+  // ) {
+    
+  // }
 }

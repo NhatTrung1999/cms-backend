@@ -17,7 +17,7 @@ export class Cat1andcat4Controller {
   constructor(private readonly cat1andcat4Service: Cat1andcat4Service) {}
 
   @Get('get-data-cat1-and-cat4')
-  async getDataWMS(
+  async getDataCat1AndCat4(
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,

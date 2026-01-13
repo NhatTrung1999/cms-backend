@@ -266,13 +266,15 @@ export const buildQuery = async (
   return { query, countQuery };
 };
 
+export const buildQueryTest = async () => {};
+
 export const getADataExcelFactoryCat1AndCat4 = async (
   sheet: ExcelJS.Worksheet,
   db: Sequelize,
   dateFrom: string,
   dateTo: string,
   factory: string,
-  dbEIP?: Sequelize
+  dbEIP?: Sequelize,
 ) => {
   //   let where = 'WHERE 1=1';
   //   const replacements: any[] = [];
