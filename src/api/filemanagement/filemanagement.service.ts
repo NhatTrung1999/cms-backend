@@ -21,7 +21,7 @@ import {
   getADataExcelFactoryCat7,
 } from 'src/helper/cat7.helper';
 
-import { buildQuery as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
+import { buildQueryTest as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
 
 @Injectable()
 export class FilemanagementService {
@@ -841,49 +841,23 @@ export class FilemanagementService {
     dateFrom: string,
     dateTo: string,
   ) {
-    // let where = 'WHERE 1=1';
-    // const replacements: any[] = [];
-    // if (dateFrom && dateTo) {
-    //   where += ` AND CONVERT(VARCHAR, c.USERDate, 23) BETWEEN ? AND ?`;
-    //   replacements.push(dateFrom, dateTo);
-    // }
-    // const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY c.USERDate) AS INT) AS [No]
-    //                       ,c.USERDate        AS [Date]
-    //                       ,c.CGNO            AS Purchase_Order
-    //                       ,c2.CLBH           AS Material_No
-    //                       ,CAST('0' AS INT)     AS [Weight]
-    //                       ,z.SupplierCode AS Supplier_Code
-    //                       ,z.ThirdCountryLandTransport AS Thirdcountry_Land_Transport
-    //                       ,z.PortofDeparture AS Port_Of_Departure
-    //                       ,z.PortofArrival AS Port_Of_Arrival
-    //                       ,z.Transportationmethod AS Factory_Domestic_Land_Transport
-    //                       ,CAST('0' AS INT)     AS Land_Transport_Distance
-    //                       ,z.SeaTransportDistance AS Sea_Transport_Distance
-    //                       ,CAST('0' AS INT) AS Air_Transport_Distance
-    //                       ,CAST('0' AS INT) AS Land_Transport_Ton_Kilometers
-    //                       ,CAST('0' AS INT) AS Sea_Transport_Ton_Kilometers
-    //                       ,CAST('0' AS INT) AS Air_Transport_Ton_Kilometers
-    //                 FROM   CGZL              AS c
-    //                       INNER JOIN CGZLS  AS c2
-    //                             ON  c2.CGNO = c.CGNO
-    //                       LEFT JOIN zszl    AS z
-    //                             ON  z.zsdh = c.CGNO
-    //                 ${where}`;
-    // const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP];
     const connects: { facotryName: string; conn: Sequelize }[] = [
       { facotryName: 'LYV', conn: this.LYV_ERP },
       { facotryName: 'LHG', conn: this.LHG_ERP },
       { facotryName: 'LVL', conn: this.LVL_ERP },
       { facotryName: 'LYM', conn: this.LYM_ERP },
-      { facotryName: 'JAZ', conn: this.JAZ_ERP },
-      { facotryName: 'JZS', conn: this.JZS_ERP },
     ];
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+    const replacements = {
+      startDate: dateFrom,
+      endDate: dateTo,
+      offset: 1,
+      limit: 20,
+    };
     const dataResults = await Promise.all(
       connects.map(async ({ facotryName, conn }) => {
-        const { query } = await buildQueryCat1AndCat4(
-          dateFrom,
-          dateTo,
+        const query = await buildQueryCat1AndCat4(
+          'No',
+          'asc',
           facotryName,
           this.EIP,
         );
@@ -895,105 +869,49 @@ export class FilemanagementService {
     );
     let data = dataResults.flat();
     sheet.columns = [
-      {
-        header: 'No.',
-        key: 'No',
-      },
-      {
-        header: 'Pur Date',
-        key: 'PurDate',
-      },
-      {
-        header: 'RK Date',
-        key: 'RKDate',
-      },
-      {
-        header: 'Purchase Order',
-        key: 'PurchaseOrder',
-      },
-      {
-        header: 'Received No.',
-        key: 'ReceivedNo',
-      },
-      {
-        header: 'Material No',
-        key: 'MaterialNo',
-      },
-      {
-        header: 'Qty.(Usage)',
-        key: 'QtyUsage',
-      },
-      {
-        header: 'Qty.(Receive)',
-        key: 'QtyReceive',
-      },
-      {
-        header: 'Unit Weight',
-        key: 'UnitWeight',
-      },
-      {
-        header: 'Weight(Unit: KG)',
-        key: 'Weight',
-      },
-      {
-        header: 'Supplier Code',
-        key: 'SupplierCode',
-      },
-      {
-        header: 'Style',
-        key: 'Style',
-      },
-      {
-        header: 'Transportation Method',
-        key: 'TransportationMethod',
-      },
-      {
-        header: 'Departure',
-        key: 'Departure',
-      },
+      { header: 'No.', key: 'No' },
+      { header: 'Factory Code', key: 'FactoryCode' },
+      { header: 'Pur Date', key: 'PurDate' },
+      { header: 'RK Date', key: 'RKDate' },
+      { header: 'Purchase Order', key: 'PurNo' },
+      { header: 'Received No.', key: 'ReceivedNo' },
+      { header: 'Material No.', key: 'MatID' },
+      { header: 'Qty.(Usage)', key: 'Qty_Usage' },
+      { header: 'Qty.(receive)', key: 'Qty_Receive' },
+      { header: 'Unit weight', key: 'UnitWeight' },
+      { header: 'Weight (Unit：KG)', key: 'Weight_Unitkg' },
+      { header: 'Supplier Code', key: 'SupplierCode' },
+      { header: 'Style', key: 'Style' },
+      { header: 'Transportation Method', key: 'TransportationMethod' },
+      { header: 'Departure', key: 'Departure' },
       {
         header: 'Third-country Land Transport (A)',
-        key: 'ThirdcountryLandTransportA',
+        key: 'ThirdCountryLandTransport',
       },
+      { header: 'Port of Departure', key: 'PortOfDeparture' },
+      { header: 'Port of Arrival', key: 'PortOfArrival' },
       {
-        header: 'Port of Departure',
-        key: 'PortofDeparture',
+        header: 'Factory (Domestic Land Transport)(B)',
+        key: 'FactoryDomesticLandTransport',
       },
-      {
-        header: 'Port of Arrival',
-        key: 'PortofArrival',
-      },
-      {
-        header: 'Factory (Domestic Land Transport) (B)',
-        key: 'FactoryDomesticLandTransportB',
-      },
-      {
-        header: 'Destination',
-        key: 'Destination',
-      },
+      { header: 'Destination', key: 'Destination' },
       {
         header: 'Land Transport Distance (A+B)',
-        key: 'LandTransportDistanceAB',
+        key: 'LandTransportDistance',
       },
+      { header: 'Sea Transport Distance', key: 'SeaTransportDistance' },
+      { header: 'Air Transport Distanc', key: 'AirTransportDistance' },
       {
-        header: 'Sea Transport Distance',
-        key: 'SeaTransportDistance',
-      },
-      {
-        header: 'Air Transport Distance',
-        key: 'AirTransportDistance',
-      },
-      {
-        header: 'Land Transport Ton-Kilometers',
-        key: 'LandTransortTonKilometers',
+        header: 'Land Transport Ton-Kilometer',
+        key: 'LandTransportTonKilometers',
       },
       {
         header: 'Sea Transport Ton-Kilometers',
-        key: 'SeaTransortTonKilometers',
+        key: 'SeaTransportTonKilometers',
       },
       {
-        header: 'Air Transport Ton-Kilometers',
-        key: 'AirTransortTonKilometers',
+        header: '	Air Transport Ton-Kilomete',
+        key: 'AirTransportTonKilometers',
       },
     ];
     data.forEach((item) => sheet.addRow(item));
