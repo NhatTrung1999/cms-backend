@@ -271,6 +271,7 @@ export const buildQueryTest = async (
   sortOrder: string = 'asc',
   factory: string,
   db?: Sequelize,
+  isExport: boolean = false
 ) => {
   const queryAddress = `SELECT [Address]
                         FROM CMW_Info_Factory
@@ -280,6 +281,11 @@ export const buildQueryTest = async (
     (await db?.query(queryAddress, {
       type: QueryTypes.SELECT,
     })) || [];
+
+    const pagingSql = isExport
+      ? ''
+      : `OFFSET :offset ROWS
+      FETCH NEXT :limit ROWS ONLY;`;
   const query = `IF OBJECT_ID('tempdb..#PurN233_CGZL') IS NOT NULL
               DROP TABLE #PurN233_CGZL
 
@@ -429,9 +435,7 @@ export const buildQueryTest = async (
                           AND ZLCLSL.CLBH = CGZL.MatID
           ORDER BY
                 ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
-                OFFSET :offset                  ROWS
-
-          FETCH NEXT :limit ROWS ONLY;`;
+            ${pagingSql}`;
   return query;
 };
 
@@ -558,12 +562,10 @@ export const getADataExcelFactoryCat1AndCat4 = async (
   //   },
   // ];
 
-  const query = await buildQueryTest('No', 'asc', factory, dbEIP);
+  const query = await buildQueryTest('No', 'asc', factory, dbEIP, true);
   const replacements = {
     startDate: dateFrom,
     endDate: dateTo,
-    offset: 1,
-    limit: 20,
   };
 
   const data: any[] = await db.query(query, {

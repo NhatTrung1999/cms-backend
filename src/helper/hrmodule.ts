@@ -53,17 +53,14 @@ export const buildQueryHRModule = (
                             ON  c.UserNo = a.userId
                                 AND c.UserNo = b.UserNo`
     : `users                         AS a
-                    LEFT JOIN Data_Person         AS b
-                            ON  a.userId COLLATE SQL_Latin1_General_CP1_CI_AS = b.Person_ID COLLATE SQL_Latin1_General_CP1_CI_AS
-                    LEFT JOIN Data_Department     AS c
-                            ON  b.Department_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = c.Department_Serial_Key COLLATE
-                                SQL_Latin1_General_CP1_CI_AS
-                    LEFT JOIN Data_Person_Detail  AS d
-                            ON  d.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = a.Person_Serial_Key COLLATE 
-                                SQL_Latin1_General_CP1_CI_AS
-                    LEFT JOIN Data_Work_Time      AS e
-                            ON  e.Person_Serial_Key COLLATE SQL_Latin1_General_CP1_CI_AS = a.Person_Serial_Key COLLATE
-                                SQL_Latin1_General_CP1_CI_AS`;
+       LEFT JOIN Data_Person         AS b
+            ON  a.userId = b.Person_ID COLLATE Database_Default
+       LEFT JOIN Data_Department     AS c
+            ON  b.Department_Serial_Key = c.Department_Serial_Key COLLATE Database_Default
+       LEFT JOIN Data_Person_Detail  AS d
+            ON  d.Person_Serial_Key = a.Person_Serial_Key COLLATE Database_Default
+       LEFT JOIN Data_Work_Time      AS e
+            ON  e.Person_Serial_Key = ISNULL(a.Person_Serial_Key, a.userId) COLLATE Database_Default`;
 
   const groupBy: string = isLYM
     ? `a.userId

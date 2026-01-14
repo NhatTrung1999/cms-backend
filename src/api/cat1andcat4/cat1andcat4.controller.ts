@@ -11,6 +11,7 @@ import {
 import { Cat1andcat4Service } from './cat1andcat4.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { getFactortyID, getUserId } from 'src/helper/common.helper';
+import { Public } from 'src/decorators';
 
 @Controller('cat1andcat4')
 export class Cat1andcat4Controller {
@@ -60,6 +61,21 @@ export class Cat1andcat4Controller {
     const data = await this.cat1andcat4Service.importExcelPortCode(
       file,
       userid,
+      factory,
+    );
+    return data;
+  }
+
+  @Public()
+  @Get('auto-sent-cms')
+  async autoSentCMS(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+  ) {
+    const data = await this.cat1andcat4Service.autoSentCMS(
+      dateFrom,
+      dateTo,
       factory,
     );
     return data;

@@ -390,7 +390,8 @@ export class Cat1andcat4Service {
         replacements,
         type: QueryTypes.SELECT,
       });
-      const total = data[0].TotalRowsCount || 0;
+
+      const total = data.length > 0 ? data[0].TotalRowsCount : 0;
       const hasMore = offset + data.length < total;
       return { data, page, limit, total, hasMore };
     } catch (error: any) {
@@ -417,28 +418,46 @@ export class Cat1andcat4Service {
       const replacements = {
         startDate: dateFrom,
         endDate: dateTo,
-        offset,
-        limit,
       };
 
-      const [dataResults] = await Promise.all([
-        Promise.all(
-          connects.map(async ({ factoryName, conn }) => {
-            const query = await buildQueryTest(
-              sortField,
-              sortOrder,
-              factoryName,
-              this.EIP,
-            );
-            return conn.query(query, { type: QueryTypes.SELECT, replacements });
-          }),
-        ),
-      ]);
+      const results = await Promise.all(
+        connects.map(async ({ factoryName, conn }) => {
+          const query = await buildQueryTest(
+            sortField,
+            sortOrder,
+            factoryName,
+            this.EIP,
+            true,
+          );
 
-      let data: any[] = dataResults.flat();
-      const total = data[0].TotalRowsCount || 0;
+          const rows: any[] = await conn.query(query, {
+            type: QueryTypes.SELECT,
+            replacements,
+          });
+
+          return rows;
+        }),
+      );
+
+      let allData: any[] = results.flat();
+
+      allData.sort((a, b) => {
+        if (sortOrder === 'asc') {
+          return a[sortField] > b[sortField] ? 1 : -1;
+        }
+        return a[sortField] < b[sortField] ? 1 : -1;
+      });
+
+      const total = allData.length;
+      const data = allData
+        .slice(offset, offset + limit)
+        .map((row, index) => ({ ...row, No: offset + index + 1 }));
       const hasMore = offset + data.length < total;
       return { data, page, limit, total, hasMore };
     } catch (error) {}
+  }
+
+  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
+    return { dateFrom, dateTo, factory };
   }
 }
