@@ -4,6 +4,7 @@ export const buildQueryHRModule = (
   fullName: string,
   id: string,
   department: string,
+  joinDate: string,
   factory: string,
 ) => {
   const isLYM = factory === 'LYM';
@@ -17,22 +18,32 @@ export const buildQueryHRModule = (
     conditions.push(`CONVERT(DATE, ${dateField}) BETWEEN ? AND ?`);
   }
 
-  if (fullName && !isLYM) {
+  if (fullName) {
     conditions.push(`a.fullName LIKE ?`);
   }
 
-  if (id && !isLYM) {
+  if (id) {
     conditions.push(`a.userId LIKE ?`);
   }
 
-  if (department && !isLYM) {
-    conditions.push(`c.Department_Serial_Key LIKE ?`);
+  if (department) {
+    conditions.push(
+      `${isLYM ? `d.__sno = ?` : `c.Department_Serial_Key LIKE ?`}`,
+    );
+  }
+
+  if (joinDate) {
+    // const dateField = isLYM ? 'b.[Start_Date]' : 'b.Date_Come_In';
+    conditions.push(
+      `${isLYM ? `CAST(b.[Start_Date] AS DATE) = ?` : `CONVERT(VARCHAR ,b.Date_Come_In ,23) = ?`}`,
+    );
   }
 
   const select: string = isLYM
     ? `a.userId                 AS ID
       ,b.Part                   AS Department
-      ,a.fullName               AS Full_Name
+      ,a.fullName               AS FullName
+      ,b.[Start_Date]           AS JoinDate
       ,b.Addr_now               AS PermanentAddress
       ,a.Address_Live           AS CurrentAddress
       ,a.Vehicle                AS TransportationMode
@@ -40,6 +51,7 @@ export const buildQueryHRModule = (
     : `a.userId                      AS ID
       ,c.Department_Name             AS Department
       ,a.fullName                    AS FullName
+      ,b.Date_Come_In                AS JoinDate
       ,d.Address_Live                AS PermanentAddress
       ,a.Address_Live                AS CurrentAddress
       ,a.Vehicle                     AS TransportationMethod
@@ -51,7 +63,8 @@ export const buildQueryHRModule = (
                             ON  b.UserNo = a.userId
                     LEFT JOIN HR_Attendance  AS c
                             ON  c.UserNo = a.userId
-                                AND c.UserNo = b.UserNo`
+                                AND c.UserNo = b.UserNo
+                    LEFT JOIN HR_DEPT AS d ON d.DeptName = b.Part`
     : `users                         AS a
        LEFT JOIN Data_Person         AS b
             ON  a.userId = b.Person_ID COLLATE Database_Default
@@ -66,12 +79,14 @@ export const buildQueryHRModule = (
     ? `a.userId
                     ,b.Part
                     ,a.fullName
+                    ,b.[Start_Date]
                     ,b.Addr_now
                     ,a.Address_Live
                     ,a.Vehicle`
     : `a.userId
                     ,c.Department_Name
                     ,a.fullName
+                    ,b.Date_Come_In
                     ,d.Address_Live
                     ,a.Address_Live
                     ,a.Vehicle`;

@@ -28,6 +28,7 @@ export class HrController {
     @Query('fullName') fullName: string,
     @Query('id') id: string,
     @Query('department') department: string,
+    @Query('joinDate') joinDate: string,
     @Query('page') page: number,
     @Query('limit') limit: number,
     @Query('sortField') sortField: string,
@@ -41,6 +42,7 @@ export class HrController {
       fullName,
       id,
       department,
+      joinDate,
       factory,
       +page,
       +limit,
@@ -89,6 +91,7 @@ export class HrController {
     @Query('fullName') fullName: string,
     @Query('id') id: string,
     @Query('department') department: string,
+    @Query('joinDate') joinDate: string,
     @Request() req,
     @Res() res: Response,
   ) {
@@ -99,6 +102,7 @@ export class HrController {
       fullName,
       id,
       department,
+      joinDate,
       factory,
     );
     res.header('Content-Disposition', 'attachment; filename="danh_sach.xlsx"');

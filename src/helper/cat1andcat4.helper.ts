@@ -1,6 +1,7 @@
 import * as ExcelJS from 'exceljs';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
+import { getFactory } from './factory.helper';
 
 export const buildQuery = async (
   dateFrom: string,
@@ -298,7 +299,7 @@ export const buildQueryTest = async (
           FROM   CGZLS AS c
                 LEFT JOIN cgzl
                       ON  cgzl.CGNO = c.CGNO
-          WHERE  CONVERT(VARCHAR ,CGDate ,23) BETWEEN :startDate AND :endDate
+          WHERE  CONVERT(VARCHAR ,CGDate ,23) BETWEEN :startDate AND :endDate AND ISNULL(cgzl.CGLX,'')<>'6' AND ISNULL(c.Qty,0)<>0
 
           DECLARE @TotalRows INT;
 
@@ -415,10 +416,10 @@ export const buildQueryTest = async (
                           AND SN74A.MatID = CGZL.MatID
                 LEFT JOIN kcrk
                       ON  kcrk.ZSNO = CGZL.PurNo
-                LEFT JOIN kcrks
+                INNER JOIN kcrks
                       ON  kcrks.RKNO = kcrk.RKNO
                           AND kcrks.CLBH = CGZL.MatID
-                          AND ISNULL(KCRKS.RKSB ,'') NOT IN ('DL' ,'NG')
+                          AND ISNULL(KCRKS.RKSB ,'') NOT IN ('DL' ,'NG') AND ISNULL(Qty,0) <> 0
                 LEFT JOIN (
                           SELECT SS.CGNO
                                 ,S2.CLBH
@@ -644,3 +645,178 @@ export const getADataExcelFactoryCat1AndCat4 = async (
     });
   });
 };
+
+
+export const buildQueryAutoSentCMS = async (
+  factory: string,
+  db?: Sequelize,
+) => {
+  const queryAddress = `SELECT [Address]
+                        FROM CMW_Info_Factory
+                        WHERE CreatedFactory = '${factory}'`;
+
+  const factoryAddress =
+    (await db?.query(queryAddress, {
+      type: QueryTypes.SELECT,
+    })) || [];
+
+  const query = `IF OBJECT_ID('tempdb..#PurN233_CGZL') IS NOT NULL
+              DROP TABLE #PurN233_CGZL
+
+          SELECT cgzl.CGDate     PurDate
+                ,c.CGNO          PurNo
+                ,c.CLBH          MatID
+                ,cgzl.ZSBH
+                ,cgzl.GSBH
+          INTO   #PurN233_CGZL
+          FROM   CGZLS AS c
+                LEFT JOIN cgzl
+                      ON  cgzl.CGNO = c.CGNO
+          WHERE  CONVERT(VARCHAR ,CGDate ,23) BETWEEN :startDate AND :endDate AND ISNULL(cgzl.CGLX,'')<>'6' AND ISNULL(c.Qty,0)<>0
+
+          DECLARE @TotalRows INT;
+
+
+          SELECT @TotalRows = COUNT(*)
+          FROM   #PurN233_CGZL CGZL
+                LEFT JOIN ZSZL
+                      ON  CGZL.ZSBH = ZSZL.ZSDH
+                LEFT JOIN clzl
+                      ON  cldh = CGZL.MatID
+                LEFT JOIN kcrk
+                      ON  kcrk.ZSNO = CGZL.PurNo
+                LEFT JOIN kcrks
+                      ON  kcrks.RKNO = kcrk.RKNO
+                          AND kcrks.CLBH = CGZL.MatID
+                          AND ISNULL(KCRKS.RKSB ,'') NOT IN ('DL' ,'NG');
+
+
+          SELECT @TotalRows                   AS TotalRowsCount
+                ,CAST(ROW_NUMBER() OVER(ORDER BY kcrk.ModifyDate) AS INT) AS [No]
+                ,'${getFactory(factory)}'                 AS FactoryCode
+                ,CGZL.PurDate                 AS PurDate
+                ,kcrk.ModifyDate              AS RKDate
+                ,CGZL.PurNo                   AS PurNo
+                ,kcrk.RKNO                    AS ReceivedNo
+                ,CGZL.MatID                   AS MatID
+                ,clzl.ywpm                    AS MatName
+                ,ZLCLSL.CLSL                  AS QtyUsage
+                ,KCRKS.Qty                    AS QtyReceive
+                ,ISNULL(
+                    ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                    ,SN74A.UnitWeight
+                )                               UnitWeight
+                ,(
+                    ISNULL(
+                        ISNULL(SN223_UnitWeight.UnitWeight ,imw.Total_Weight)
+                        ,SN74A.UnitWeight
+                    )*KCRKS.Qty
+                )                               WeightUnitkg
+                ,ISNULL(z.ZSDH ,CGZL.ZSBH)       SupplierCode
+                ,ISNULL(P.Style ,ZSZL.Style)     Style
+                ,CASE 
+                      WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
+                      WHEN (
+                              '${factory}' IN ('LYV' ,'LVL' ,'LHG')
+                              AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                          ) 
+                          OR (
+                              '${factory}'='LYF'
+                              AND ZSZL.Country='Indonesia'
+                          ) 
+                          OR (
+                              '${factory}' IN ('LYM' ,'POL')
+                              AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
+                          ) THEN 'Land'
+                      ELSE 'SEA + Land'
+                END                             TransportationMethod
+                ,isi.SupplierFullAddress      AS Departure
+                ,CASE 
+                      WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN 'N/A'
+                      ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
+                END                             ThirdCountryLandTransport
+                --,isi.PortOfDeparture          AS PortOfDeparture
+                --,isi.PortOfArrival            AS PortOfArrival
+                ,pc.PortCode                    AS PortOfDeparture
+                ,'${factory === 'LYM' ? 'MMRGN' : 'VNCLP'}'            AS PortOfArrival
+                ,isi.Factory_Port             AS FactoryDomesticLandTransport
+                ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Destination
+                ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) AS LandTransportDistance
+                ,isi.SeaTransportDistance     AS SeaTransportDistance
+                ,isi.AirTransportDistance     AS AirTransportDistance
+                ,CAST('0' AS INT)             AS LandTransportTonKilometers
+                ,CAST('0' AS INT)             AS SeaTransportTonKilometers
+                ,CAST('0' AS INT)             AS AirTransportTonKilometers
+          FROM   #PurN233_CGZL CGZL
+                LEFT JOIN ZSZL
+                      ON  CGZL.ZSBH = ZSZL.ZSDH
+                LEFT JOIN ZSZL_Prod P
+                      ON  P.ZSDH = ZSZL.zsdh
+                          AND P.GSBH = cgzl.GSBH
+                LEFT JOIN ZSZL z
+                      ON  z.zsdh = ISNULL(P.MZSDH ,ZSZL.MZSDH)
+                LEFT JOIN Imp_SuppIDCombine  AS isi
+                      ON  isi.ZSDH = ZSZL.zsdh
+                LEFT JOIN clzl
+                      ON  cldh = CGZL.MatID
+                LEFT JOIN (
+                          SELECT smi2.CLBH
+                                ,zszl.zsdh
+                                ,MAX(smi2.Supplier_Material_ID) Supplier_Material_ID
+                          FROM   SuppMatID AS smi2
+                                LEFT JOIN zszl
+                                      ON  zszl.Zsdh_TW = smi2.CSBH
+                                INNER JOIN Imp_MaterialWeight
+                                      ON  Imp_MaterialWeight.Supplier_Material_ID = REPLACE(
+                                              REPLACE(smi2.Supplier_Material_ID ,CHAR(10) ,'')
+                                            ,CHAR(13)
+                                            ,''
+                                          )
+                          WHERE  ISNULL(Total_Weight ,0)<>0
+                          GROUP BY
+                                smi2.CLBH
+                                ,zszl.zsdh
+                      ) A
+                      ON  A.CLBH = CGZL.MatID
+                          AND A.zsdh = CGZL.ZSBH
+                LEFT JOIN Imp_MaterialWeight imw
+                      ON  imw.Supplier_Material_ID = A.Supplier_Material_ID
+                LEFT JOIN Setup_UnitWeight   AS SN223_UnitWeight
+                      ON  SN223_UnitWeight.FormID = 'SN223'
+                          AND SN223_UnitWeight.SupplierID = CGZL.ZSBH
+                          AND SN223_UnitWeight.MatID = CGZL.MatID
+                LEFT JOIN Setup_UnitWeight   AS SN74A
+                      ON  SN74A.FormID = 'SN74A'
+                          AND SN74A.SupplierID = 'ZZZZ'
+                          AND SN74A.MatID = CGZL.MatID
+                LEFT JOIN kcrk
+                      ON  kcrk.ZSNO = CGZL.PurNo
+                LEFT JOIN kcrks
+                      ON  kcrks.RKNO = kcrk.RKNO
+                          AND kcrks.CLBH = CGZL.MatID
+                          AND ISNULL(KCRKS.RKSB ,'') NOT IN ('DL' ,'NG')
+                LEFT JOIN (
+                          SELECT SS.CGNO
+                                ,S2.CLBH
+                                ,ISNULL(SUM(S2.CLSL) ,0) AS CLSL
+                          FROM   ZLZLS2 S2
+                                LEFT JOIN CGZLSS SS
+                                      ON  SS.ZLBH = S2.ZLBH
+                                          AND SS.CLBH = S2.CLBH
+                          GROUP BY
+                                SS.CGNO
+                                ,S2.CLBH
+                      ) ZLCLSL
+                      ON  ZLCLSL.CGNO = CGZL.PurNo
+                          AND ZLCLSL.CLBH = CGZL.MatID
+                  LEFT JOIN (
+                              SELECT SupplierID
+                                    ,PortCode
+                                    ,TransportMethod
+                              FROM   CMW.CMW.dbo.CMW_PortCode_Cat1_4
+                              WHERE  FactoryCode = 'LYV'
+                        )                       AS pc
+                        ON  pc.SupplierID = ISNULL(z.ZSDH ,CGZL.ZSBH) COLLATE Database_Default`;
+  return query;
+};
+

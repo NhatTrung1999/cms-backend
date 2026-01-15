@@ -27,6 +27,7 @@ export class HrService {
     fullName: string,
     id: string,
     department: string,
+    joinDate: string,
     factory: string,
     page: number = 1,
     limit: number = 20,
@@ -63,6 +64,7 @@ export class HrService {
       fullName,
       id,
       department,
+      joinDate,
       factory,
     );
     const replacements: any = [];
@@ -79,7 +81,13 @@ export class HrService {
     }
 
     if (department) {
-      replacements.push(`%${department}%`);
+      replacements.push(
+        `${factory.trim().toUpperCase() === 'LYM' ? department : `%${department}%`}`,
+      );
+    }
+
+    if (joinDate) {
+      replacements.push(joinDate);
     }
 
     const [dataResults, countResults] = await Promise.all([
@@ -137,8 +145,13 @@ export class HrService {
       }
 
       const results = await db.query(
-        `SELECT DISTINCT Department_Name as name, Department_Serial_Key as value 
-          FROM Data_Department`,
+        `${
+          factory.trim().toUpperCase() !== 'LYM'
+            ? `SELECT DISTINCT Department_Name as name, Department_Serial_Key as value 
+                FROM Data_Department`
+            : `SELECT DISTINCT DeptName as name, __sno as value
+                FROM HR_DEPT`
+        }`,
         { type: QueryTypes.SELECT },
       );
       return results;
@@ -393,6 +406,7 @@ export class HrService {
     fullName: string,
     id: string,
     department: string,
+    joinDate: string,
     factory: string,
   ) {
     let db: Sequelize;
@@ -424,6 +438,7 @@ export class HrService {
       fullName,
       id,
       department,
+      joinDate,
       factory,
     );
     const replacements: any = [];
@@ -442,6 +457,11 @@ export class HrService {
     if (department) {
       replacements.push(`%${department}%`);
     }
+
+    if (joinDate) {
+      replacements.push(joinDate);
+    }
+
     const data = await db.query(query, {
       type: QueryTypes.SELECT,
       replacements,
@@ -462,6 +482,10 @@ export class HrService {
       {
         header: 'Department',
         key: 'Department',
+      },
+      {
+        header: 'Join Date',
+        key: 'JoinDate',
       },
       {
         header: 'Permanent Address',

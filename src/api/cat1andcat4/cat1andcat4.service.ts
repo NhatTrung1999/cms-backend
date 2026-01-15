@@ -5,11 +5,17 @@ import {
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { buildQuery, buildQueryTest } from 'src/helper/cat1andcat4.helper';
+import {
+  buildQuery,
+  buildQueryAutoSentCMS,
+  buildQueryTest,
+} from 'src/helper/cat1andcat4.helper';
 import { IDataPortCodeCat1AndCat4 } from 'src/types/cat1andcat4';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import dayjs from 'dayjs';
+dayjs().format();
 
 @Injectable()
 export class Cat1andcat4Service {
@@ -458,6 +464,90 @@ export class Cat1andcat4Service {
   }
 
   async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
-    return { dateFrom, dateTo, factory };
+    const replacements =
+      dateFrom && dateTo
+        ? {
+            startDate: dateFrom,
+            endDate: dateTo,
+          }
+        : {};
+
+    const connects = [
+      { factory: 'LYV', db: this.LYV_ERP },
+      // { factory: 'LHG', db: this.LHG_ERP },
+      // { factory: 'LYM', db: this.LYM_ERP },
+      // { factory: 'LVL', db: this.LVL_ERP },
+    ];
+
+    const dataResults = await Promise.all(
+      connects.map(async (conn) => {
+        const query = await buildQueryAutoSentCMS(conn.factory, this.EIP);
+        return conn.db.query(query, {
+          type: QueryTypes.SELECT,
+          replacements,
+        });
+      }),
+    );
+
+    const data = dataResults.flat();
+
+    const formatData = data.map((item: any) => {
+      const factory = item.FactoryCode ?? '';
+      const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
+      const docDate = item.PurDate
+        ? dayjs(item.PurDate).format('YYYY/MM/DD')
+        : '';
+      const docDate2 = item.RKDate
+        ? dayjs(item.RKDate).format('YYYY/MM/DD')
+        : '';
+      const docNo = item.PurNo ?? '';
+      const custVenName = item.SupplierCode ?? '';
+      const transType = item.TransportationMethod ?? '';
+      const departure = item.Departure ?? '';
+      const portOfDeparture = item.PortOfDeparture ?? '';
+      const portOfArrival = item.PortOfArrival ?? '';
+      const destination = item.Destination ?? '';
+      const activityData = item.WeightUnitkg ?? '';
+      return {
+        System: 'CMS Web',
+        Corporation: 'Lai Yih',
+        Factory: factory,
+        Department: '',
+        DocKey: docKey,
+        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+        ActivityType: '3.1',
+        DataType: '1',
+        DocType: 'CMS Web',
+        UndDoc: '',
+        DocFlow: '',
+        DocDate: docDate,
+        DocDate2: docDate2,
+        DocNo: docNo,
+        UndDocNo: '',
+        CustVenName: custVenName,
+        InvoiceNo: '',
+        TransType: transType,
+        Departure: departure,
+        Destination: destination,
+        PortType:
+          transType.trim().toLowerCase() === 'land' || !transType ? '' : '海港',
+        StPort: portOfDeparture,
+        ThPort: '',
+        EndPort: portOfArrival,
+        Product: '',
+        Quity: '',
+        Amount: '',
+        ActivityData: activityData,
+        ActivityUnit: 'KG',
+        Unit: '',
+        UnitWeight: '',
+        Memo: '',
+        CreateDateTime: '',
+        Creator: '',
+      };
+    });
+
+    return formatData;
   }
 }
