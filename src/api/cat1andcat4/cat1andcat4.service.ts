@@ -491,63 +491,73 @@ export class Cat1andcat4Service {
 
     const data = dataResults.flat();
 
-    const formatData = data.map((item: any) => {
-      const factory = item.FactoryCode ?? '';
-      const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
-      const docDate = item.PurDate
-        ? dayjs(item.PurDate).format('YYYY/MM/DD')
-        : '';
-      const docDate2 = item.RKDate
-        ? dayjs(item.RKDate).format('YYYY/MM/DD')
-        : '';
-      const docNo = item.PurNo ?? '';
-      const custVenName = item.SupplierCode ?? '';
-      const transType = item.TransportationMethod ?? '';
-      const departure = item.Departure ?? '';
-      const portOfDeparture = item.PortOfDeparture ?? '';
-      const portOfArrival = item.PortOfArrival ?? '';
-      const destination = item.Destination ?? '';
-      const activityData = item.WeightUnitkg ?? '';
-      return {
-        System: 'CMS Web',
-        Corporation: 'Lai Yih',
-        Factory: factory,
-        Department: '',
-        DocKey: docKey,
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: '3.1',
-        DataType: '1',
-        DocType: 'CMS Web',
-        UndDoc: '',
-        DocFlow: '',
-        DocDate: docDate,
-        DocDate2: docDate2,
-        DocNo: docNo,
-        UndDocNo: '',
-        CustVenName: custVenName,
-        InvoiceNo: '',
-        TransType: transType,
-        Departure: departure,
-        Destination: destination,
-        PortType:
-          transType.trim().toLowerCase() === 'land' || !transType ? '' : '海港',
-        StPort: portOfDeparture,
-        ThPort: '',
-        EndPort: portOfArrival,
-        Product: '',
-        Quity: '',
-        Amount: '',
-        ActivityData: activityData,
-        ActivityUnit: 'KG',
-        Unit: '',
-        UnitWeight: '',
-        Memo: '',
-        CreateDateTime: '',
-        Creator: '',
-      };
-    });
+    const formatData = data
+      .filter((item: any) => item.WeightUnitkg > 0)
+      .map((item: any) => {
+        const factory = item.FactoryCode ?? '';
+        const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
+        const docDate = item.PurDate
+          ? dayjs(item.PurDate).format('YYYY/MM/DD')
+          : '';
+        const docDate2 = item.RKDate
+          ? dayjs(item.RKDate).format('YYYY/MM/DD')
+          : '';
+        const docNo = item.PurNo ?? '';
+        const custVenName = item.SupplierCode ?? '';
+        const transType = item.TransportationMethod ?? '';
+        const departure = item.Departure ?? '';
+        const portOfDeparture = item.PortOfDeparture ?? '';
+        const portOfArrival = item.PortOfArrival ?? '';
+        const destination = item.Destination ?? '';
+        const activityData = item.WeightUnitkg ?? '';
+        return {
+          System: 'CMS Web',
+          Corporation: 'Lai Yih',
+          Factory: factory,
+          Department: '',
+          DocKey: docKey,
+          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+          ActivityType: '3.1',
+          DataType: '1',
+          DocType: 'CMS Web',
+          UndDoc: '',
+          DocFlow: '',
+          DocDate: docDate,
+          DocDate2: docDate2,
+          DocNo: docNo,
+          UndDocNo: '',
+          CustVenName: custVenName,
+          InvoiceNo: '',
+          TransType: transType,
+          Departure: departure,
+          Destination: destination,
+          PortType:
+            transType.trim().toLowerCase() === 'land' || !transType
+              ? ''
+              : '海港',
+          StPort: portOfDeparture,
+          ThPort: '',
+          EndPort:
+            transType.trim().toLowerCase() === 'land' || !transType
+              ? ''
+              : portOfArrival.trim().toLowerCase() === 'lym'
+                ? 'MMRGN'
+                : 'VNCLP',
+          Product: '',
+          Quity: '',
+          Amount: '',
+          ActivityData: activityData,
+          ActivityUnit: 'KG',
+          Unit: '',
+          UnitWeight: '',
+          Memo: '',
+          CreateDateTime: '',
+          Creator: '',
+        };
+      });
 
+      console.log(formatData.length);
     return formatData;
   }
 }
