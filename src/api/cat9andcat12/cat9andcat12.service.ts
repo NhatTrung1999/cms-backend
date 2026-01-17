@@ -1223,8 +1223,8 @@ export class Cat9andcat12Service {
       DocType: '應收憑單', // DEFAULT
       UndDoc: '銷貨單', // DEFAULT
       DocFlow: '銷貨相關流程', // DEFAULT
-      DocDate: date,
-      DocDate2: shipmentDate,
+      DocDate: dayjs(date).format('YYYY/MM/DD'),
+      DocDate2: dayjs(shipmentDate).format('YYYY/MM/DD'),
       DocNo: bookingNo, // DEFAULT
       UndDocNo: '', // DEFAULT
       CustVenName: customerID,
@@ -1246,6 +1246,7 @@ export class Cat9andcat12Service {
       Memo: '', // DEFAULT
       CreateDateTime: createdDate,
       Creator: '',
+      ActivitySource: 'Incineration (not energy recovery)',
     }));
   }
   // logging

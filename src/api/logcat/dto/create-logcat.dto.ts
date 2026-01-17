@@ -34,6 +34,9 @@ export class CreateLogCat5 {
   Memo: string;
   CreateDateTime: string;
   Creator: string;
+  AccNo: string;
+  AccName: string;
+  ActivitySource: string;
 }
 
 export class CreateLogCat7 {
@@ -95,4 +98,5 @@ export class CreateLogCat9And12 {
   Memo: string;
   CreateDateTime: string;
   Creator: string;
+  ActivitySource: string;
 }

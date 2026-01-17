@@ -431,9 +431,7 @@ export class Cat5Service {
       replacements,
     });
 
-    return data.flatMap((item) =>
-      this.mapToCMSFormat(item, dateFrom, dateTo),
-    );
+    return data.flatMap((item) => this.mapToCMSFormat(item, dateFrom, dateTo));
   }
 
   private getDbByFactory(factory: FactoryCode): Sequelize | null {
@@ -449,17 +447,13 @@ export class Cat5Service {
     return dbMap[factory] ?? null;
   }
 
-  private mapToCMSFormat(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-  ) {
+  private mapToCMSFormat(item: any, dateFrom: string, dateTo: string) {
     const custVenName = item.Vendor_ID;
     const departure = item.Factory_address;
     const destination = item.Waste_collection_address;
     const product = `${item.The_type_of_waste} - ${item.Waste_type}`;
     const activityData = item.Weight_of_waste_treated_Unit_kg;
-    const memo = item.Waste_Treatment_method;
+    const wasteTreatmentMethod = item.Waste_Treatment_method;
     const factoryName = item.Factory_Name;
     const wasteDisposalDate = item.Waste_disposal_date;
 
@@ -468,7 +462,7 @@ export class Cat5Service {
       Corporation: 'LAI YIH', //default
       Factory: factoryName,
       Department: '',
-      DocKey: 'S3.C5', //default
+      DocKey: '006', //default
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, //default
@@ -496,9 +490,12 @@ export class Cat5Service {
       ActivityUnit: 'KG', //default
       Unit: '',
       UnitWeight: '',
-      Memo: memo,
+      Memo: '',
       CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
       Creator: '',
+      AccNo: '6002',
+      AccName: '其他費用',
+      ActivitySource: wasteTreatmentMethod,
     }));
   }
 
