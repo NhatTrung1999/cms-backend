@@ -456,17 +456,18 @@ export class Cat5Service {
     const wasteTreatmentMethod = item.Waste_Treatment_method;
     const factoryName = item.Factory_Name;
     const wasteDisposalDate = item.Waste_disposal_date;
+    const wasteCode = item.Waste_Code;
 
     return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
       System: 'CMW', //default
       Corporation: 'LAI YIH', //default
       Factory: factoryName,
       Department: '',
-      DocKey: '006', //default
+      DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, //default
-      DataType: '1', //default
+      DataType: '999', //default
       DocType: 'CMS Web', //default
       UndDoc: '',
       DocFlow: '',

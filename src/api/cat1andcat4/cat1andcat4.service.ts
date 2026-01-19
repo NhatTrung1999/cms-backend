@@ -10,11 +10,16 @@ import {
   buildQueryAutoSentCMS,
   buildQueryTest,
 } from 'src/helper/cat1andcat4.helper';
-import { IDataPortCodeCat1AndCat4 } from 'src/types/cat1andcat4';
+import {
+  ACTIVITY_TYPES,
+  ActivityType,
+  IDataPortCodeCat1AndCat4,
+} from 'src/types/cat1andcat4';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import dayjs from 'dayjs';
+import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
 dayjs().format();
 
 @Injectable()
@@ -464,6 +469,133 @@ export class Cat1andcat4Service {
   }
 
   async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
+    // const replacements =
+    //   dateFrom && dateTo
+    //     ? {
+    //         startDate: dateFrom,
+    //         endDate: dateTo,
+    //       }
+    //     : {};
+
+    // const connects = [
+    //   { factory: 'LYV', db: this.LYV_ERP },
+    //   // { factory: 'LHG', db: this.LHG_ERP },
+    //   // { factory: 'LYM', db: this.LYM_ERP },
+    //   // { factory: 'LVL', db: this.LVL_ERP },
+    // ];
+
+    // const dataResults = await Promise.all(
+    //   connects.map(async (conn) => {
+    //     const query = await buildQueryAutoSentCMS(conn.factory, this.EIP);
+    //     return conn.db.query(query, {
+    //       type: QueryTypes.SELECT,
+    //       replacements,
+    //     });
+    //   }),
+    // );
+
+    // const data = dataResults.flat();
+
+    // const formatData = data
+    //   .filter((item: any) => item.WeightUnitkg > 0)
+    //   .map((item: any) => {
+    // const factory = item.FactoryCode ?? '';
+    // const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
+    // const docDate = item.PurDate
+    //   ? dayjs(item.PurDate).format('YYYY/MM/DD')
+    //   : '';
+    // const docDate2 = item.RKDate
+    //   ? dayjs(item.RKDate).format('YYYY/MM/DD')
+    //   : '';
+    // const docNo = item.PurNo ?? '';
+    // const custVenName = item.SupplierCode ?? '';
+    // const transType = item.TransportationMethod ?? '';
+    // const departure = item.Departure ?? '';
+    // const portOfDeparture = item.PortOfDeparture ?? '';
+    // const portOfArrival = item.PortOfArrival ?? '';
+    // const destination = item.Destination ?? '';
+    // const activityData = item.WeightUnitkg ?? '';
+    //     return {
+    // System: 'CMS Web',
+    // Corporation: 'Lai Yih',
+    // Factory: factory,
+    // Department: '',
+    // DocKey: docKey,
+    // SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+    // EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+    // ActivityType: '3.1',
+    // DataType: '1',
+    // DocType: 'CMS Web',
+    // UndDoc: '',
+    // DocFlow: '',
+    // DocDate: docDate,
+    // DocDate2: docDate2,
+    // DocNo: docNo,
+    // UndDocNo: '',
+    // CustVenName: custVenName,
+    // InvoiceNo: '',
+    // TransType: transType,
+    // Departure: departure,
+    // Destination: destination,
+    // PortType:
+    //   transType.trim().toLowerCase() === 'land' || !transType
+    //     ? ''
+    //     : '海港',
+    // StPort: portOfDeparture,
+    // ThPort: '',
+    // EndPort:
+    //   transType.trim().toLowerCase() === 'land' || !transType
+    //     ? ''
+    //     : portOfArrival.trim().toLowerCase() === 'lym'
+    //       ? 'MMRGN'
+    //       : 'VNCLP',
+    // Product: '',
+    // Quity: '',
+    // Amount: '',
+    // ActivityData: activityData,
+    // ActivityUnit: 'KG',
+    // Unit: '',
+    // UnitWeight: '',
+    // Memo: '',
+    // CreateDateTime: '',
+    // Creator: '',
+    //     };
+    //   });
+
+    //   console.log(formatData.length);
+    // return formatData;
+
+    try {
+      if (factory.trim().toUpperCase() === 'ALL') {
+        return this.autoSentCMSAllFactories(dateFrom, dateTo);
+      }
+
+      return this.getCMSByFactory(factory as FactoryCode, dateFrom, dateTo);
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  private async autoSentCMSAllFactories(dateFrom: string, dateTo: string) {
+    const results = await Promise.all(
+      FACTORY_LIST.map((factory) =>
+        this.getCMSByFactory(factory, dateFrom, dateTo),
+      ),
+    );
+
+    return results.flat();
+  }
+
+  private async getCMSByFactory(
+    factory: FactoryCode,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    const db = this.getDbByFactory(factory);
+    if (!db) return [];
+
+    const query = await buildQueryAutoSentCMS(factory, this.EIP);
+
     const replacements =
       dateFrom && dateTo
         ? {
@@ -472,92 +604,83 @@ export class Cat1andcat4Service {
           }
         : {};
 
-    const connects = [
-      { factory: 'LYV', db: this.LYV_ERP },
-      // { factory: 'LHG', db: this.LHG_ERP },
-      // { factory: 'LYM', db: this.LYM_ERP },
-      // { factory: 'LVL', db: this.LVL_ERP },
-    ];
+    const data = await db.query<any>(query, {
+      type: QueryTypes.SELECT,
+      replacements,
+    });
 
-    const dataResults = await Promise.all(
-      connects.map(async (conn) => {
-        const query = await buildQueryAutoSentCMS(conn.factory, this.EIP);
-        return conn.db.query(query, {
-          type: QueryTypes.SELECT,
-          replacements,
-        });
-      }),
-    );
+    return data.flatMap((item) => this.mapToCMSFormat(item, dateFrom, dateTo));
+  }
 
-    const data = dataResults.flat();
+  private getDbByFactory(factory: FactoryCode): Sequelize | null {
+    const dbMap: Record<FactoryCode, Sequelize> = {
+      LYV: this.LYV_ERP,
+      LHG: this.LHG_ERP,
+      LVL: this.LVL_ERP,
+      LYM: this.LYM_ERP,
+    };
 
-    const formatData = data
-      .filter((item: any) => item.WeightUnitkg > 0)
-      .map((item: any) => {
-        const factory = item.FactoryCode ?? '';
-        const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
-        const docDate = item.PurDate
-          ? dayjs(item.PurDate).format('YYYY/MM/DD')
-          : '';
-        const docDate2 = item.RKDate
-          ? dayjs(item.RKDate).format('YYYY/MM/DD')
-          : '';
-        const docNo = item.PurNo ?? '';
-        const custVenName = item.SupplierCode ?? '';
-        const transType = item.TransportationMethod ?? '';
-        const departure = item.Departure ?? '';
-        const portOfDeparture = item.PortOfDeparture ?? '';
-        const portOfArrival = item.PortOfArrival ?? '';
-        const destination = item.Destination ?? '';
-        const activityData = item.WeightUnitkg ?? '';
-        return {
-          System: 'CMS Web',
-          Corporation: 'Lai Yih',
-          Factory: factory,
-          Department: '',
-          DocKey: docKey,
-          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-          ActivityType: '3.1',
-          DataType: '1',
-          DocType: 'CMS Web',
-          UndDoc: '',
-          DocFlow: '',
-          DocDate: docDate,
-          DocDate2: docDate2,
-          DocNo: docNo,
-          UndDocNo: '',
-          CustVenName: custVenName,
-          InvoiceNo: '',
-          TransType: transType,
-          Departure: departure,
-          Destination: destination,
-          PortType:
-            transType.trim().toLowerCase() === 'land' || !transType
-              ? ''
-              : '海港',
-          StPort: portOfDeparture,
-          ThPort: '',
-          EndPort:
-            transType.trim().toLowerCase() === 'land' || !transType
-              ? ''
-              : portOfArrival.trim().toLowerCase() === 'lym'
-                ? 'MMRGN'
-                : 'VNCLP',
-          Product: '',
-          Quity: '',
-          Amount: '',
-          ActivityData: activityData,
-          ActivityUnit: 'KG',
-          Unit: '',
-          UnitWeight: '',
-          Memo: '',
-          CreateDateTime: '',
-          Creator: '',
-        };
-      });
+    return dbMap[factory] ?? null;
+  }
 
-      console.log(formatData.length);
-    return formatData;
+  private mapToCMSFormat(item: any, dateFrom: string, dateTo: string) {
+    const factory = item.FactoryCode ?? '';
+    const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
+    const docDate = item.PurDate
+      ? dayjs(item.PurDate).format('YYYY/MM/DD')
+      : '';
+    const docDate2 = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
+    const docNo = item.PurNo ?? '';
+    const custVenName = item.SupplierCode ?? '';
+    const transType = item.TransportationMethod ?? '';
+    const departure = item.Departure ?? '';
+    const portOfDeparture = item.PortOfDeparture ?? '';
+    const portOfArrival = item.PortOfArrival ?? '';
+    const destination = item.Destination ?? '';
+    const activityData = item.WeightUnitkg ?? 0;
+
+    return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
+      System: 'CMS Web',
+      Corporation: 'Lai Yih',
+      Factory: factory,
+      Department: '',
+      DocKey: docKey,
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: activityType,
+      DataType: '1',
+      DocType: 'CMS Web',
+      UndDoc: '',
+      DocFlow: '',
+      DocDate: docDate,
+      DocDate2: docDate2,
+      DocNo: docNo,
+      UndDocNo: '',
+      CustVenName: custVenName,
+      InvoiceNo: '',
+      TransType: transType,
+      Departure: departure,
+      Destination: destination,
+      PortType:
+        transType.trim().toLowerCase() === 'land' || !transType ? '' : '海港',
+      StPort: portOfDeparture,
+      ThPort: '',
+      EndPort:
+        transType.trim().toLowerCase() === 'land' || !transType
+          ? ''
+          : portOfArrival.trim().toLowerCase() === 'lym'
+            ? 'MMRGN'
+            : 'VNCLP',
+      Product: '',
+      Quity: '',
+      Amount: '',
+      ActivityData: activityData,
+      ActivityUnit: 'KG',
+      Unit: '',
+      UnitWeight: '',
+      Memo: '',
+      CreateDateTime: '',
+      Creator: '',
+    }));
   }
 }

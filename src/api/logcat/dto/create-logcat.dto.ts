@@ -1,3 +1,41 @@
+export class CreateLogCat1And4 {
+  System: string;
+  Corporation: string;
+  Factory: string;
+  Department: string;
+  DocKey: string;
+  SPeriodData: string;
+  EPeriodData: string;
+  ActivityType: string;
+  DataType: string;
+  DocType: string;
+  UndDoc: string;
+  DocFlow: string;
+  DocDate: string;
+  DocDate2: string;
+  DocNo: string;
+  UndDocNo: string;
+  CustVenName: string;
+  InvoiceNo: string;
+  TransType: string;
+  Departure: string;
+  Destination: string;
+  PortType: string;
+  StPort: string;
+  ThPort: string;
+  EndPort: string;
+  Product: string;
+  Quity: string;
+  Amount: string;
+  ActivityData: number;
+  ActivityUnit: string;
+  Unit: string;
+  UnitWeight: string;
+  Memo: string;
+  CreateDateTime: string;
+  Creator: string;
+}
+
 export class CreateLogCat5 {
   System: string;
   Corporation: string;

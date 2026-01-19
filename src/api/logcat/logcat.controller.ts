@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, Request } from '@nestjs/common';
 import { LogcatService } from './logcat.service';
 import {
+  CreateLogCat1And4,
   CreateLogCat5,
   CreateLogCat7,
   CreateLogCat9And12,
@@ -10,6 +11,34 @@ import { getFactortyID, getUserId } from 'src/helper/common.helper';
 @Controller('logcat')
 export class LogcatController {
   constructor(private readonly logcatService: LogcatService) {}
+
+  @Get('get-log-cat1-4')
+  async getLogCat1And4(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.logcatService.getLogCat1And4(
+      dateFrom,
+      dateTo,
+      factory,
+      +page,
+      +limit,
+      sortField,
+      sortOrder,
+    );
+  }
+
+  @Post('create-log-cat1-4')
+  async createLogCat1And4(@Body() data: CreateLogCat1And4[], @Request() req) {
+    const factory = getFactortyID(req);
+    const userid = getUserId(req);
+    return this.logcatService.createLogCat1And4(data, factory, userid);
+  }
 
   // Logging CAT5
   @Get('get-log-cat5')

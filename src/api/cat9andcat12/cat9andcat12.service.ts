@@ -1219,7 +1219,7 @@ export class Cat9andcat12Service {
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, // DEFAULT
-      DataType: '1', // DEFAULT
+      DataType: '999', // DEFAULT
       DocType: '應收憑單', // DEFAULT
       UndDoc: '銷貨單', // DEFAULT
       DocFlow: '銷貨相關流程', // DEFAULT
