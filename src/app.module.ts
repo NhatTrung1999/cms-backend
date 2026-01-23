@@ -19,6 +19,7 @@ import { Cat1andcat4Module } from './api/cat1andcat4/cat1andcat4.module';
 import { InfofactoryModule } from './api/infofactory/infofactory.module';
 import { HrModule } from './api/hr/hr.module';
 import { LogcatModule } from './api/logcat/logcat.module';
+import { CmsModule } from './api/cms/cms.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { LogcatModule } from './api/logcat/logcat.module';
     HrModule,
     InfofactoryModule,
     LogcatModule,
+    CmsModule,
     Cat9andcat12Module,
     Cat5Module,
     Cat7Module,

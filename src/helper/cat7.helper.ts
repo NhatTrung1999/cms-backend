@@ -203,7 +203,7 @@ export const buildQueryAutoSentCmsLYV = async (
   dateTo?: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT Coordinates as [Address]
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = 'LYV'`;
 
@@ -220,7 +220,7 @@ export const buildQueryAutoSentCmsLYV = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 100*
+  const query = `SELECT TOP 200*
                         ,N'${getFactory('LYV')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
@@ -607,7 +607,7 @@ export const buildQueryAutoSentCmsLHG = async (
   dateTo?: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT Coordinates as [Address]
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = 'LHG'`;
 
@@ -624,7 +624,7 @@ export const buildQueryAutoSentCmsLHG = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 100*
+  const query = `SELECT *
                         ,N'${getFactory('LHG')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
@@ -1003,7 +1003,7 @@ export const buildQueryAutoSentCmsLVL = async (
   dateTo?: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT Coordinates as [Address]
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = 'LVL'`;
 
@@ -1020,7 +1020,7 @@ export const buildQueryAutoSentCmsLVL = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 200*
+  const query = `SELECT *
                         ,N'${getFactory('LVL')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId                          AS Staff_ID
@@ -1399,7 +1399,7 @@ export const buildQueryAutoSentCmsLYM = async (
   dateTo?: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT Coordinates as [Address]
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = 'LYM'`;
 
@@ -1419,7 +1419,7 @@ export const buildQueryAutoSentCmsLYM = async (
 
   // N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
 
-  const query = `SELECT TOP 200*
+  const query = `SELECT *
                         ,N'${getFactory('LYM')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId                       AS Staff_ID
@@ -1748,7 +1748,7 @@ export const buildQueryAutoSentCmsJAZ = async (
   dateTo?: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT Coordinates as [Address]
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = 'JAZ'`;
 
@@ -1765,7 +1765,7 @@ export const buildQueryAutoSentCmsJAZ = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 100*
+  const query = `SELECT *
                         ,N'${getFactory('JAZ')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID
@@ -2146,7 +2146,7 @@ export const buildQueryAutoSentCmsJZS = async (
   dateTo?: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT Coordinates as [Address]
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = 'JZS'`;
 
@@ -2163,7 +2163,7 @@ export const buildQueryAutoSentCmsJZS = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT TOP 100*
+  const query = `SELECT *
                         ,N'${getFactory('JZS')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID

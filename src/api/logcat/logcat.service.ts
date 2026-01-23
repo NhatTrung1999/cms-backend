@@ -342,7 +342,7 @@ export class LogcatService {
     }
 
     if (factory) {
-      where += ' AND Factory LIKE ?';
+      where += ' AND Corporation LIKE ?';
       replacements.push(`%${factory}%`);
     }
 

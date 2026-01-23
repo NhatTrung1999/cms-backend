@@ -614,22 +614,42 @@ export class Cat7Service {
     const DepartmentName = item.Department_Name;
 
     return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
-      System: 'CMS Web', // Default
-      Corporation: 'LAI YIH', // Default
-      Factory: FactoryName,
-      Department: DepartmentName,
+      // System: 'CMS Web', // Default
+      // Corporation: 'LAI YIH', // Default
+      // Factory: FactoryName,
+      // Department: DepartmentName,
+      // DocKey: staffId,
+      // SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      // EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      // ActivityType: activityType, // Default
+      // DataType: '2', // Default
+      // DocType: '員工通勤', // Default
+      // DocDate: dayjs().format('YYYY/MM/DD'),
+      // DocDate2: dayjs().format('YYYY/MM/DD'),
+      // UndDocNo: staffId,
+      // TransType: Main_transportation_type,
+      // Departure: Factory_address ? Factory_address : '',
+      // Destination: Residential_address ? Residential_address : '',
+      // Attendance: Number_of_working_days.toString(),
+      // Memo: '',
+      // CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      // Creator: '',
+      System: 'CMS Web',
+      Corporation: FactoryName,
+      Factory: '',
+      Department: '',
       DocKey: staffId,
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: activityType, // Default
-      DataType: '2', // Default
-      DocType: '員工通勤', // Default
+      ActivityType: activityType,
+      DataType: '2',
+      DocType: 'CMS Web',
       DocDate: dayjs().format('YYYY/MM/DD'),
       DocDate2: dayjs().format('YYYY/MM/DD'),
       UndDocNo: staffId,
       TransType: Main_transportation_type,
-      Departure: Factory_address ? Factory_address : '',
-      Destination: Residential_address ? Residential_address : '',
+      Departure: Residential_address,
+      Destination: Factory_address,
       Attendance: Number_of_working_days.toString(),
       Memo: '',
       CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
