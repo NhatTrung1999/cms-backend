@@ -4,6 +4,8 @@ import { UpdateCat6Dto } from './dto/update-cat6.dto';
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
+import dayjs from 'dayjs';
+dayjs().format();
 
 interface Route {
   AddressName?: string;
@@ -30,11 +32,11 @@ export class Cat6Service {
     const offset = (page - 1) * limit;
     const query = `SELECT *
                     FROM CDS_HRBUSS_BusTripData
-                    WHERE DOC_NBR = 'LYV_HR_BT251200015'`;
+                    WHERE DOC_NBR = 'LHG-SUG-DEV251200004'`;
 
     const countQuery = `SELECT COUNT(*) as total
                         FROM CDS_HRBUSS_BusTripData
-                        WHERE DOC_NBR = 'LYV_HR_BT251200015'`;
+                        WHERE DOC_NBR = 'LHG-SUG-DEV251200004'`;
 
     const [dataResults, countResults] = await Promise.all([
       this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<
@@ -167,7 +169,6 @@ export class Cat6Service {
             ...record,
             Routes: routes.slice(startIndex, cutIndex + 1),
           });
-
           startIndex = cutIndex;
         }
       }
@@ -190,5 +191,34 @@ export class Cat6Service {
       From: route.From ?? null,
       To: route.To ?? null,
     };
+  }
+
+  async autoSentCMS() {
+    return [
+      {
+        System: 'BPM',
+        Corporation: '樂億 - LYV',
+        Factory: '樂億 - LYV',
+        Department: '設計部',
+        DocKey: 'LYV-HR-BT250100001',
+        ActivitySource: '',
+        SPeriodData: '2026/01/24',
+        EPeriodData: '2026/01/24',
+        ActivityType: '3.5',
+        DataType: '2',
+        DocType: 'LYV-HR-BT250100001',
+        DocDate: '2025/01/02',
+        DocDate2: '2025/02/15',
+        DocNo: 'LYV-HR-BT250100001',
+        UndDocNo: 'LYV-HR-BT250100001-1',
+        TransType: 'Company Shuttle Bus',
+        Departure:
+          '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
+        Destination: 'SGN',
+        Memo: 'Round Trip',
+        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+        Creator: '',
+      },
+    ];
   }
 }

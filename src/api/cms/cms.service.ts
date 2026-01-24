@@ -18,17 +18,16 @@ export class CmsService {
       this.httpService.post(externalApiUrl, payload).pipe(
         catchError((error: AxiosError) => {
           console.error(
-            'Lỗi khi gọi BPM:',
+            'Lỗi khi gọi CMS:',
             error.response?.data || error.message,
           );
           throw new HttpException(
-            error.response?.data || 'Lỗi kết nối đến Server BPM',
+            error.response?.data || 'Lỗi kết nối đến Server CMS',
             error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
           );
         }),
       ),
     );
     return data;
-    // return 'dfbdjsb'
   }
 }

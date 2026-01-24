@@ -25,4 +25,8 @@ export class Cat6Controller {
       sortOrder,
     );
   }
+  @Get('auto-sent-cms')
+  async autoSentCMS() {
+    return this.cat6Service.autoSentCMS();
+  }
 }
