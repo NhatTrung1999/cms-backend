@@ -5,6 +5,8 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
 import dayjs from 'dayjs';
+import { fakeCat6Data } from 'src/fakedata';
+import { getFactory } from 'src/helper/factory.helper';
 dayjs().format();
 
 interface Route {
@@ -193,32 +195,80 @@ export class Cat6Service {
     };
   }
 
-  async autoSentCMS() {
-    return [
-      {
-        System: 'BPM',
-        Corporation: '樂億 - LYV',
-        Factory: '樂億 - LYV',
-        Department: '設計部',
-        DocKey: 'LYV-HR-BT250100001',
-        ActivitySource: '',
-        SPeriodData: '2026/01/24',
-        EPeriodData: '2026/01/24',
-        ActivityType: '3.5',
-        DataType: '2',
-        DocType: 'LYV-HR-BT250100001',
-        DocDate: '2025/01/02',
-        DocDate2: '2025/02/15',
-        DocNo: 'LYV-HR-BT250100001',
-        UndDocNo: 'LYV-HR-BT250100001-1',
-        TransType: 'Company Shuttle Bus',
-        Departure:
-          '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
-        Destination: 'SGN',
-        Memo: 'Round Trip',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-      },
-    ];
+  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
+    return fakeCat6Data.map((item) => ({
+      System: 'BPM',
+      Corporation: getFactory(factory),
+      Factory: getFactory(factory),
+      Department: '設計部',
+      DocKey: item.DocumentNumber,
+      ActivitySource: '',
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: '3.5',
+      DataType: '2',
+      DocType: item.DocumentNumber,
+      DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
+      DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
+      DocNo: item.DocumentNumber,
+      UndDocNo: item.DocumentNumber,
+      TransType: item.LandTrasportationTypeA,
+      Departure: item.PlaceOfDeparture,
+      Destination: item.ThirdCountryTransferDestination,
+      Memo: item.BusinessTripType,
+      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      Creator: '',
+    }));
+    // return [
+    //   {
+    // System: 'BPM',
+    // Corporation: '樂億 - LYV',
+    // Factory: '樂億 - LYV',
+    // Department: '設計部',
+    // DocKey: 'LYV-HR-BT250100001',
+    // ActivitySource: '',
+    // SPeriodData: '2026/01/24',
+    // EPeriodData: '2026/01/24',
+    // ActivityType: '3.5',
+    // DataType: '2',
+    // DocType: 'LYV-HR-BT250100001',
+    // DocDate: '2025/01/02',
+    // DocDate2: '2025/02/15',
+    // DocNo: 'LYV-HR-BT250100001',
+    // UndDocNo: 'LYV-HR-BT250100001-1',
+    // TransType: 'Company Shuttle Bus',
+    // Departure:
+    //   '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
+    // Destination: 'SGN',
+    // Memo: 'Round Trip',
+    // CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+    // Creator: '',
+    //   },
+    // ];
+  }
+
+  async autoSentCMSV2(dateFrom: string, dateTo: string, factory: string) {
+    return fakeCat6Data.map((item) => ({
+      System: 'BPM',
+      Corporation: getFactory(factory),
+      Factory: getFactory(factory),
+      Department: '設計部',
+      DocKey: item.StaffID.toString(),
+      ActivitySource: '住宿',
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: '3.5',
+      DataType: '3',
+      DocType: '出差住宿單',
+      DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
+      DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
+      DocNo: item.DocumentNumber,
+      UndDocNo: item.DocumentNumber,
+      TransType: 'double',
+      ActivityData: item.NumberOfNightsStayed.toString(),
+      Memo: '',
+      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      Creator: '',
+    }));
   }
 }

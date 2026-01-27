@@ -26,7 +26,20 @@ export class Cat6Controller {
     );
   }
   @Get('auto-sent-cms')
-  async autoSentCMS() {
-    return this.cat6Service.autoSentCMS();
+  async autoSentCMS(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+  ) {
+    return this.cat6Service.autoSentCMS(dateFrom, dateTo, factory);
+  }
+
+  @Get('auto-sent-cms-v2')
+  async autoSentCMSV2(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+  ) {
+    return this.cat6Service.autoSentCMSV2(dateFrom, dateTo, factory);
   }
 }
