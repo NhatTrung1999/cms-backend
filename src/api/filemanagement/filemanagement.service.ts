@@ -441,7 +441,7 @@ export class FilemanagementService {
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,is1.Inv_No              AS Invoice_Number
                                     ,'SAMPLE SHOE'           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
+                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
                                     ,is1.Qty                 AS Quantity
                                     ,is1.GW                  AS Gross_Weight
                                     ,im.CUSTID               AS Customer_ID

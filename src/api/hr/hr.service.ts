@@ -121,39 +121,68 @@ export class HrService {
   async findAllDepartment(factory: string) {
     try {
       let db: Sequelize;
+      let query: string = '';
       switch (factory.trim().toUpperCase()) {
         case 'LYV':
           db = this.LYV_HRIS;
+          query = `SELECT DISTINCT Department_Name  AS label
+                          ,Department_Serial_Key     AS value
+                    FROM   Data_Department
+                    WHERE  NoUse_Date = '2099-12-31 00:00:00.000'
+                          AND ISNULL(Hide ,'0')<>'1'
+                    ORDER BY Department_Name`;
           break;
         case 'LHG':
           db = this.LHG_HRIS;
+          query = `SELECT DISTINCT Department_Name  AS label
+                          ,Department_Serial_Key     AS value
+                    FROM   Data_Department
+                    WHERE  NoUse_Date = '2099-12-31 00:00:00.000'
+                          AND Building_Overtime<>''
+                    ORDER BY
+                          Department_Name`;
           break;
         case 'LVL':
           db = this.LVL_HRIS;
+          query = `SELECT DISTINCT Department_Name  AS label
+                          ,Department_Serial_Key     AS value
+                    FROM   Data_Department
+                    WHERE  NoUse_Date = '2099-12-31 00:00:00.000'
+                          AND ISNULL(Hide ,'0')<>'1'
+                    ORDER BY
+                          Department_Name`;
           break;
         case 'LYM':
           db = this.LYM_HRIS;
+          query = `SELECT DISTINCT DeptName  AS label
+                          ,__sno              AS value
+                    FROM   HR_DEPT
+                    ORDER BY
+                          DeptName`;
           break;
         case 'JAZ':
           db = this.JAZ_HRIS;
+          query = `SELECT DISTINCT Department_Name  AS label
+                          ,Department_Serial_Key     AS value
+                    FROM   Data_Department
+                    WHERE  NoUse_Date = '2099-12-31 00:00:00.000'
+                    ORDER BY
+                          Department_Name`;
           break;
         case 'JZS':
           db = this.JZS_HRIS;
+          query = `SELECT DISTINCT Department_Name  AS label
+                          ,Department_Serial_Key     AS value
+                    FROM   Data_Department
+                    WHERE  NoUse_Date = '2099-12-31 00:00:00.000'
+                    ORDER BY
+                          Department_Name`;
           break;
         default:
           throw new Error('Invalid factory code');
       }
 
-      const results = await db.query(
-        `${
-          factory.trim().toUpperCase() !== 'LYM'
-            ? `SELECT DISTINCT Department_Name as name, Department_Serial_Key as value 
-                FROM Data_Department`
-            : `SELECT DISTINCT DeptName as name, __sno as value
-                FROM HR_DEPT`
-        }`,
-        { type: QueryTypes.SELECT },
-      );
+      const results = await db.query(query, { type: QueryTypes.SELECT });
       return results;
     } catch (error) {
       throw new InternalServerErrorException(error?.message);

@@ -292,9 +292,8 @@ export const buildQueryAutoSentCMS = async (
   dateFrom: string,
   dateTo: string,
   factory: string,
-  db?:Sequelize
+  db?: Sequelize,
 ) => {
-
   const queryAddress = `SELECT [Address]
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = '${factory}'`;
@@ -316,8 +315,8 @@ export const buildQueryAutoSentCMS = async (
 
   // const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
   //                         ,*
-                          // , N'${getFactory(factory)}' AS Factory
-                          // , N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+  // , N'${getFactory(factory)}' AS Factory
+  // , N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
   //                   FROM   (
   //                                   SELECT CONVERT(VARCHAR(10), im.INV_DATE, 111)             AS [Date]
   //                                   ,CONVERT(VARCHAR(10), sb.ExFty_Date, 111)           AS Shipment_Date
@@ -363,7 +362,7 @@ export const buildQueryAutoSentCMS = async (
   //                                   ,ISNULL(
   //                                       ISNULL(
   //                                           bg.SHPIDS
-  //                                         ,CASE 
+  //                                         ,CASE
   //                                               WHEN (do.ShipMode='Air')
   //                                           AND (do.Shipmode_1 IS NULL) THEN 'AIR'
   //                                               WHEN(do.ShipMode='Air Expres')
@@ -373,7 +372,7 @@ export const buildQueryAutoSentCMS = async (
   //                                               WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
   //                                               WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
   //                                               WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
-  //                                               WHEN do.ShipMode_1 IS NULL THEN '' 
+  //                                               WHEN do.ShipMode_1 IS NULL THEN ''
   //                                               ELSE 'N/A' END
   //                                       )
   //                                     ,y.ShipMode
@@ -586,7 +585,7 @@ export const buildQueryAutoSentCMS = async (
                                   ,sb.Booking_No AS Booking_No
                                   ,is1.Inv_No              AS Invoice_Number
                                   ,'SAMPLE SHOE'           AS Article_Name
-                                  ,id.ARTICLE              AS Article_ID
+                                  ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
                                   ,is1.Qty                 AS Quantity
                                   ,is1.GW                  AS Gross_Weight
                                   ,im.CUSTID               AS Customer_ID
