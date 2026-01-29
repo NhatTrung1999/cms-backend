@@ -1,6 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CreateCat6Dto } from './dto/create-cat6.dto';
-import { UpdateCat6Dto } from './dto/update-cat6.dto';
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
@@ -34,11 +32,11 @@ export class Cat6Service {
     const offset = (page - 1) * limit;
     const query = `SELECT *
                     FROM CDS_HRBUSS_BusTripData
-                    WHERE DOC_NBR = 'LYV_HR_BT260100002'`;
+                    WHERE DOC_NBR = 'LYV_HR_BT260100009'`;
 
     const countQuery = `SELECT COUNT(*) as total
                         FROM CDS_HRBUSS_BusTripData
-                        WHERE DOC_NBR = 'LYV_HR_BT260100002'`;
+                        WHERE DOC_NBR = 'LYV_HR_BT260100009'`;
 
     const [dataResults, countResults] = await Promise.all([
       this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<
@@ -58,6 +56,51 @@ export class Cat6Service {
         Accommodation: item.Accommodation ? JSON.parse(item.Accommodation) : [],
       }))
       .flatMap((record) => this.splitRecordByAirport(record));
+
+    const formattedData = records.map((item) => {
+      const routes = item.Routes || [];
+      const flightSegment = routes.find((r) => r.isAirport);
+      const startSegment = routes[0];
+
+      const otherDestinations = routes.filter(
+        (r) => r !== startSegment && !r.isAirport,
+      );
+
+      const getAddr = (r: any) => r?.AddressDetail || r?.AddressName || '';
+      const totalNights =
+        item.Accommodation?.filter(
+          (item) => item.isSameAsAbove === false,
+        ).reduce((sum, acc) => sum + (acc.nights || 0), 0) || 0;
+
+      return {
+        Document_Date: item.CreatedAt,
+        Document_Number: item.DOC_NBR,
+        Staff_ID: item.UserCreate,
+        Round_trip_One_way: item.TypeTravel,
+        Start_Time: item.DateStart,
+        End_Time: item.DateEnd,
+        Business_Trip_Type: item.Factory,
+        Place_of_Departure: getAddr(startSegment),
+        Land_Trasportation_Type_A: startSegment?.Transport || '',
+        Land_Transport_Distance_km_A: 'API Calculation',
+        Departure_Airport: flightSegment?.From || '',
+        Destination_Airport: flightSegment?.To || '',
+        Air_Transport_Distance_km: flightSegment ? 'API Calculation' : '',
+        Third_country_transfer_Destination: getAddr(otherDestinations[0]),
+        Land_Transportation_Type_B: otherDestinations[0]?.Transport || '',
+        Land_Transport_Distance_km_B: otherDestinations[0]
+          ? 'API Calculation'
+          : '',
+        Destination_2: getAddr(otherDestinations[1]),
+        Destination_3: getAddr(otherDestinations[2]),
+        Destination_4: getAddr(otherDestinations[3]),
+        Destination_5: getAddr(otherDestinations[4]),
+        Destination_6: getAddr(otherDestinations[5]),
+        Land_Transportation_Type: otherDestinations[0]?.Transport || '',
+        Land_Transport_Distance_km: 'API Calculation',
+        Number_of_nights_stayed: totalNights,
+      };
+    });
 
     // const data = records.map((item) => {
     //   return {
@@ -88,9 +131,8 @@ export class Cat6Service {
     //   };
     // });
 
-    // console.log(records);
-    return records;
-    // return data
+    return { formattedData, records };
+    // return records;
 
     // let data: ICat6Data[] = records.map((item) => {
     //   const routes = item.Routes.filter((item) => item.isAirport === true);
@@ -155,6 +197,7 @@ export class Cat6Service {
 
   private splitRecordByAirport(record: ICat6Record): ICat6Record[] {
     const routes = record.Routes;
+    let remainingAccommodations = [...(record.Accommodation || [])];
     const result: ICat6Record[] = [];
 
     let startIndex = 0;
@@ -167,18 +210,36 @@ export class Cat6Service {
         if (airportCount > 1) {
           const cutIndex = i - 1;
 
+          const segmentRoutes = routes.slice(startIndex, cutIndex + 1);
+
+          const destinationsCount = segmentRoutes
+            .slice(1)
+            .filter((r) => !r.isAirport).length;
+
+          const segmentAccommodations = remainingAccommodations.slice(
+            0,
+            destinationsCount,
+          );
+
+          remainingAccommodations =
+            remainingAccommodations.slice(destinationsCount);
+
           result.push({
             ...record,
-            Routes: routes.slice(startIndex, cutIndex + 1),
+            Routes: segmentRoutes,
+            Accommodation: segmentAccommodations,
           });
           startIndex = cutIndex;
         }
       }
     }
 
+    const lastRoutes = routes.slice(startIndex);
+
     result.push({
       ...record,
-      Routes: routes.slice(startIndex),
+      Routes: lastRoutes,
+      Accommodation: remainingAccommodations,
     });
 
     return result;

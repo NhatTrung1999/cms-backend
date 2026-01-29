@@ -457,13 +457,36 @@ export class Cat5Service {
     const factoryName = item.Factory_Name;
     const wasteDisposalDate = item.Waste_disposal_date;
     const wasteCode = item.Waste_Code;
+    let dockey = '';
+
+    switch (wasteTreatmentMethod.trim().toLowerCase()) {
+      case 'Waste Recycling'.trim().toLowerCase():
+        dockey = '4.4.01';
+        break;
+      case 'Waste to Energy'.trim().toLowerCase():
+        dockey = '4.4.02';
+        break;
+      case 'Landfill'.trim().toLowerCase():
+        dockey = '4.4.03';
+        break;
+      case 'Waste Incineration'.trim().toLowerCase():
+        dockey = '4.4.04';
+        break;
+      case 'Waste other treatment method'.trim().toLowerCase():
+        dockey = '4.4.05';
+        break;
+      default:
+        dockey = '';
+        break;
+    }
 
     return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
       System: 'CMW', //default
       Corporation: 'LAI YIH', //default
       Factory: factoryName,
       Department: '',
-      DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
+      // DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
+      DocKey: dockey, //default
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, //default

@@ -1215,7 +1215,11 @@ export class Cat9andcat12Service {
       Corporation: 'LAI YIH', // DEFAULT
       Factory: factory,
       Department: 'Shipping', // DEFAULT
-      DocKey: 'S3.C9', // DEFAULT
+      // DocKey:
+      //   transportMethod.trim().toLowerCase() !== 'AIR'.trim().toLowerCase()
+      //     ? '3.2.01'
+      //     : '3.2.02', // DEFAULT
+      DocKey: activityType, // DEFAULT
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, // DEFAULT
