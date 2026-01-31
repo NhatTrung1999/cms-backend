@@ -264,7 +264,6 @@ export class HrService {
     factory: string,
   ) {
     try {
-      let updateCount = 0;
       if (!file.path || !fs.existsSync(file.path)) {
         throw new Error('File path not found!');
       }
@@ -307,6 +306,7 @@ export class HrService {
           headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
         }
       });
+
       const requiredHeaders = [
         'ID',
         'Full_Name',
@@ -348,11 +348,11 @@ export class HrService {
           }
         });
         if (
-          rowData?.ID &&
-          rowData?.Full_Name &&
-          rowData?.Department &&
-          rowData?.Permanent_Address &&
-          rowData?.Current_Address &&
+          rowData?.ID ||
+          rowData?.Full_Name ||
+          rowData?.Department ||
+          rowData?.Permanent_Address ||
+          rowData?.Current_Address ||
           rowData?.Transportation_Method
         ) {
           data.push(rowData);

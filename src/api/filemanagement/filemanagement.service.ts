@@ -22,6 +22,12 @@ import {
 } from 'src/helper/cat7.helper';
 
 import { buildQueryTest as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
+import {
+  buildQueryCat6,
+  normalizeRoute,
+  splitRecordByAirport,
+} from 'src/helper/cat6.helper';
+import { ICat6Query, ICat6Record } from 'src/types/cat6';
 
 @Injectable()
 export class FilemanagementService {
@@ -52,6 +58,8 @@ export class FilemanagementService {
     @Inject('LYM_HRIS') private readonly LYM_HRIS: Sequelize,
     @Inject('JAZ_HRIS') private readonly JAZ_HRIS: Sequelize,
     @Inject('JZS_HRIS') private readonly JZS_HRIS: Sequelize,
+    // cat 6
+    @Inject('UOF') private readonly UOF: Sequelize,
   ) {
     this.rootFolder = this.configService.get(
       'EXCEL_STORAGE_PATH',
@@ -117,8 +125,8 @@ export class FilemanagementService {
     dateFrom: string,
     dateTo: string,
     factory: string,
-    fields: string[],
     userID: string,
+    fields?: string[],
   ) {
     const id = uuidv4();
     const fileName = `${factory}-${module}-${dateFrom}-${dateTo}.xlsx`;
@@ -237,7 +245,7 @@ export class FilemanagementService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(module);
 
-    switch (module.toLowerCase()) {
+    switch (module.trim().toLowerCase()) {
       case 'cat1andcat4':
         await this.fileExcelCat1AndCat4(sheet, dateFrom, dateTo, factory);
         break;
@@ -245,7 +253,7 @@ export class FilemanagementService {
         await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat6':
-        await this.fileExcelCat6();
+        await this.fileExcelCat6(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat7':
         await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
@@ -937,7 +945,170 @@ export class FilemanagementService {
     });
   }
 
-  async fileExcelCat6() {}
+  async fileExcelCat6(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    const query = await buildQueryCat6(dateFrom, dateTo, factory);
+    const replacements: any[] = [];
+    if (dateFrom && dateTo) {
+      replacements.push(dateFrom, dateTo);
+    }
+    if (factory) {
+      replacements.push(`%${factory}%`);
+    }
+
+    const dataResults = (await this.UOF.query(query, {
+      type: QueryTypes.SELECT,
+      replacements,
+    })) as ICat6Query[];
+
+    const records: ICat6Record[] = dataResults
+      .map((item) => ({
+        ...item,
+        Routes: item.Routes
+          ? JSON.parse(item.Routes).map((r: any) => normalizeRoute(r))
+          : [],
+        Accommodation: item.Accommodation ? JSON.parse(item.Accommodation) : [],
+      }))
+      .flatMap((record) => splitRecordByAirport(record));
+
+    let data = records.map((item) => {
+      const routes = item.Routes || [];
+      const flightSegment = routes.find((r) => r.isAirport);
+      const startSegment = routes[0];
+
+      const otherDestinations = routes.filter(
+        (r) => r !== startSegment && !r.isAirport,
+      );
+
+      const getAddr = (r: any) => r?.AddressDetail || r?.AddressName || '';
+      const totalNights =
+        item.Accommodation?.filter(
+          (item) => item.isSameAsAbove === false,
+        ).reduce((sum, acc) => sum + (acc.nights || 0), 0) || 0;
+
+      let businessTripType: string = '';
+      switch (item.Factory.trim().toLowerCase()) {
+        case 'factory_domestic':
+          businessTripType = 'Domestic business trip within the group';
+          break;
+        case 'outside_domestic':
+          businessTripType = 'Domestic business trip to third-party entities';
+          break;
+        case 'factory_oversea':
+          businessTripType = 'Overseas business trip within the group';
+          break;
+        case 'outside_oversea':
+          businessTripType = 'Overseas business trip to third-party entities';
+          break;
+        default:
+          businessTripType = '';
+          break;
+      }
+
+      return {
+        Document_Date: item.CreatedAt,
+        Document_Number: item.DOC_NBR,
+        Staff_ID: item.UserCreate,
+        Round_trip_One_way:
+          item.TypeTravel.trim().toLowerCase() === 'round'.trim().toLowerCase()
+            ? 'Round trip'
+            : 'One-way',
+        Start_Time: item.DateStart,
+        End_Time: item.DateEnd,
+        Business_Trip_Type: businessTripType,
+        Place_of_Departure: getAddr(startSegment),
+        Land_Trasportation_Type_A: startSegment?.Transport || '',
+        Land_Transport_Distance_km_A: 'API Calculation',
+        Departure_Airport: flightSegment?.From || '',
+        Destination_Airport: flightSegment?.To || '',
+        Air_Transport_Distance_km: flightSegment ? 'API Calculation' : '',
+        Third_country_transfer_Destination: getAddr(otherDestinations[0]),
+        Land_Transportation_Type_B: otherDestinations[0]?.Transport || '',
+        Land_Transport_Distance_km_B: otherDestinations[0]
+          ? 'API Calculation'
+          : '',
+        Destination_2: getAddr(otherDestinations[1]),
+        Destination_3: getAddr(otherDestinations[2]),
+        Destination_4: getAddr(otherDestinations[3]),
+        Destination_5: getAddr(otherDestinations[4]),
+        Destination_6: getAddr(otherDestinations[5]),
+        Land_Transportation_Type: otherDestinations[0]?.Transport || '',
+        Land_Transport_Distance_km: 'API Calculation',
+        Number_of_nights_stayed: totalNights,
+        TotalRow: item.TotalRow || 0,
+      };
+    });
+
+    sheet.columns = [
+      { header: 'Document Date', key: 'Document_Date' },
+      { header: 'Document Number', key: 'Document_Number' },
+      { header: 'Staff ID', key: 'Staff_ID' },
+      { header: 'Round Trip One way', key: 'Round_trip_One_way' },
+      { header: 'Start Time', key: 'Start_Time' },
+      { header: 'End Time', key: 'End_Time' },
+      { header: 'Business Trip Type', key: 'Business_Trip_Type' },
+      { header: 'Place of Departure', key: 'Place_of_Departure' },
+      { header: 'Land Trasportation Type A', key: 'Land_Trasportation_Type_A' },
+      {
+        header: 'Land Transport Distance km A',
+        key: 'Land Transport Distance km A',
+      },
+      { header: 'Departure Airport', key: 'Departure_Airport' },
+      { header: 'Destination Airport', key: 'Destination_Airport' },
+      { header: 'Air Transport Distance km', key: 'Air_Transport_Distance_km' },
+      {
+        header: 'Third Country Transfer Destination',
+        key: 'Third_country_transfer_Destination',
+      },
+      {
+        header: 'Land Transportation Type B',
+        key: 'Land_Transportation_Type_B',
+      },
+      {
+        header: 'Land Transport Distance km B',
+        key: 'Land_Transport_Distance_km_B',
+      },
+      { header: 'Destination 2', key: 'Destination_2' },
+      { header: 'Destination 3', key: 'Destination_3' },
+      { header: 'Destination 4', key: 'Destination_4' },
+      { header: 'Destination 5', key: 'Destination_5' },
+      { header: 'Destination 6', key: 'Destination_6' },
+      { header: 'Land Transportation Type', key: 'Land_Transportation_Type' },
+      {
+        header: 'Land Transport Distance km',
+        key: 'Land_Transport_Distance_km',
+      },
+      { header: 'Number of nights stayed', key: 'Number_of_nights_stayed' },
+    ];
+
+    data.forEach((item) => sheet.addRow(item));
+
+    sheet.columns.forEach((column) => {
+      let maxLength = 0;
+      if (typeof column.eachCell === 'function') {
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? String(cell.value) : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+      }
+      column.width = maxLength * 1.2;
+    });
+
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
+  }
 
   async fileExcelCat7(
     sheet: ExcelJS.Worksheet,

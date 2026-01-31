@@ -17,6 +17,7 @@ export interface ICat6Query {
   Factory_User: string;
   DateStart: string;
   DateEnd: string;
+  TotalRow?: number;
 }
 
 export interface ICat6Record
@@ -26,8 +27,8 @@ export interface ICat6Record
     Transport: string;
     AddressDetail?: string;
     isAirport: boolean;
-    From?: string
-    To?: string
+    From?: string;
+    To?: string;
   }[];
 
   Accommodation: {
@@ -39,6 +40,14 @@ export interface ICat6Record
   }[];
 }
 
+export interface Route {
+  AddressName?: string;
+  AddressDetail?: string;
+  Transport: string;
+  isAirport: boolean;
+  From?: string;
+  To?: string;
+}
 
 export interface ICat6Data {
   Document_Date: string;

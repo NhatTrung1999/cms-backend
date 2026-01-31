@@ -5,16 +5,8 @@ import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
 import dayjs from 'dayjs';
 import { fakeCat6Data } from 'src/fakedata';
 import { getFactory } from 'src/helper/factory.helper';
+import { normalizeRoute, splitRecordByAirport } from 'src/helper/cat6.helper';
 dayjs().format();
-
-interface Route {
-  AddressName?: string;
-  AddressDetail?: string;
-  Transport: string;
-  isAirport: boolean;
-  From?: string;
-  To?: string;
-}
 
 @Injectable()
 export class Cat6Service {
@@ -30,34 +22,52 @@ export class Cat6Service {
     sortOrder: string = 'asc',
   ) {
     const offset = (page - 1) * limit;
-    const query = `SELECT *
+    let where = 'WHERE 1=1';
+    const replacements: any[] = [];
+
+    if (dateTo && dateFrom) {
+      where += ` AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?`;
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (factory) {
+      where += ` AND Factory_User LIKE ?`;
+      replacements.push(`%${factory}%`);
+    }
+
+    const query = `SELECT *, COUNT(TripID) OVER() AS TotalRow
                     FROM CDS_HRBUSS_BusTripData
-                    WHERE DOC_NBR = 'LYV_HR_BT260100009'`;
+                    ${where}`;
 
-    const countQuery = `SELECT COUNT(*) as total
-                        FROM CDS_HRBUSS_BusTripData
-                        WHERE DOC_NBR = 'LYV_HR_BT260100009'`;
+    // const countQuery = `SELECT COUNT(*) as total
+    //                     FROM CDS_HRBUSS_BusTripData
+    //                     WHERE DOC_NBR = 'LYV_HR_BT260100010'`;
 
-    const [dataResults, countResults] = await Promise.all([
-      this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<
-        ICat6Query[]
-      >,
-      this.UOF.query(countQuery, {
-        type: QueryTypes.SELECT,
-      }) as Promise<{ total: number }[]>,
-    ]);
+    // const [dataResults, countResults] = await Promise.all([
+    //   this.UOF.query(query, { type: QueryTypes.SELECT }) as Promise<
+    //     ICat6Query[]
+    //   >,
+    //   this.UOF.query(countQuery, {
+    //     type: QueryTypes.SELECT,
+    //   }) as Promise<{ total: number }[]>,
+    // ]);
+
+    const dataResults = (await this.UOF.query(query, {
+      type: QueryTypes.SELECT,
+      replacements,
+    })) as ICat6Query[];
 
     const records: ICat6Record[] = dataResults
       .map((item) => ({
         ...item,
         Routes: item.Routes
-          ? JSON.parse(item.Routes).map((r: any) => this.normalizeRoute(r))
+          ? JSON.parse(item.Routes).map((r: any) => normalizeRoute(r))
           : [],
         Accommodation: item.Accommodation ? JSON.parse(item.Accommodation) : [],
       }))
-      .flatMap((record) => this.splitRecordByAirport(record));
+      .flatMap((record) => splitRecordByAirport(record));
 
-    const formattedData = records.map((item) => {
+    let data = records.map((item) => {
       const routes = item.Routes || [];
       const flightSegment = routes.find((r) => r.isAirport);
       const startSegment = routes[0];
@@ -72,14 +82,36 @@ export class Cat6Service {
           (item) => item.isSameAsAbove === false,
         ).reduce((sum, acc) => sum + (acc.nights || 0), 0) || 0;
 
+      let businessTripType: string = '';
+      switch (item.Factory.trim().toLowerCase()) {
+        case 'factory_domestic':
+          businessTripType = 'Domestic business trip within the group';
+          break;
+        case 'outside_domestic':
+          businessTripType = 'Domestic business trip to third-party entities';
+          break;
+        case 'factory_oversea':
+          businessTripType = 'Overseas business trip within the group';
+          break;
+        case 'outside_oversea':
+          businessTripType = 'Overseas business trip to third-party entities';
+          break;
+        default:
+          businessTripType = '';
+          break;
+      }
+
       return {
         Document_Date: item.CreatedAt,
         Document_Number: item.DOC_NBR,
         Staff_ID: item.UserCreate,
-        Round_trip_One_way: item.TypeTravel,
+        Round_trip_One_way:
+          item.TypeTravel.trim().toLowerCase() === 'round'.trim().toLowerCase()
+            ? 'Round trip'
+            : 'One-way',
         Start_Time: item.DateStart,
         End_Time: item.DateEnd,
-        Business_Trip_Type: item.Factory,
+        Business_Trip_Type: businessTripType,
         Place_of_Departure: getAddr(startSegment),
         Land_Trasportation_Type_A: startSegment?.Transport || '',
         Land_Transport_Distance_km_A: 'API Calculation',
@@ -99,9 +131,11 @@ export class Cat6Service {
         Land_Transportation_Type: otherDestinations[0]?.Transport || '',
         Land_Transport_Distance_km: 'API Calculation',
         Number_of_nights_stayed: totalNights,
+        TotalRow: item.TotalRow || 0,
       };
     });
 
+    // console.log(formattedData);
     // const data = records.map((item) => {
     //   return {
     //     Document_Date: item.CreatedAt,
@@ -131,29 +165,28 @@ export class Cat6Service {
     //   };
     // });
 
-    return { formattedData, records };
     // return records;
 
     // let data: ICat6Data[] = records.map((item) => {
     //   const routes = item.Routes.filter((item) => item.isAirport === true);
-    //   let businessTripType: string = '';
-    //   switch (item.Factory) {
-    //     case 'factory_domestic':
-    //       businessTripType = 'Domestic business trip within the group';
-    //       break;
-    //     case 'outside_domestic':
-    //       businessTripType = 'Domestic business trip to third-party entities';
-    //       break;
-    //     case 'factory_oversea':
-    //       businessTripType = 'Overseas business trip within the group';
-    //       break;
-    //     case 'outside_oversea':
-    //       businessTripType = 'Overseas business trip to third-party entities';
-    //       break;
-    //     default:
-    //       businessTripType = '';
-    //       break;
-    //   }
+    // let businessTripType: string = '';
+    // switch (item.Factory) {
+    //   case 'factory_domestic':
+    //     businessTripType = 'Domestic business trip within the group';
+    //     break;
+    //   case 'outside_domestic':
+    //     businessTripType = 'Domestic business trip to third-party entities';
+    //     break;
+    //   case 'factory_oversea':
+    //     businessTripType = 'Overseas business trip within the group';
+    //     break;
+    //   case 'outside_oversea':
+    //     businessTripType = 'Overseas business trip to third-party entities';
+    //     break;
+    //   default:
+    //     businessTripType = '';
+    //     break;
+    // }
 
     //   return {
     //     Document_Date: item.CreatedAt,
@@ -176,110 +209,121 @@ export class Cat6Service {
     //   };
     // });
 
-    // data.sort((a, b) => {
-    //   const aValue = a[sortField];
-    //   const bValue = b[sortField];
-    //   if (sortOrder === 'asc') {
-    //     return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-    //   } else {
-    //     return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-    //   }
-    // });
-
-    // data = data.slice(offset, offset + limit);
-
-    // const total = countResults[0]?.total || 0;
-
-    // const hasMore = offset + data.length < total;
-
-    // return { data, page, limit, total, hasMore };
-  }
-
-  private splitRecordByAirport(record: ICat6Record): ICat6Record[] {
-    const routes = record.Routes;
-    let remainingAccommodations = [...(record.Accommodation || [])];
-    const result: ICat6Record[] = [];
-
-    let startIndex = 0;
-    let airportCount = 0;
-
-    for (let i = 0; i < routes.length; i++) {
-      if (routes[i].isAirport) {
-        airportCount++;
-
-        if (airportCount > 1) {
-          const cutIndex = i - 1;
-
-          const segmentRoutes = routes.slice(startIndex, cutIndex + 1);
-
-          const destinationsCount = segmentRoutes
-            .slice(1)
-            .filter((r) => !r.isAirport).length;
-
-          const segmentAccommodations = remainingAccommodations.slice(
-            0,
-            destinationsCount,
-          );
-
-          remainingAccommodations =
-            remainingAccommodations.slice(destinationsCount);
-
-          result.push({
-            ...record,
-            Routes: segmentRoutes,
-            Accommodation: segmentAccommodations,
-          });
-          startIndex = cutIndex;
-        }
+    data.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
       }
-    }
-
-    const lastRoutes = routes.slice(startIndex);
-
-    result.push({
-      ...record,
-      Routes: lastRoutes,
-      Accommodation: remainingAccommodations,
     });
 
-    return result;
-  }
+    data = data.slice(offset, offset + limit);
 
-  private normalizeRoute(route: any): Route {
-    return {
-      AddressName: route.AddressName ?? null,
-      AddressDetail: route.AddressDetail ?? null,
-      Transport: route.Transport,
-      isAirport: route.isAirport,
-      From: route.From ?? null,
-      To: route.To ?? null,
-    };
+    const total = data[0]?.TotalRow || 0;
+
+    const hasMore = offset + data.length < total;
+
+    return { data, page, limit, total, hasMore };
   }
 
   async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
-    return fakeCat6Data.map((item) => ({
-      System: 'BPM',
-      Corporation: getFactory(factory),
-      Factory: getFactory(factory),
-      Department: '設計部',
-      DocKey: item.DocumentNumber,
-      ActivitySource: '',
-      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: '3.5',
-      DataType: '2',
-      DocType: item.DocumentNumber,
-      DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
-      DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
-      DocNo: item.DocumentNumber,
-      UndDocNo: item.DocumentNumber,
-      TransType: item.LandTrasportationTypeA,
-      Departure: item.PlaceOfDeparture,
-      Destination: item.ThirdCountryTransferDestination,
-      Memo: item.BusinessTripType,
-      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-      Creator: '',
-    }));
+    // return fakeCat6Data.map((item) => ({
+    // System: 'BPM',
+    // Corporation: getFactory(factory),
+    // Factory: getFactory(factory),
+    // Department: '設計部',
+    // DocKey: item.DocumentNumber,
+    // ActivitySource: '',
+    // SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+    // EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+    // ActivityType: '3.5',
+    // DataType: '2',
+    // DocType: item.DocumentNumber,
+    // DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
+    // DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
+    // DocNo: item.DocumentNumber,
+    // UndDocNo: item.DocumentNumber,
+    // TransType: item.LandTrasportationTypeA,
+    // Departure: item.PlaceOfDeparture,
+    // Destination: item.ThirdCountryTransferDestination,
+    // Memo: item.BusinessTripType,
+    // CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+    // Creator: '',
+    // }));
+    return [
+      {
+        System: 'BPM',
+        Corporation: getFactory(factory),
+        Factory: getFactory(factory),
+        Department: '設計部',
+        DocKey: '3.5.4',
+        ActivitySource: '',
+        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+        ActivityType: '3.5',
+        DataType: '2',
+        DocType: 'LYV-HR-BT250100001',
+        DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
+        DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
+        DocNo: 'LYV-HR-BT250100001',
+        UndDocNo: 'LYV-HR-BT250100001-1',
+        TransType: 'Company Shuttle Bus',
+        Departure:
+          '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
+        Destination: 'SGN',
+        Memo: 'Overseas business trip to third-party entities',
+        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+        Creator: '',
+      },
+      {
+        System: 'BPM',
+        Corporation: getFactory(factory),
+        Factory: getFactory(factory),
+        Department: '設計部',
+        DocKey: '3.5.4',
+        ActivitySource: '',
+        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+        ActivityType: '3.5',
+        DataType: '2',
+        DocType: 'LYV-HR-BT250100001',
+        DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
+        DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
+        DocNo: 'LYV-HR-BT250100001',
+        UndDocNo: 'LYV-HR-BT250100001-2',
+        TransType: '',
+        Departure: 'SGN',
+        Destination: 'NUE',
+        Memo: 'Overseas business trip to third-party entities',
+        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+        Creator: '',
+      },
+      {
+        System: 'BPM',
+        Corporation: getFactory(factory),
+        Factory: getFactory(factory),
+        Department: '設計部',
+        DocKey: '3.5.4',
+        ActivitySource: '',
+        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+        ActivityType: '3.5',
+        DataType: '2',
+        DocType: 'LYV-HR-BT250100001',
+        DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
+        DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
+        DocNo: 'LYV-HR-BT250100001',
+        UndDocNo: 'LYV-HR-BT250100001-3',
+        TransType: 'Car',
+        Departure: 'NUE',
+        Destination: 'Adi-Dassler-Straße 1, 91074 Herzogenaurach, Germany',
+        Memo: 'Overseas business trip to third-party entities',
+        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+        Creator: '',
+      },
+    ];
     // return [
     //   {
     // System: 'BPM',

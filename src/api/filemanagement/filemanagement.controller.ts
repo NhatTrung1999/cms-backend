@@ -49,8 +49,8 @@ export class FilemanagementController {
     @Query('DateFrom') dateFrom: string,
     @Query('DateTo') dateTo: string,
     @Query('Factory') factory: string,
-    @Query('Fields') fields: string[],
     @Request() req,
+    @Query('Fields') fields?: string[],
   ) {
     // console.log(fields);
     const userID = getUserId(req);
@@ -59,8 +59,8 @@ export class FilemanagementController {
       dateFrom,
       dateTo,
       factory,
-      fields,
       userID,
+      fields,
     );
     if (!res) return { statusCode: 401, message: 'Error export!' };
     return {
