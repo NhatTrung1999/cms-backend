@@ -456,7 +456,7 @@ export class Cat5Service {
     const wasteTreatmentMethod = item.Waste_Treatment_method;
     const factoryName = item.Factory_Name;
     const wasteDisposalDate = item.Waste_disposal_date;
-    const wasteCode = item.Waste_Code;
+    // const wasteCode = item.Waste_Code;
     let dockey = '';
 
     switch (wasteTreatmentMethod.trim().toLowerCase()) {
@@ -486,7 +486,7 @@ export class Cat5Service {
       Factory: factoryName,
       Department: '',
       // DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
-      DocKey: dockey, //default
+      DocKey: activityType.trim() === '3.6' ? '3.6' : dockey, //default
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, //default

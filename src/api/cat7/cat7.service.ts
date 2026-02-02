@@ -613,6 +613,38 @@ export class Cat7Service {
     const FactoryName = item.Factory_Name;
     const DepartmentName = item.Department_Name;
 
+    let dockey = ''
+
+    switch(Main_transportation_type.trim().toLowerCase()) {
+      case 'Walking'.trim().toLowerCase():
+        dockey = '3.3.1'
+        break
+      case 'Bicycle'.trim().toLowerCase():
+        dockey = '3.3.2'
+        break
+      case 'Electric motorcycle'.trim().toLowerCase():
+        dockey = '3.3.3'
+        break
+      case 'Motorcycle'.trim().toLowerCase():
+        dockey = '3.3.4'
+        break
+      case 'Electric car'.trim().toLowerCase():
+        dockey = '3.3.5'
+        break
+      case 'Car'.trim().toLowerCase():
+        dockey = '3.3.6'
+        break
+      case 'Bus'.trim().toLowerCase():
+        dockey = '3.3.7'
+        break
+      case 'Company shuttle bus'.trim().toLowerCase():
+        dockey = '3.3.8'
+        break
+      default:
+        dockey = ''
+        break
+    }
+
     return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
       // System: 'CMS Web', // Default
       // Corporation: 'LAI YIH', // Default
@@ -638,7 +670,7 @@ export class Cat7Service {
       Corporation: FactoryName,
       Factory: FactoryName,
       Department: DepartmentName,
-      DocKey: staffId,
+      DocKey: dockey,
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType,

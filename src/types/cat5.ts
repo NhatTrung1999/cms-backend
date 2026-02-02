@@ -11,6 +11,6 @@ export interface IDataCat5 {
 }
 
 
-// export const ACTIVITY_TYPES = ['3.6', '4.4'] as const
-export const ACTIVITY_TYPES = ['4.4'] as const;
+export const ACTIVITY_TYPES = ['3.6', '4.4'] as const
+// export const ACTIVITY_TYPES = ['4.4'] as const;
 export type ActivityType = typeof ACTIVITY_TYPES[number]

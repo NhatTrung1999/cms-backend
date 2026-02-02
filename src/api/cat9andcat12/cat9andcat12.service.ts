@@ -1210,6 +1210,20 @@ export class Cat9andcat12Service {
     const grossWeight = item.Gross_Weight; // ACTIVITY DATA
     const createdDate = dayjs().format('YYYY-MM-DD HH:mm:ss');
 
+    let dockey = '';
+
+    switch (transportMethod.trim().toLowerCase()) {
+      case 'SEA'.trim().toLowerCase():
+        dockey = '3.2.01';
+        break;
+      case 'AIR'.trim().toLowerCase():
+        dockey = '3.2.02';
+        break;
+      default:
+        dockey = '';
+        break;
+    }
+
     return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
       System: 'ERP', // DEFAULT
       Corporation: 'LAI YIH', // DEFAULT
@@ -1219,7 +1233,7 @@ export class Cat9andcat12Service {
       //   transportMethod.trim().toLowerCase() !== 'AIR'.trim().toLowerCase()
       //     ? '3.2.01'
       //     : '3.2.02', // DEFAULT
-      DocKey: activityType, // DEFAULT
+      DocKey: activityType.trim() === '5.3'.trim() ? '5.3' : dockey, // DEFAULT
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, // DEFAULT

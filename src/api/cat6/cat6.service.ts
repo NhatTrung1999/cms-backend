@@ -293,7 +293,7 @@ export class Cat6Service {
         DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
         DocNo: 'LYV-HR-BT250100001',
         UndDocNo: 'LYV-HR-BT250100001-2',
-        TransType: '',
+        TransType: 'Flight',
         Departure: 'SGN',
         Destination: 'NUE',
         Memo: 'Overseas business trip to third-party entities',
