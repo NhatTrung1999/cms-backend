@@ -220,7 +220,7 @@ export const buildQueryAutoSentCmsLYV = async (
 
   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
 
-  const query = `SELECT *
+  const query = `SELECT TOP 50 *
                         ,N'${getFactory('LYV')}'  AS Factory_Name
                   FROM   (
                             SELECT u.userId               AS Staff_ID

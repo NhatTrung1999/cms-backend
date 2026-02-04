@@ -38,7 +38,7 @@ export class LogcatService {
     }
 
     if (factory) {
-      where += ' AND Factory LIKE ?';
+      where += ' AND Fac LIKE ?';
       replacements.push(`%${factory}%`);
     }
 
@@ -89,11 +89,39 @@ export class LogcatService {
 
     try {
       for (const item of data) {
+        let fac: string = '';
+
+        switch (item.Factory.trim().toLowerCase()) {
+          case '樂億 - LYV'.trim().toLowerCase():
+            fac = 'LYV';
+            break;
+          case '樂億II - LHG'.trim().toLowerCase():
+            fac = 'LHG';
+            break;
+          case '億春B - LVL'.trim().toLowerCase():
+            fac = 'LVL';
+            break;
+          case '昌億 - LYM'.trim().toLowerCase():
+            fac = 'LYM';
+            break;
+          case '億福 - LYF'.trim().toLowerCase():
+            fac = 'LYF';
+            break;
+          case 'Jiazhi-1'.trim().toLowerCase():
+            fac = 'JAZ';
+            break;
+          case 'Jiazhi-2'.trim().toLowerCase():
+            fac = 'JZS';
+            break;
+          default:
+            break;
+        }
+
         await this.EIP.query(
           `
           INSERT INTO CMW_Category_1_And_4_Log
           (
-            ID, [System], Corporation, Factory, Department, DocKey,
+            ID, [System], Corporation, Factory, Fac, Department, DocKey,
             SPeriodData, EPeriodData, ActivityType, DataType, DocType,
             UndDoc, DocFlow, DocDate, DocDate2, DocNo, UndDocNo,
             CustVenName, InvoiceNo, TransType, Departure, Destination,
@@ -103,7 +131,7 @@ export class LogcatService {
           )
           VALUES
           (
-            :id, :system, :corporation, :factory, :department, :docKey,
+            :id, :system, :corporation, :factory, :fac, :department, :docKey,
             :sPeriod, :ePeriod, :activityType, :dataType, :docType,
             :undDoc, :docFlow, :docDate, :docDate2, :docNo, :undDocNo,
             :custVenName, :invoiceNo, :transType, :departure, :destination,
@@ -120,6 +148,7 @@ export class LogcatService {
               system: item.System,
               corporation: item.Corporation,
               factory: item.Factory,
+              fac: fac,
               department: item.Department,
               docKey: item.DocKey,
               sPeriod: item.SPeriodData,
@@ -192,7 +221,7 @@ export class LogcatService {
     }
 
     if (factory) {
-      where += ' AND Factory LIKE ?';
+      where += ' AND Fac LIKE ?';
       replacements.push(`%${factory}%`);
     }
 
@@ -239,11 +268,39 @@ export class LogcatService {
 
     try {
       for (const item of data) {
+        let fac: string = '';
+
+        switch (item.Factory.trim().toLowerCase()) {
+          case '樂億 - LYV'.trim().toLowerCase():
+            fac = 'LYV';
+            break;
+          case '樂億II - LHG'.trim().toLowerCase():
+            fac = 'LHG';
+            break;
+          case '億春B - LVL'.trim().toLowerCase():
+            fac = 'LVL';
+            break;
+          case '昌億 - LYM'.trim().toLowerCase():
+            fac = 'LYM';
+            break;
+          case '億福 - LYF'.trim().toLowerCase():
+            fac = 'LYF';
+            break;
+          case 'Jiazhi-1'.trim().toLowerCase():
+            fac = 'JAZ';
+            break;
+          case 'Jiazhi-2'.trim().toLowerCase():
+            fac = 'JZS';
+            break;
+          default:
+            break;
+        }
+
         await this.EIP.query(
           `
           INSERT INTO CMW_Category_5_Log
           (
-            ID, [System], Corporation, Factory, Department, DocKey,
+            ID, [System], Corporation, Factory, Fac, Department, DocKey,
             SPeriodData, EPeriodData, ActivityType, DataType, DocType,
             UndDoc, DocFlow, DocDate, DocDate2, DocNo, UndDocNo,
             CustVenName, InvoiceNo, TransType, Departure, Destination,
@@ -253,7 +310,7 @@ export class LogcatService {
           )
           VALUES
           (
-            :id, :system, :corporation, :factory, :department, :docKey,
+            :id, :system, :corporation, :factory, :fac, :department, :docKey,
             :sPeriod, :ePeriod, :activityType, :dataType, :docType,
             :undDoc, :docFlow, :docDate, :docDate2, :docNo, :undDocNo,
             :custVenName, :invoiceNo, :transType, :departure, :destination,
@@ -270,6 +327,7 @@ export class LogcatService {
               system: item.System,
               corporation: item.Corporation,
               factory: item.Factory,
+              fac: fac,
               department: item.Department,
               docKey: item.DocKey,
               sPeriod: item.SPeriodData,
@@ -342,7 +400,7 @@ export class LogcatService {
     }
 
     if (factory) {
-      where += ' AND Factory LIKE ?';
+      where += ' AND Fac LIKE ?';
       replacements.push(`%${factory}%`);
     }
 
@@ -389,6 +447,34 @@ export class LogcatService {
 
     try {
       for (const item of data) {
+        let fac: string = '';
+
+        switch (item.Factory.trim().toLowerCase()) {
+          case '樂億 - LYV'.trim().toLowerCase():
+            fac = 'LYV';
+            break;
+          case '樂億II - LHG'.trim().toLowerCase():
+            fac = 'LHG';
+            break;
+          case '億春B - LVL'.trim().toLowerCase():
+            fac = 'LVL';
+            break;
+          case '昌億 - LYM'.trim().toLowerCase():
+            fac = 'LYM';
+            break;
+          case '億福 - LYF'.trim().toLowerCase():
+            fac = 'LYF';
+            break;
+          case 'Jiazhi-1'.trim().toLowerCase():
+            fac = 'JAZ';
+            break;
+          case 'Jiazhi-2'.trim().toLowerCase():
+            fac = 'JZS';
+            break;
+          default:
+            break;
+        }
+
         await this.EIP.query(
           `
           INSERT INTO CMW_Category_7_Log
@@ -397,6 +483,7 @@ export class LogcatService {
             [System],
             Corporation,
             Factory,
+            Fac,
             Department,
             DocKey,
             SPeriodData,
@@ -424,6 +511,7 @@ export class LogcatService {
             :system,
             :corporation,
             :factory,
+            :fac,
             :department,
             :docKey,
             :sPeriodData,
@@ -454,6 +542,7 @@ export class LogcatService {
               system: item.System,
               corporation: item.Corporation,
               factory: item.Factory,
+              fac: fac,
               department: item.Department,
               docKey: item.DocKey,
               sPeriodData: item.SPeriodData,
@@ -511,7 +600,7 @@ export class LogcatService {
     }
 
     if (factory) {
-      where += ' AND Factory LIKE ?';
+      where += ' AND Fac LIKE ?';
       replacements.push(`%${factory}%`);
     }
 
@@ -562,6 +651,34 @@ export class LogcatService {
 
     try {
       for (const item of data) {
+        let fac: string = '';
+
+        switch (item.Factory.trim().toLowerCase()) {
+          case '樂億 - LYV'.trim().toLowerCase():
+            fac = 'LYV';
+            break;
+          case '樂億II - LHG'.trim().toLowerCase():
+            fac = 'LHG';
+            break;
+          case '億春B - LVL'.trim().toLowerCase():
+            fac = 'LVL';
+            break;
+          case '昌億 - LYM'.trim().toLowerCase():
+            fac = 'LYM';
+            break;
+          case '億福 - LYF'.trim().toLowerCase():
+            fac = 'LYF';
+            break;
+          case 'Jiazhi-1'.trim().toLowerCase():
+            fac = 'JAZ';
+            break;
+          case 'Jiazhi-2'.trim().toLowerCase():
+            fac = 'JZS';
+            break;
+          default:
+            break;
+        }
+
         await this.EIP.query(
           `
           INSERT INTO CMW_Category_9_And_12_Log
@@ -570,6 +687,7 @@ export class LogcatService {
             [System],
             Corporation,
             Factory,
+            Fac,
             Department,
             DocKey,
             SPeriodData,
@@ -612,6 +730,7 @@ export class LogcatService {
             :system,
             :corporation,
             :factory,
+            :fac,
             :department,
             :docKey,
             :sPeriodData,
@@ -657,6 +776,7 @@ export class LogcatService {
               system: item.System,
               corporation: item.Corporation,
               factory: item.Factory,
+              fac: fac,
               department: item.Department,
               docKey: item.DocKey,
               sPeriodData: item.SPeriodData,

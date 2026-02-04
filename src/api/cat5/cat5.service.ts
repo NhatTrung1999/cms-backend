@@ -490,7 +490,7 @@ export class Cat5Service {
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType, //default
-      DataType: '999', //default
+      DataType: activityType.trim() === '3.6' ? '1' : '999', //default
       DocType: 'CMS Web', //default
       UndDoc: '',
       DocFlow: '',

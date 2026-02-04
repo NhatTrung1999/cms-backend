@@ -605,44 +605,53 @@ export class Cat7Service {
   }
 
   private mapToCMSFormat(item: any, dateFrom: string, dateTo: string) {
-    const staffId = item.Staff_ID;
-    const Residential_address = item.Residential_address;
-    const Main_transportation_type = item.Main_transportation_type;
-    const Number_of_working_days = item.Number_of_working_days;
-    const Factory_address = item.Factory_address;
-    const FactoryName = item.Factory_Name;
-    const DepartmentName = item.Department_Name;
+    const staffId = item.Staff_ID ?? '';
+    const Main_transportation_type = item.Main_transportation_type ?? '';
+    const Number_of_working_days = item.Number_of_working_days ?? '';
+    const Factory_address = item.Factory_address ?? '';
+    const Residential_address = item.Residential_address ?? Factory_address;
+    const FactoryName = item.Factory_Name ?? '';
+    const DepartmentName = item.Department_Name ?? '';
 
-    let dockey = ''
+    let dockey = '';
+    let transType = ''
 
-    switch(Main_transportation_type.trim().toLowerCase()) {
-      case 'Walking'.trim().toLowerCase():
-        dockey = '3.3.1'
-        break
-      case 'Bicycle'.trim().toLowerCase():
-        dockey = '3.3.2'
-        break
-      case 'Electric motorcycle'.trim().toLowerCase():
-        dockey = '3.3.3'
-        break
-      case 'Motorcycle'.trim().toLowerCase():
-        dockey = '3.3.4'
-        break
-      case 'Electric car'.trim().toLowerCase():
-        dockey = '3.3.5'
-        break
-      case 'Car'.trim().toLowerCase():
-        dockey = '3.3.6'
-        break
-      case 'Bus'.trim().toLowerCase():
-        dockey = '3.3.7'
-        break
-      case 'Company shuttle bus'.trim().toLowerCase():
-        dockey = '3.3.8'
-        break
+    switch (Main_transportation_type.trim().toLowerCase()) {
+      case 'Walking'.trim().toLowerCase(): //步行
+        dockey = '3.3.1';
+        transType ='步行'
+        break;
+      case 'Bicycle'.trim().toLowerCase(): //自行車
+        dockey = '3.3.2';
+        transType ='自行車'
+        break;
+      case 'Electric motorcycle'.trim().toLowerCase(): //電動機車
+        dockey = '3.3.3';
+        transType ='電動機車'
+        break;
+      case 'Motorcycle'.trim().toLowerCase(): //機車
+        dockey = '3.3.4';
+        transType ='機車'
+        break;
+      case 'Electric car'.trim().toLowerCase(): //電動汽車
+        dockey = '3.3.5';
+        transType ='電動汽車'
+        break;
+      case 'Car'.trim().toLowerCase(): //汽車
+        dockey = '3.3.6';
+        transType ='汽車'
+        break;
+      case 'Bus'.trim().toLowerCase(): //公車/客運
+        dockey = '3.3.7';
+        transType ='公車/客運'
+        break;
+      case 'Company shuttle bus'.trim().toLowerCase(): //交通車
+        dockey = '3.3.8';
+        transType ='交通車'
+        break;
       default:
-        dockey = ''
-        break
+        dockey = '';
+        break;
     }
 
     return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
@@ -679,7 +688,7 @@ export class Cat7Service {
       DocDate: dayjs().format('YYYY/MM/DD'),
       DocDate2: dayjs().format('YYYY/MM/DD'),
       UndDocNo: staffId,
-      TransType: Main_transportation_type,
+      TransType: transType,
       Departure: Residential_address,
       Destination: Factory_address,
       Attendance: Number_of_working_days.toString(),

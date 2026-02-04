@@ -3,7 +3,7 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
 import dayjs from 'dayjs';
-import { fakeCat6Data } from 'src/fakedata';
+import { AutoCMSCat6Data, fakeCat6Data } from 'src/fakedata';
 import { getFactory } from 'src/helper/factory.helper';
 import { normalizeRoute, splitRecordByAirport } from 'src/helper/cat6.helper';
 dayjs().format();
@@ -228,7 +228,106 @@ export class Cat6Service {
     return { data, page, limit, total, hasMore };
   }
 
+  async transformData(
+    data: AutoCMSCat6Data[],
+    factory: string,
+    dateFrom: string,
+    dateTo: string,
+  ) {
+    return data.flatMap((item) => {
+      const routes: { transType: string; dep: string; dest: string }[] = [];
+
+      if (item.PlaceOfDeparture && item.DepartureAirport) {
+        routes.push({
+          transType: item.LandTrasportationTypeA,
+          dep: item.PlaceOfDeparture,
+          dest: item.DepartureAirport,
+        });
+      }
+
+      if (item.DepartureAirport && item.DestinationAirport) {
+        routes.push({
+          transType: 'Flight',
+          dep: item.DepartureAirport,
+          dest: item.DestinationAirport,
+        });
+      }
+
+      if (item.DestinationAirport && item.ThirdCountryTransferDestination) {
+        routes.push({
+          transType: item.LandTrasportationTypeB,
+          dep: item.DestinationAirport,
+          dest: item.ThirdCountryTransferDestination,
+        });
+      }
+
+      return routes.map((route, index) => {
+        let transType = ''
+        switch (route.transType.trim().toLowerCase()) {
+          case 'Car'.trim().toLowerCase():
+            transType = '計程車/出租車';
+            break;
+          case 'Company Shuttle Car'.trim().toLowerCase():
+            transType = '公司車';
+            break;
+          case 'Flight'.trim().toLowerCase():
+            transType = '飛機';
+            break;
+          default:
+            transType = route.transType.trim();
+            break;
+        }
+
+        let docKey = '';
+        switch (item.BusinessTripType.trim().toLowerCase()) {
+          case 'Domestic business trip within the group'.trim().toLowerCase():
+            docKey = '3.5.1';
+            break;
+          case 'Domestic husiness trin to third-nartv entities'
+            .trim()
+            .toLowerCase():
+            docKey = '3.5.2';
+            break;
+          case 'Overseas business trip within the group'.trim().toLowerCase():
+            docKey = '3.5.3';
+            break;
+          case 'Overseas business trip to third-party entities'
+            .trim()
+            .toLowerCase():
+            docKey = '3.5.4';
+            break;
+          default:
+            break;
+        }
+        return {
+          System: 'BPM',
+          Corporation: getFactory(factory),
+          Factory: getFactory(factory),
+          Department: '設計部',
+          DocKey: docKey,
+          ActivitySource: '',
+          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+          ActivityType: '3.5',
+          DataType: '2',
+          DocType: '洽公單',
+          DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
+          DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
+          DocNo: item.DocumentNumber,
+          UndDocNo: `${item.DocumentNumber}-${index + 1}`,
+          TransType: transType,
+          Departure: route.dep,
+          Destination: route.dest,
+          Memo: item.BusinessTripType,
+          CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+          Creator: '',
+        };
+      });
+    });
+  }
+
   async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
+    return await this.transformData(fakeCat6Data, factory, dateFrom, dateTo);
     // return fakeCat6Data.map((item) => ({
     // System: 'BPM',
     // Corporation: getFactory(factory),
@@ -252,78 +351,78 @@ export class Cat6Service {
     // CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
     // Creator: '',
     // }));
-    return [
-      {
-        System: 'BPM',
-        Corporation: getFactory(factory),
-        Factory: getFactory(factory),
-        Department: '設計部',
-        DocKey: '3.5.4',
-        ActivitySource: '',
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: '3.5',
-        DataType: '2',
-        DocType: 'LYV-HR-BT250100001',
-        DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
-        DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
-        DocNo: 'LYV-HR-BT250100001',
-        UndDocNo: 'LYV-HR-BT250100001-1',
-        TransType: 'Company Shuttle Bus',
-        Departure:
-          '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
-        Destination: 'SGN',
-        Memo: 'Overseas business trip to third-party entities',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-      },
-      {
-        System: 'BPM',
-        Corporation: getFactory(factory),
-        Factory: getFactory(factory),
-        Department: '設計部',
-        DocKey: '3.5.4',
-        ActivitySource: '',
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: '3.5',
-        DataType: '2',
-        DocType: 'LYV-HR-BT250100001',
-        DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
-        DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
-        DocNo: 'LYV-HR-BT250100001',
-        UndDocNo: 'LYV-HR-BT250100001-2',
-        TransType: 'Flight',
-        Departure: 'SGN',
-        Destination: 'NUE',
-        Memo: 'Overseas business trip to third-party entities',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-      },
-      {
-        System: 'BPM',
-        Corporation: getFactory(factory),
-        Factory: getFactory(factory),
-        Department: '設計部',
-        DocKey: '3.5.4',
-        ActivitySource: '',
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: '3.5',
-        DataType: '2',
-        DocType: 'LYV-HR-BT250100001',
-        DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
-        DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
-        DocNo: 'LYV-HR-BT250100001',
-        UndDocNo: 'LYV-HR-BT250100001-3',
-        TransType: 'Car',
-        Departure: 'NUE',
-        Destination: 'Adi-Dassler-Straße 1, 91074 Herzogenaurach, Germany',
-        Memo: 'Overseas business trip to third-party entities',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-      },
-    ];
+    // return [
+    //   {
+    //     System: 'BPM',
+    //     Corporation: getFactory(factory),
+    //     Factory: getFactory(factory),
+    //     Department: '設計部',
+    //     DocKey: '3.5.4',
+    //     ActivitySource: '',
+    //     SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+    //     EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+    //     ActivityType: '3.5',
+    //     DataType: '2',
+    //     DocType: 'LYV-HR-BT250100001',
+    //     DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
+    //     DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
+    //     DocNo: 'LYV-HR-BT250100001',
+    //     UndDocNo: 'LYV-HR-BT250100001-1',
+    //     TransType: 'Company Shuttle Bus',
+    //     Departure:
+    //       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
+    //     Destination: 'SGN',
+    //     Memo: 'Overseas business trip to third-party entities',
+    //     CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+    //     Creator: '',
+    //   },
+    //   {
+    //     System: 'BPM',
+    //     Corporation: getFactory(factory),
+    //     Factory: getFactory(factory),
+    //     Department: '設計部',
+    //     DocKey: '3.5.4',
+    //     ActivitySource: '',
+    //     SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+    //     EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+    //     ActivityType: '3.5',
+    //     DataType: '2',
+    //     DocType: 'LYV-HR-BT250100001',
+    //     DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
+    //     DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
+    //     DocNo: 'LYV-HR-BT250100001',
+    //     UndDocNo: 'LYV-HR-BT250100001-2',
+    //     TransType: 'Flight',
+    //     Departure: 'SGN',
+    //     Destination: 'NUE',
+    //     Memo: 'Overseas business trip to third-party entities',
+    //     CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+    //     Creator: '',
+    //   },
+    //   {
+    //     System: 'BPM',
+    //     Corporation: getFactory(factory),
+    //     Factory: getFactory(factory),
+    //     Department: '設計部',
+    //     DocKey: '3.5.4',
+    //     ActivitySource: '',
+    //     SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+    //     EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+    //     ActivityType: '3.5',
+    //     DataType: '2',
+    //     DocType: 'LYV-HR-BT250100001',
+    //     DocDate: dayjs('2025-01-02').format('YYYY/MM/DD'),
+    //     DocDate2: dayjs('2025-02-15').format('YYYY/MM/DD'),
+    //     DocNo: 'LYV-HR-BT250100001',
+    //     UndDocNo: 'LYV-HR-BT250100001-3',
+    //     TransType: 'Car',
+    //     Departure: 'NUE',
+    //     Destination: 'Adi-Dassler-Straße 1, 91074 Herzogenaurach, Germany',
+    //     Memo: 'Overseas business trip to third-party entities',
+    //     CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+    //     Creator: '',
+    //   },
+    // ];
     // return [
     //   {
     // System: 'BPM',
