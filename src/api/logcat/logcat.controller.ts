@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Query, Request } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Request,
+  Res,
+  StreamableFile,
+} from '@nestjs/common';
 import { LogcatService } from './logcat.service';
 import {
   CreateLogCat1And4,
@@ -7,6 +16,7 @@ import {
   CreateLogCat9And12,
 } from './dto/create-logcat.dto';
 import { getFactortyID, getUserId } from 'src/helper/common.helper';
+import { Response } from 'express';
 
 @Controller('logcat')
 export class LogcatController {
@@ -40,6 +50,28 @@ export class LogcatController {
     return this.logcatService.createLogCat1And4(data, factory, userid);
   }
 
+  @Get('export-excel-cat1-4')
+  async exportExcelCat1And4(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.logcatService.exportExcelCat1And4(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="LogCat1And4.xlsx"`,
+      'Content-Length': buffer.byteLength,
+    });
+    return new StreamableFile(Buffer.from(buffer));
+  }
+
   // Logging CAT5
   @Get('get-log-cat5')
   async getLogCat5(
@@ -67,6 +99,28 @@ export class LogcatController {
     const factory = getFactortyID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat5(data, factory, userid);
+  }
+
+  @Get('export-excel-cat5')
+  async exportExcelCat5(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.logcatService.exportExcelCat5(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="LogCat5.xlsx"`,
+      'Content-Length': buffer.byteLength,
+    });
+    return new StreamableFile(Buffer.from(buffer));
   }
 
   // Logging CAT7

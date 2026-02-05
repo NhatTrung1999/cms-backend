@@ -613,44 +613,48 @@ export class Cat7Service {
     const FactoryName = item.Factory_Name ?? '';
     const DepartmentName = item.Department_Name ?? '';
 
+    if (DepartmentName.length > 20) {
+      return [];
+    }
+
+    // console.log(DepartmentName.length);
     let dockey = '';
-    let transType = ''
+    let transType = '';
 
     switch (Main_transportation_type.trim().toLowerCase()) {
       case 'Walking'.trim().toLowerCase(): //步行
         dockey = '3.3.1';
-        transType ='步行'
+        transType = '步行';
         break;
       case 'Bicycle'.trim().toLowerCase(): //自行車
         dockey = '3.3.2';
-        transType ='自行車'
+        transType = '自行車';
         break;
       case 'Electric motorcycle'.trim().toLowerCase(): //電動機車
         dockey = '3.3.3';
-        transType ='電動機車'
+        transType = '電動機車';
         break;
       case 'Motorcycle'.trim().toLowerCase(): //機車
         dockey = '3.3.4';
-        transType ='機車'
+        transType = '機車';
         break;
       case 'Electric car'.trim().toLowerCase(): //電動汽車
         dockey = '3.3.5';
-        transType ='電動汽車'
+        transType = '電動汽車';
         break;
       case 'Car'.trim().toLowerCase(): //汽車
         dockey = '3.3.6';
-        transType ='汽車'
+        transType = '汽車';
         break;
       case 'Bus'.trim().toLowerCase(): //公車/客運
         dockey = '3.3.7';
-        transType ='公車/客運'
+        transType = '公車/客運';
         break;
-      case 'Company shuttle bus'.trim().toLowerCase(): //交通車
+      case 'Company shuttle bus'.trim().toLowerCase(): //員工接駁車
         dockey = '3.3.8';
-        transType ='交通車'
+        transType = '員工接駁車';
         break;
       default:
-        dockey = '';
         break;
     }
 

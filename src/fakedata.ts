@@ -33,7 +33,7 @@ export interface AutoCMSCat6Data {
 //     TripType: 'Round Trip',
 //     StartTime: '2025-02-15',
 //     EndTime: '2025-03-01',
-//     BusinessTripType: 'Overseas business trip to third-party entities',
+//     BusinessTripType: 'Overseas business trip to third party entities',
 //     PlaceOfDeparture:
 //       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
 //     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -64,7 +64,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-02-15',
     EndTime: '2025-03-01',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -92,7 +92,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-02-15',
     EndTime: '2025-02-28',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -120,7 +120,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-03-24',
     EndTime: '2025-03-27',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -148,7 +148,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-03-23',
     EndTime: '2025-03-27',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -176,7 +176,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-02-10',
     EndTime: '2025-02-21',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -260,7 +260,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-04-08',
     EndTime: '2025-04-26',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -288,7 +288,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-04-08',
     EndTime: '2025-04-16',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -316,7 +316,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-03-23',
     EndTime: '2025-03-27',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -324,7 +324,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     LandTrasportationTypeA: 'Company Shuttle Car',
     DestinationAirport: 'Guangzhou Baiyun International Airport',
     ThirdCountryTransferDestination:
-      '中國广东省广州市 North, 百顺南路30号 邮政编码: 510442',
+      '中國广东省广州市 North, 百顺南路30号 邮政编码 510442',
     LandTransportDistanceB: 'API Auto calculate',
     LandTrasportationTypeB: '高鐵',
     Destination2: '',
@@ -428,7 +428,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-05-18',
     EndTime: '2025-05-23',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -456,7 +456,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-06-12',
     EndTime: '2025-06-13',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -464,7 +464,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     LandTrasportationTypeA: 'Company Shuttle Car',
     DestinationAirport: 'Nanjing Lukou International Airport',
     ThirdCountryTransferDestination:
-      '中國江苏省苏州市吴中区现代大道 邮政编码: 215121',
+      '中國江苏省苏州市吴中区现代大道 邮政编码 215121',
     LandTransportDistanceB: 'API Auto calculate',
     LandTrasportationTypeB: '高鐵',
     Destination2: '',
@@ -484,7 +484,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-06-12',
     EndTime: '2025-06-14',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -511,7 +511,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-07-16',
     EndTime: '2025-07-19',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -539,14 +539,14 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-07-02',
     EndTime: '2025-07-03',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
     LandTransportDistanceA: 'API Auto calculagte',
     LandTrasportationTypeA: 'Company Shuttle Car',
     DestinationAirport: 'Shenzhen Bao\'an International Airport',
-    ThirdCountryTransferDestination: '中國東莞市 邮政编码: 523900',
+    ThirdCountryTransferDestination: '中國東莞市 邮政编码 523900',
     LandTransportDistanceB: 'API Auto calculate',
     LandTrasportationTypeB: '高鐵',
     Destination2: '',
@@ -566,7 +566,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-08-16',
     EndTime: '2025-08-31',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -594,7 +594,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-07-26',
     EndTime: '2025-08-07',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -622,7 +622,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-08-16',
     EndTime: '2025-08-31',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -650,7 +650,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-08-19',
     EndTime: '2025-08-31',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -678,7 +678,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-08-09',
     EndTime: '2025-08-16',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -706,7 +706,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-08-09',
     EndTime: '2025-08-16',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -734,7 +734,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-08-09',
     EndTime: '2025-08-16',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -762,7 +762,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-08-16',
     EndTime: '2025-08-25',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -790,7 +790,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-07-26',
     EndTime: '2025-08-07',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -818,7 +818,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-07-26',
     EndTime: '2025-08-07',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -846,7 +846,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-07-26',
     EndTime: '2025-08-07',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -902,7 +902,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-09-17',
     EndTime: '2025-09-18',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -929,7 +929,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-11-10',
     EndTime: '2025-11-13',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -985,7 +985,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-11-02',
     EndTime: '2025-11-03',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -1012,7 +1012,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-11-02',
     EndTime: '2025-11-03',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',
@@ -1039,7 +1039,7 @@ export const fakeCat6Data: AutoCMSCat6Data[] = [
     TripType: 'Round Trip',
     StartTime: '2025-11-02',
     EndTime: '2025-11-03',
-    BusinessTripType: 'Overseas business trip to third-party entities',
+    BusinessTripType: 'Overseas business trip to third party entities',
     PlaceOfDeparture:
       '3-5 Đ. Tên Lửa, An Lạc, Bình Tân, Thành phố Hồ Chí Minh 763430越南',
     DepartureAirport: 'Tan Son Nhat International Airport',

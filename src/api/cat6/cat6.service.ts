@@ -291,7 +291,7 @@ export class Cat6Service {
           case 'Overseas business trip within the group'.trim().toLowerCase():
             docKey = '3.5.3';
             break;
-          case 'Overseas business trip to third-party entities'
+          case 'Overseas business trip to third party entities'
             .trim()
             .toLowerCase():
             docKey = '3.5.4';
@@ -452,27 +452,50 @@ export class Cat6Service {
   }
 
   async autoSentCMSV2(dateFrom: string, dateTo: string, factory: string) {
-    return fakeCat6Data.map((item) => ({
-      System: 'BPM',
-      Corporation: getFactory(factory),
-      Factory: getFactory(factory),
-      Department: '設計部',
-      DocKey: item.StaffID.toString(),
-      ActivitySource: '住宿',
-      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: '3.5',
-      DataType: '3',
-      DocType: '出差住宿單',
-      DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
-      DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
-      DocNo: item.DocumentNumber,
-      UndDocNo: item.DocumentNumber,
-      TransType: 'double',
-      ActivityData: item.NumberOfNightsStayed.toString(),
-      Memo: '',
-      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-      Creator: '',
-    }));
+    return fakeCat6Data.map((item) =>{
+      let docKey = '';
+      switch (item.BusinessTripType.trim().toLowerCase()) {
+        case 'Domestic business trip within the group'.trim().toLowerCase():
+          docKey = '3.5.1';
+          break;
+        case 'Domestic husiness trin to third-nartv entities'
+          .trim()
+          .toLowerCase():
+          docKey = '3.5.2';
+          break;
+        case 'Overseas business trip within the group'.trim().toLowerCase():
+          docKey = '3.5.3';
+          break;
+        case 'Overseas business trip to third party entities'
+          .trim()
+          .toLowerCase():
+          docKey = '3.5.4';
+          break;
+        default:
+          break;
+      }
+      return {
+        System: 'BPM',
+        Corporation: getFactory(factory),
+        Factory: getFactory(factory),
+        Department: '設計部',
+        DocKey: docKey,
+        ActivitySource: '住宿',
+        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+        ActivityType: '3.5',
+        DataType: '3',
+        DocType: '出差住宿單',
+        DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
+        DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
+        DocNo: item.DocumentNumber,
+        UndDocNo: item.DocumentNumber,
+        TransType: 'double',
+        ActivityData: item.NumberOfNightsStayed.toString(),
+        Memo: '',
+        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+        Creator: '',
+      };
+    });
   }
 }
