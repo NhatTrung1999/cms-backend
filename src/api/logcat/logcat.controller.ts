@@ -152,6 +152,28 @@ export class LogcatController {
     return this.logcatService.createLogCat7(data, factory, userid);
   }
 
+  @Get('export-excel-cat7')
+  async exportExcelCat7(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.logcatService.exportExcelCat7(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="LogCat7.xlsx"`,
+      'Content-Length': buffer.byteLength,
+    });
+    return new StreamableFile(Buffer.from(buffer));
+  }
+
   // Logging CAT9&12
   @Get('get-log-cat9-12')
   async getLogCat9And12(
@@ -179,5 +201,27 @@ export class LogcatController {
     const factory = getFactortyID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat9And12(data, factory, userid);
+  }
+
+  @Get('export-excel-cat9-12')
+  async exportExcelCat9And12(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.logcatService.exportExcelCat9And12(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="LogCat9And12.xlsx"`,
+      'Content-Length': buffer.byteLength,
+    });
+    return new StreamableFile(Buffer.from(buffer));
   }
 }

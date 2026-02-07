@@ -36,6 +36,10 @@ export class Cat1andcat4Service {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    usage: boolean,
+    unitWeight: boolean,
+    weight: boolean,
+    departure: boolean,
     page: number = 1,
     limit: number = 20,
     sortField: string = 'No',
@@ -59,6 +63,10 @@ export class Cat1andcat4Service {
         return await this.getAllFactoryDataTest(
           dateFrom,
           dateTo,
+          usage,
+          unitWeight,
+          weight,
+          departure,
           page,
           limit,
           sortField,
@@ -71,6 +79,10 @@ export class Cat1andcat4Service {
       dateFrom,
       dateTo,
       factory,
+      usage,
+      unitWeight,
+      weight,
+      departure,
       page,
       limit,
       sortField,
@@ -375,6 +387,10 @@ export class Cat1andcat4Service {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    usage: boolean,
+    unitWeight: boolean,
+    weight: boolean,
+    departure: boolean,
     page: number,
     limit: number,
     sortField: string = 'No',
@@ -387,12 +403,19 @@ export class Cat1andcat4Service {
         sortField,
         sortOrder,
         factory,
+        usage,
+        unitWeight,
+        weight,
+        departure,
         this.EIP,
       );
 
       const replacements = {
         startDate: dateFrom,
-        endDate: dateTo,
+        endDate: dayjs(dateTo)
+          .add(1, 'day')
+          .startOf('day')
+          .format('YYYY-MM-DD'),
         offset,
         limit,
       };
@@ -413,6 +436,10 @@ export class Cat1andcat4Service {
   private async getAllFactoryDataTest(
     dateFrom: string,
     dateTo: string,
+    usage: boolean,
+    unitWeight: boolean,
+    weight: boolean,
+    departure: boolean,
     page: number,
     limit: number,
     sortField: string,
@@ -428,7 +455,10 @@ export class Cat1andcat4Service {
       ];
       const replacements = {
         startDate: dateFrom,
-        endDate: dateTo,
+        endDate: dayjs(dateTo)
+          .add(1, 'day')
+          .startOf('day')
+          .format('YYYY-MM-DD'),
       };
 
       const results = await Promise.all(
@@ -437,6 +467,10 @@ export class Cat1andcat4Service {
             sortField,
             sortOrder,
             factoryName,
+            usage,
+            unitWeight,
+            weight,
+            departure,
             this.EIP,
             true,
           );
@@ -600,7 +634,10 @@ export class Cat1andcat4Service {
       dateFrom && dateTo
         ? {
             startDate: dateFrom,
-            endDate: dateTo,
+            endDate: dayjs(dateTo)
+              .add(1, 'day')
+              .startOf('day')
+              .format('YYYY-MM-DD'),
           }
         : {};
 

@@ -28,6 +28,7 @@ import {
   splitRecordByAirport,
 } from 'src/helper/cat6.helper';
 import { ICat6Query, ICat6Record } from 'src/types/cat6';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class FilemanagementService {
@@ -127,6 +128,10 @@ export class FilemanagementService {
     factory: string,
     userID: string,
     fields?: string[],
+    usage?: boolean,
+    unitWeight?: boolean,
+    weight?: boolean,
+    departure?: boolean,
   ) {
     const id = uuidv4();
     const fileName = `${factory}-${module}-${dateFrom}-${dateTo}.xlsx`;
@@ -144,6 +149,10 @@ export class FilemanagementService {
       dateTo,
       factory,
       fields,
+      usage,
+      unitWeight,
+      weight,
+      departure,
     );
 
     let statusWaiting = await this.fileExcelWaiting(
@@ -241,13 +250,26 @@ export class FilemanagementService {
     dateTo: string,
     factory: string,
     fields?: string[],
+    usage?: boolean,
+    unitWeight?: boolean,
+    weight?: boolean,
+    departure?: boolean,
   ) {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(module);
 
     switch (module.trim().toLowerCase()) {
       case 'cat1andcat4':
-        await this.fileExcelCat1AndCat4(sheet, dateFrom, dateTo, factory);
+        await this.fileExcelCat1AndCat4(
+          sheet,
+          dateFrom,
+          dateTo,
+          factory,
+          usage,
+          unitWeight,
+          weight,
+          departure,
+        );
         break;
       case 'cat5':
         await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
@@ -811,6 +833,10 @@ export class FilemanagementService {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    usage?: boolean,
+    unitWeight?: boolean,
+    weight?: boolean,
+    departure?: boolean,
   ) {
     let db: Sequelize;
     switch (factory.trim()) {
@@ -831,6 +857,10 @@ export class FilemanagementService {
           sheet,
           dateFrom,
           dateTo,
+          usage,
+          unitWeight,
+          weight,
+          departure,
         );
     }
 
@@ -840,6 +870,10 @@ export class FilemanagementService {
       dateFrom,
       dateTo,
       factory,
+      usage,
+      unitWeight,
+      weight,
+      departure,
       this.EIP,
     );
   }
@@ -848,6 +882,10 @@ export class FilemanagementService {
     sheet: ExcelJS.Worksheet,
     dateFrom: string,
     dateTo: string,
+    usage?: boolean,
+    unitWeight?: boolean,
+    weight?: boolean,
+    departure?: boolean,
   ) {
     const connects: { facotryName: string; conn: Sequelize }[] = [
       { facotryName: 'LYV', conn: this.LYV_ERP },
@@ -857,7 +895,7 @@ export class FilemanagementService {
     ];
     const replacements = {
       startDate: dateFrom,
-      endDate: dateTo,
+      endDate: dayjs(dateTo).add(1, 'day').startOf('day').format('YYYY-MM-DD'),
       offset: 1,
       limit: 20,
     };
@@ -867,6 +905,10 @@ export class FilemanagementService {
           'No',
           'asc',
           facotryName,
+          usage,
+          unitWeight,
+          weight,
+          departure,
           this.EIP,
         );
         return conn.query(query, {

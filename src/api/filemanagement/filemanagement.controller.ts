@@ -51,6 +51,10 @@ export class FilemanagementController {
     @Query('Factory') factory: string,
     @Request() req,
     @Query('Fields') fields?: string[],
+    @Query('Usage') usage?: boolean,
+    @Query('UnitWeight') unitWeight?: boolean,
+    @Query('Weight') weight?: boolean,
+    @Query('Departure') departure?: boolean,
   ) {
     // console.log(fields);
     const userID = getUserId(req);
@@ -61,6 +65,10 @@ export class FilemanagementController {
       factory,
       userID,
       fields,
+      String(usage) === 'true',
+      String(unitWeight) === 'true',
+      String(weight) === 'true',
+      String(departure) === 'true',
     );
     if (!res) return { statusCode: 401, message: 'Error export!' };
     return {
