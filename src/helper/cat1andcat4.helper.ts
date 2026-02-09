@@ -354,6 +354,8 @@ export const buildQueryTest = async (
                   ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) AS LandTransportDistance
                   ,isi.SeaTransportDistance     AS SeaTransportDistance
                   ,isi.AirTransportDistance     AS AirTransportDistance
+                  ,clzl.dwbh
+                  ,c.Qty
             INTO   #PurN233_CGZL
             FROM   CGZLS AS c
                   LEFT JOIN cgzl
@@ -417,7 +419,10 @@ export const buildQueryTest = async (
                   ,kcrk.ModifyDate            AS RKDate
                   ,KCRK.Qty                   AS QtyReceive
                   ,kcrk.RKNO                  AS ReceivedNo
-                  ,(pnc.UnitWeight * KCRK.Qty) AS WeightUnitkg
+                  ,CASE 
+                        WHEN dwbh='KGS' THEN pnc.Qty
+                        ELSE (pnc.UnitWeight*KCRK.Qty)
+                  END WeightUnitkg
                   ,CAST('0' AS INT)           AS LandTransportTonKilometers
                   ,CAST('0' AS INT)           AS SeaTransportTonKilometers
                   ,CAST('0' AS INT)           AS AirTransportTonKilometers
@@ -875,6 +880,8 @@ export const buildQueryAutoSentCMS = async (
                         ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) AS LandTransportDistance
                         ,isi.SeaTransportDistance     AS SeaTransportDistance
                         ,isi.AirTransportDistance     AS AirTransportDistance
+                        ,clzl.dwbh
+                        ,c.Qty
                   INTO   #PurN233_CGZL
                   FROM   CGZLS AS c
                         LEFT JOIN cgzl
@@ -945,7 +952,10 @@ export const buildQueryAutoSentCMS = async (
                         ,kcrk.ModifyDate            AS RKDate
                         ,KCRK.Qty                   AS QtyReceive
                         ,kcrk.RKNO                  AS ReceivedNo
-                        ,(pnc.UnitWeight*KCRK.Qty)  AS WeightUnitkg
+                        ,CASE 
+                              WHEN dwbh='KGS' THEN pnc.Qty
+                              ELSE (pnc.UnitWeight*KCRK.Qty)
+                        END  WeightUnitkg
                         ,CAST('0' AS INT)           AS LandTransportTonKilometers
                         ,CAST('0' AS INT)           AS SeaTransportTonKilometers
                         ,CAST('0' AS INT)           AS AirTransportTonKilometers

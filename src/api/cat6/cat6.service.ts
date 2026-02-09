@@ -3,7 +3,7 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
 import dayjs from 'dayjs';
-import { AutoCMSCat6Data, fakeCat6Data } from 'src/fakedata';
+import { AutoCMSCat6Data, fakeCat6LHGData, fakeCat6LVLData, fakeCat6LYMData, fakeCat6LYVData } from 'src/fakedata';
 import { getFactory } from 'src/helper/factory.helper';
 import { normalizeRoute, splitRecordByAirport } from 'src/helper/cat6.helper';
 dayjs().format();
@@ -327,8 +327,8 @@ export class Cat6Service {
   }
 
   async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
-    return await this.transformData(fakeCat6Data, factory, dateFrom, dateTo);
-    // return fakeCat6Data.map((item) => ({
+    return await this.transformData(fakeCat6LYMData, factory, dateFrom, dateTo);
+    // return fakeCat6LYVData.map((item) => ({
     // System: 'BPM',
     // Corporation: getFactory(factory),
     // Factory: getFactory(factory),
@@ -452,7 +452,7 @@ export class Cat6Service {
   }
 
   async autoSentCMSV2(dateFrom: string, dateTo: string, factory: string) {
-    return fakeCat6Data.map((item) =>{
+    return fakeCat6LYVData.map((item) =>{
       let docKey = '';
       switch (item.BusinessTripType.trim().toLowerCase()) {
         case 'Domestic business trip within the group'.trim().toLowerCase():
@@ -478,7 +478,7 @@ export class Cat6Service {
         System: 'BPM',
         Corporation: getFactory(factory),
         Factory: getFactory(factory),
-        Department: '設計部',
+        Department: '',
         DocKey: docKey,
         ActivitySource: '住宿',
         SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
