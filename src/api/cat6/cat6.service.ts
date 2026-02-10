@@ -3,7 +3,13 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ICat6Data, ICat6Query, ICat6Record } from 'src/types/cat6';
 import dayjs from 'dayjs';
-import { AutoCMSCat6Data, fakeCat6LHGData, fakeCat6LVLData, fakeCat6LYMData, fakeCat6LYVData } from 'src/fakedata';
+import {
+  AutoCMSCat6Data,
+  fakeCat6LHGData,
+  fakeCat6LVLData,
+  fakeCat6LYMData,
+  fakeCat6LYVData,
+} from 'src/fakedata';
 import { getFactory } from 'src/helper/factory.helper';
 import { normalizeRoute, splitRecordByAirport } from 'src/helper/cat6.helper';
 dayjs().format();
@@ -262,7 +268,7 @@ export class Cat6Service {
       }
 
       return routes.map((route, index) => {
-        let transType = ''
+        let transType = '';
         switch (route.transType.trim().toLowerCase()) {
           case 'Car'.trim().toLowerCase():
             transType = '計程車/出租車';
@@ -452,7 +458,7 @@ export class Cat6Service {
   }
 
   async autoSentCMSV2(dateFrom: string, dateTo: string, factory: string) {
-    return fakeCat6LYVData.map((item) =>{
+    return fakeCat6LYVData.map((item) => {
       let docKey = '';
       switch (item.BusinessTripType.trim().toLowerCase()) {
         case 'Domestic business trip within the group'.trim().toLowerCase():
@@ -491,7 +497,7 @@ export class Cat6Service {
         DocNo: item.DocumentNumber,
         UndDocNo: item.DocumentNumber,
         TransType: 'double',
-        ActivityData: item.NumberOfNightsStayed.toString(),
+        ActivityData: item.NumberOfNightsStayed,
         Memo: '',
         CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
         Creator: '',

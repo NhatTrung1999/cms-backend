@@ -77,6 +77,53 @@ export class CreateLogCat5 {
   ActivitySource: string;
 }
 
+export class CreateLogCat6BusinessTravel {
+  System: string;
+  Corporation: string;
+  Factory: string;
+  Department: string;
+  DocKey: string;
+  ActivitySource: string;
+  SPeriodData: string;
+  EPeriodData: string;
+  ActivityType: string;
+  DataType: string;
+  DocType: string;
+  DocDate: string;
+  DocDate2: string;
+  DocNo: string;
+  UndDocNo: string;
+  TransType: string;
+  Departure: string;
+  Destination: string;
+  Memo: string;
+  CreateDateTime: string;
+  Creator: string;
+}
+
+export class CreateLogCat6Accommodation {
+  System: string;
+  Corporation: string;
+  Factory: string;
+  Department: string;
+  DocKey: string;
+  ActivitySource: string;
+  SPeriodData: string;
+  EPeriodData: string;
+  ActivityType: string;
+  DataType: string;
+  DocType: string;
+  DocDate: string;
+  DocDate2: string;
+  DocNo: string;
+  UndDocNo: string;
+  TransType: string;
+  ActivityData: number;
+  Memo: string;
+  CreateDateTime: string;
+  Creator: string;
+}
+
 export class CreateLogCat7 {
   System: string;
   Corporation: string;

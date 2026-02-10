@@ -293,7 +293,7 @@ export const buildQueryTest = async (
     : `OFFSET :offset ROWS
       FETCH NEXT :limit ROWS ONLY;`;
 
-  let where = `WHERE 1=1`;
+  let where = `WHERE 1=1 AND DWBH IN ('Gram' ,'MGR')`;
   if (usage) {
     where += ` AND ISNULL(QtyUsage, 0) = 0`;
   }
@@ -404,58 +404,74 @@ export const buildQueryTest = async (
                         ON  SN74A.FormID = 'SN74A'
                         AND SN74A.SupplierID = 'ZZZZ'
                         AND SN74A.MatID = c.CLBH
-            WHERE  
-                  CGDate>= :startDate
-                  AND CGDate< :endDate
+            WHERE  CGDate>= :startDate
+                  AND CGDate < :endDate
                   AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
                   AND ISNULL(c.Qty ,0)<>0;
-            CREATE CLUSTERED INDEX IX_PurN233_CGZL_Key ON #PurN233_CGZL(PurNo ,MatID);
+                        CREATE CLUSTERED INDEX IX_PurN233_CGZL_Key ON #PurN233_CGZL(PurNo ,MatID);
 
 
-            SELECT N'${getFactory(factory)}'              AS FactoryCode
+            SELECT N'${getFactory(factory)}'             AS FactoryCode
                   ,pnc.*
-                  ,ISNULL(ZLCLSL.CLSL, 0)     AS QtyUsage
-                  ,kcrk.ModifyDate            AS RKDate
-                  ,KCRK.Qty                   AS QtyReceive
-                  ,kcrk.RKNO                  AS ReceivedNo
+                  ,ISNULL(ZLCLSL.CLSL ,0)  AS QtyUsage
+                  ,kcrk.ModifyDate         AS RKDate
+                  ,KCRK.Qty                AS QtyReceive
+                  ,kcrk.RKNO               AS ReceivedNo
                   ,CASE 
                         WHEN dwbh='KGS' THEN pnc.Qty
+                        WHEN dwbh='GRAM' THEN pnc.Qty/1000
+                        WHEN dwbh='MGR' THEN pnc.Qty/1000000
                         ELSE (pnc.UnitWeight*KCRK.Qty)
-                  END WeightUnitkg
-                  ,CAST('0' AS INT)           AS LandTransportTonKilometers
-                  ,CAST('0' AS INT)           AS SeaTransportTonKilometers
-                  ,CAST('0' AS INT)           AS AirTransportTonKilometers
-            INTO #Cat1AndCat4
+                  END                        WeightUnitkg
+                  ,CAST('0' AS INT)        AS LandTransportTonKilometers
+                  ,CAST('0' AS INT)        AS SeaTransportTonKilometers
+                  ,CAST('0' AS INT)        AS AirTransportTonKilometers
+            INTO   #Cat1AndCat4
             FROM   #PurN233_CGZL pnc
                   INNER JOIN (
                         SELECT k.ZSNO
                               ,ks.CLBH
                               ,k.RKNO
                               ,k.ModifyDate
-                              ,SUM(ISNULL(ks.Qty ,0)) as Qty
+                              ,SUM(ISNULL(ks.Qty ,0)) AS Qty
                         FROM   kcrk k
-                              INNER JOIN kcrks ks ON k.RKNO = ks.RKNO 
-                              INNER JOIN #PurN233_CGZL t ON t.PurNo = k.ZSNO AND t.MatID = ks.CLBH
-                        WHERE ISNULL(ks.RKSB ,'') NOT IN ('DL', 'NG')
-                        GROUP BY k.ZSNO, ks.CLBH, k.RKNO, k.ModifyDate
-                        HAVING SUM(ISNULL(ks.Qty ,0)) > 0
-                  ) KCRK ON KCRK.ZSNO = pnc.PurNo AND KCRK.CLBH = pnc.MatID
-
+                              INNER JOIN kcrks ks
+                                    ON  k.RKNO = ks.RKNO
+                              INNER JOIN #PurN233_CGZL t
+                                    ON  t.PurNo = k.ZSNO
+                                          AND t.MatID = ks.CLBH
+                        WHERE  ISNULL(ks.RKSB ,'') NOT IN ('DL' ,'NG')
+                        GROUP BY
+                              k.ZSNO
+                              ,ks.CLBH
+                              ,k.RKNO
+                              ,k.ModifyDate
+                        HAVING SUM(ISNULL(ks.Qty ,0))>0
+                        ) KCRK
+                        ON  KCRK.ZSNO = pnc.PurNo
+                        AND KCRK.CLBH = pnc.MatID
                   LEFT JOIN (
                         SELECT SS.CGNO
                               ,S2.CLBH
-                              ,SUM(ISNULL(S2.CLSL, 0)) AS CLSL
+                              ,SUM(ISNULL(S2.CLSL ,0)) AS CLSL
                         FROM   CGZLSS SS
-                              INNER JOIN #PurN233_CGZL t ON t.PurNo = SS.CGNO 
-                              INNER JOIN ZLZLS2 S2 ON SS.ZLBH = S2.ZLBH AND SS.CLBH = S2.CLBH
-                        WHERE S2.CLBH = t.MatID
-                        GROUP BY SS.CGNO, S2.CLBH
-                  ) ZLCLSL ON ZLCLSL.CGNO = pnc.PurNo AND ZLCLSL.CLBH = pnc.MatID;
-                  
+                              INNER JOIN #PurN233_CGZL t
+                                    ON  t.PurNo = SS.CGNO
+                              INNER JOIN ZLZLS2 S2
+                                    ON  SS.ZLBH = S2.ZLBH
+                                          AND SS.CLBH = S2.CLBH
+                        WHERE  S2.CLBH = t.MatID
+                        GROUP BY
+                              SS.CGNO
+                              ,S2.CLBH
+                        ) ZLCLSL
+                        ON  ZLCLSL.CGNO = pnc.PurNo
+                        AND ZLCLSL.CLBH = pnc.MatID;
+
 
             SELECT *
-                  ,COUNT(*) OVER()  AS TotalRowsCount
+                  ,COUNT(*) OVER() AS TotalRowsCount
                   ,ROW_NUMBER() OVER(ORDER BY PurDate ,PurNo) AS [No]
             FROM   #Cat1AndCat4
             ${where}
@@ -954,6 +970,8 @@ export const buildQueryAutoSentCMS = async (
                         ,kcrk.RKNO                  AS ReceivedNo
                         ,CASE 
                               WHEN dwbh='KGS' THEN pnc.Qty
+                              WHEN dwbh='GRAM' THEN pnc.Qty/1000
+                              WHEN dwbh='MGR' THEN pnc.Qty/1000000
                               ELSE (pnc.UnitWeight*KCRK.Qty)
                         END  WeightUnitkg
                         ,CAST('0' AS INT)           AS LandTransportTonKilometers
@@ -1005,6 +1023,8 @@ export const buildQueryAutoSentCMS = async (
                   SELECT *
                         ,COUNT(*) OVER() AS TotalRowsCount
                         ,ROW_NUMBER() OVER(ORDER BY PurDate ,PurNo) AS [No]
-                  FROM   #Cat1AndCat4`;
+                  FROM   #Cat1AndCat4
+                  WHERE  1 = 1
+                        AND DWBH IN ('Gram' ,'MGR')`;
   return query;
 };

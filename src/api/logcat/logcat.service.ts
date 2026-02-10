@@ -8,6 +8,8 @@ import { Sequelize } from 'sequelize-typescript';
 import {
   CreateLogCat1And4,
   CreateLogCat5,
+  CreateLogCat6Accommodation,
+  CreateLogCat6BusinessTravel,
   CreateLogCat7,
   CreateLogCat9And12,
 } from './dto/create-logcat.dto';
@@ -556,6 +558,531 @@ export class LogcatService {
         { header: 'ActivityUnit', key: 'ActivityUnit' },
         { header: 'Unit', key: 'Unit' },
         { header: 'UnitWeight', key: 'UnitWeight' },
+        { header: 'Memo', key: 'Memo' },
+        { header: 'CreateDateTime', key: 'CreateDateTime' },
+        { header: 'Creator', key: 'Creator' },
+        { header: 'CreatedUser', key: 'CreatedUser' },
+        { header: 'CreatedFactory', key: 'CreatedFactory' },
+        { header: 'CreatedAt', key: 'CreatedAt' },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      worksheet.addRows(data);
+
+      worksheet.columns.forEach((column) => {
+        let maxColumnLength = 0;
+
+        if (typeof column.eachCell === 'function') {
+          column.eachCell({ includeEmpty: true }, (cell) => {
+            const cellValue = cell.value ? cell.value.toString() : '';
+
+            if (cellValue.length > maxColumnLength) {
+              maxColumnLength = cellValue.length;
+            }
+          });
+        }
+
+        const newWidth = maxColumnLength + 2;
+        column.width = newWidth < 10 ? 10 : newWidth > 50 ? 50 : newWidth;
+      });
+
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      return buffer;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  // Logging CAT6
+  async getLogCat6BusinessTravel(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    page: number = 1,
+    limit: number = 20,
+    sortField: string = 'System',
+    sortOrder: string = 'asc',
+  ) {
+    const offset = (page - 1) * limit;
+
+    let where: string = 'WHERE 1=1';
+    const replacements: any[] = [];
+
+    if (dateFrom && dateTo) {
+      where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (factory) {
+      where += ' AND Fac LIKE ?';
+      replacements.push(`%${factory}%`);
+    }
+
+    const dataResults = await this.EIP.query(
+      `
+        SELECT *,
+              COUNT(ID) OVER() AS total
+        FROM CMW_Category_6_Business_Travel
+        ${where}
+      `,
+      {
+        type: QueryTypes.SELECT,
+        replacements,
+      },
+    );
+
+    let data = dataResults as any[];
+
+    data.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    data = data.slice(offset, offset + limit);
+
+    const cleanData = data.map(({ total, ...rest }) => rest);
+
+    const total = dataResults.length
+      ? Number((dataResults[0] as any).total)
+      : 0;
+
+    const hasMore = offset + data.length < total;
+
+    return { data: cleanData, page, limit, total, hasMore };
+  }
+
+  async createLogCat6BusinessTravel(
+    data: CreateLogCat6BusinessTravel[],
+    factory: string,
+    userid: string,
+  ) {
+    const transaction = await this.EIP.transaction();
+
+    try {
+      for (const item of data) {
+        let fac: string = '';
+
+        switch (item.Factory.trim().toLowerCase()) {
+          case '樂億 - LYV'.trim().toLowerCase():
+            fac = 'LYV';
+            break;
+          case '樂億II - LHG'.trim().toLowerCase():
+            fac = 'LHG';
+            break;
+          case '億春B - LVL'.trim().toLowerCase():
+            fac = 'LVL';
+            break;
+          case '昌億 - LYM'.trim().toLowerCase():
+            fac = 'LYM';
+            break;
+          case '億福 - LYF'.trim().toLowerCase():
+            fac = 'LYF';
+            break;
+          case 'Jiazhi-1'.trim().toLowerCase():
+            fac = 'JAZ';
+            break;
+          case 'Jiazhi-2'.trim().toLowerCase():
+            fac = 'JZS';
+            break;
+          default:
+            break;
+        }
+
+        await this.EIP.query(
+          `
+          INSERT INTO CMW_Category_6_Business_Travel
+          (
+            ID, [System], Corporation, Factory, Fac, Department, DocKey, ActivitySource,
+            SPeriodData, EPeriodData, ActivityType, DataType, DocType, DocDate, DocDate2,
+            DocNo, UndDocNo, TransType, Departure, Destination, Memo,
+            CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt
+          )
+          VALUES
+          (
+            :id, :system, :corporation, :factory, :fac, :department, :docKey, :activitySource,
+            :sPeriodData, :ePeriodData, :activityType, :dataType, :docType, :docDate, :docDate2,
+            :docNo, :undDocNo, :transType, :departure, :destination, :memo,
+            :createDateTime, :creator, :createdUser, :createdFactory, GETDATE()
+          )
+          `,
+          {
+            type: QueryTypes.INSERT,
+            transaction,
+            replacements: {
+              id: uuidv4(),
+              system: item.System,
+              corporation: item.Corporation,
+              factory: item.Factory,
+              fac,
+              department: item.Department,
+              docKey: item.DocKey,
+              activitySource: item.ActivitySource,
+              sPeriodData: item.SPeriodData,
+              ePeriodData: item.EPeriodData,
+              activityType: item.ActivityType,
+              dataType: item.DataType,
+              docType: item.DocType,
+              docDate: item.DocDate,
+              docDate2: item.DocDate2,
+              docNo: item.DocNo,
+              undDocNo: item.UndDocNo,
+              transType: item.TransType,
+              departure: item.Departure,
+              destination: item.Destination,
+              memo: item.Memo,
+              createDateTime: item.CreateDateTime,
+              creator: item.Creator,
+              createdUser: userid,
+              createdFactory: factory,
+            },
+          },
+        );
+      }
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: 'Create log CAT6 Business Travel!',
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw new InternalServerErrorException('Error!');
+    }
+  }
+
+  async exportExcelCat6BusinessTravel(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    try {
+      let where: string = 'WHERE 1=1';
+      const replacements: any[] = [];
+      if (dateFrom && dateTo) {
+        where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+        replacements.push(dateFrom, dateTo);
+      }
+
+      if (factory) {
+        where += ' AND Fac LIKE ?';
+        replacements.push(`%${factory}%`);
+      }
+
+      const dataResults = await this.EIP.query(
+        `
+          SELECT *
+          FROM CMW_Category_6_Business_Travel
+          ${where}
+        `,
+        {
+          type: QueryTypes.SELECT,
+          replacements,
+        },
+      );
+      let data = dataResults as any[];
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('LogCat');
+
+      worksheet.columns = [
+        { header: 'System', key: 'System' },
+        { header: 'Corporation', key: 'Corporation' },
+        { header: 'Factory', key: 'Factory' },
+        { header: 'Fac', key: 'Fac' },
+        { header: 'Department', key: 'Department' },
+        { header: 'DocKey', key: 'DocKey' },
+        { header: 'ActivitySource', key: 'ActivitySource' },
+        { header: 'SPeriodData', key: 'SPeriodData' },
+        { header: 'EPeriodData', key: 'EPeriodData' },
+        { header: 'ActivityType', key: 'ActivityType' },
+        { header: 'DataType', key: 'DataType' },
+        { header: 'DocType', key: 'DocType' },
+        { header: 'DocDate', key: 'DocDate' },
+        { header: 'DocDate2', key: 'DocDate2' },
+        { header: 'DocNo', key: 'DocNo' },
+        { header: 'UndDocNo', key: 'UndDocNo' },
+        { header: 'TransType', key: 'TransType' },
+        { header: 'Departure', key: 'Departure' },
+        { header: 'Destination', key: 'Destination' },
+        { header: 'Memo', key: 'Memo' },
+        { header: 'CreateDateTime', key: 'CreateDateTime' },
+        { header: 'Creator', key: 'Creator' },
+        { header: 'CreatedUser', key: 'CreatedUser' },
+        { header: 'CreatedFactory', key: 'CreatedFactory' },
+        { header: 'CreatedAt', key: 'CreatedAt' },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      worksheet.addRows(data);
+
+      worksheet.columns.forEach((column) => {
+        let maxColumnLength = 0;
+
+        if (typeof column.eachCell === 'function') {
+          column.eachCell({ includeEmpty: true }, (cell) => {
+            const cellValue = cell.value ? cell.value.toString() : '';
+
+            if (cellValue.length > maxColumnLength) {
+              maxColumnLength = cellValue.length;
+            }
+          });
+        }
+
+        const newWidth = maxColumnLength + 2;
+        column.width = newWidth < 10 ? 10 : newWidth > 50 ? 50 : newWidth;
+      });
+
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      return buffer;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  async getLogCat6Accommodation(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    page: number = 1,
+    limit: number = 20,
+    sortField: string = 'System',
+    sortOrder: string = 'asc',
+  ) {
+    const offset = (page - 1) * limit;
+
+    let where: string = 'WHERE 1=1';
+    const replacements: any[] = [];
+
+    if (dateFrom && dateTo) {
+      where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (factory) {
+      where += ' AND Fac LIKE ?';
+      replacements.push(`%${factory}%`);
+    }
+
+    const dataResults = await this.EIP.query(
+      `
+        SELECT *,
+              COUNT(ID) OVER() AS total
+        FROM CMW_Category_6_Accommodation
+        ${where}
+      `,
+      {
+        type: QueryTypes.SELECT,
+        replacements,
+      },
+    );
+
+    let data = dataResults as any[];
+
+    data.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    data = data.slice(offset, offset + limit);
+
+    const cleanData = data.map(({ total, ...rest }) => rest);
+
+    const total = dataResults.length
+      ? Number((dataResults[0] as any).total)
+      : 0;
+
+    const hasMore = offset + data.length < total;
+
+    return { data: cleanData, page, limit, total, hasMore };
+  }
+
+  async createLogCat6Accommodation(
+    data: CreateLogCat6Accommodation[],
+    factory: string,
+    userid: string,
+  ) {
+    const transaction = await this.EIP.transaction();
+
+    try {
+      for (const item of data) {
+        let fac: string = '';
+
+        switch (item.Factory.trim().toLowerCase()) {
+          case '樂億 - LYV'.trim().toLowerCase():
+            fac = 'LYV';
+            break;
+          case '樂億II - LHG'.trim().toLowerCase():
+            fac = 'LHG';
+            break;
+          case '億春B - LVL'.trim().toLowerCase():
+            fac = 'LVL';
+            break;
+          case '昌億 - LYM'.trim().toLowerCase():
+            fac = 'LYM';
+            break;
+          case '億福 - LYF'.trim().toLowerCase():
+            fac = 'LYF';
+            break;
+          case 'Jiazhi-1'.trim().toLowerCase():
+            fac = 'JAZ';
+            break;
+          case 'Jiazhi-2'.trim().toLowerCase():
+            fac = 'JZS';
+            break;
+          default:
+            break;
+        }
+
+        await this.EIP.query(
+          `
+          INSERT INTO CMW_Category_6_Accommodation
+          (
+            ID, [System], Corporation, Factory, Fac, Department, DocKey, ActivitySource,
+            SPeriodData, EPeriodData, ActivityType, DataType, DocType, DocDate, DocDate2,
+            DocNo, UndDocNo, TransType, ActivityData, Memo,
+            CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt
+          )
+          VALUES
+          (
+            :id, :system, :corporation, :factory, :fac, :department, :docKey, :activitySource,
+            :sPeriodData, :ePeriodData, :activityType, :dataType, :docType, :docDate, :docDate2,
+            :docNo, :undDocNo, :transType, :activityData, :memo,
+            :createDateTime, :creator, :createdUser, :createdFactory, GETDATE()
+          )
+          `,
+          {
+            type: QueryTypes.INSERT,
+            transaction,
+            replacements: {
+              id: uuidv4(),
+              system: item.System,
+              corporation: item.Corporation,
+              factory: item.Factory,
+              fac,
+              department: item.Department,
+              docKey: item.DocKey,
+              activitySource: item.ActivitySource,
+              sPeriodData: item.SPeriodData,
+              ePeriodData: item.EPeriodData,
+              activityType: item.ActivityType,
+              dataType: item.DataType,
+              docType: item.DocKey,
+              docDate: item.DocDate,
+              docDate2: item.DocDate2,
+              docNo: item.DocNo,
+              undDocNo: item.UndDocNo,
+              transType: item.TransType,
+              activityData: item.ActivityData,
+              memo: item.Memo,
+              createDateTime: item.CreateDateTime,
+              creator: item.Creator,
+              createdUser: userid,
+              createdFactory: factory,
+            },
+          },
+        );
+      }
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: 'Create log CAT6 Accommodatio!',
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw new InternalServerErrorException('Error!');
+    }
+  }
+
+  async exportExcelCat6Accommodation(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    try {
+      let where: string = 'WHERE 1=1';
+      const replacements: any[] = [];
+      if (dateFrom && dateTo) {
+        where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+        replacements.push(dateFrom, dateTo);
+      }
+
+      if (factory) {
+        where += ' AND Fac LIKE ?';
+        replacements.push(`%${factory}%`);
+      }
+
+      const dataResults = await this.EIP.query(
+        `
+          SELECT *
+          FROM CMW_Category_6_Accommodation
+          ${where}
+        `,
+        {
+          type: QueryTypes.SELECT,
+          replacements,
+        },
+      );
+      let data = dataResults as any[];
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('LogCat');
+
+      worksheet.columns = [
+        { header: 'System', key: 'System' },
+        { header: 'Corporation', key: 'Corporation' },
+        { header: 'Factory', key: 'Factory' },
+        { header: 'Fac', key: 'Fac' },
+        { header: 'Department', key: 'Department' },
+        { header: 'DocKey', key: 'DocKey' },
+        { header: 'ActivitySource', key: 'ActivitySource' },
+        { header: 'SPeriodData', key: 'SPeriodData' },
+        { header: 'EPeriodData', key: 'EPeriodData' },
+        { header: 'ActivityType', key: 'ActivityType' },
+        { header: 'DataType', key: 'DataType' },
+        { header: 'DocType', key: 'DocType' },
+        { header: 'DocDate', key: 'DocDate' },
+        { header: 'DocDate2', key: 'DocDate2' },
+        { header: 'DocNo', key: 'DocNo' },
+        { header: 'UndDocNo', key: 'UndDocNo' },
+        { header: 'TransType', key: 'TransType' },
+        { header: 'ActivityData', key: 'ActivityData' },
         { header: 'Memo', key: 'Memo' },
         { header: 'CreateDateTime', key: 'CreateDateTime' },
         { header: 'Creator', key: 'Creator' },

@@ -12,6 +12,8 @@ import { LogcatService } from './logcat.service';
 import {
   CreateLogCat1And4,
   CreateLogCat5,
+  CreateLogCat6Accommodation,
+  CreateLogCat6BusinessTravel,
   CreateLogCat7,
   CreateLogCat9And12,
 } from './dto/create-logcat.dto';
@@ -118,6 +120,117 @@ export class LogcatController {
       'Content-Type':
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="LogCat5.xlsx"`,
+      'Content-Length': buffer.byteLength,
+    });
+    return new StreamableFile(Buffer.from(buffer));
+  }
+
+  // Logging CAT6
+  @Get('get-log-cat6-business-travel')
+  async getLogCat6BusinessTravel(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.logcatService.getLogCat6BusinessTravel(
+      dateFrom,
+      dateTo,
+      factory,
+      +page,
+      +limit,
+      sortField,
+      sortOrder,
+    );
+  }
+
+  @Post('create-log-cat6-business-travel')
+  async createLogCat6BusinessTravel(
+    @Body() data: CreateLogCat6BusinessTravel[],
+    @Request() req,
+  ) {
+    const factory = getFactortyID(req);
+    const userid = getUserId(req);
+    return this.logcatService.createLogCat6BusinessTravel(
+      data,
+      factory,
+      userid,
+    );
+  }
+
+  @Get('export-excel-cat6-business-travel')
+  async exportExcelCat6BusinessTravel(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.logcatService.exportExcelCat6BusinessTravel(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="LogCat6BusinessTravel.xlsx"`,
+      'Content-Length': buffer.byteLength,
+    });
+    return new StreamableFile(Buffer.from(buffer));
+  }
+
+  @Get('get-log-cat6-accommodation')
+  async getLogCat6Accommodation(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.logcatService.getLogCat6Accommodation(
+      dateFrom,
+      dateTo,
+      factory,
+      +page,
+      +limit,
+      sortField,
+      sortOrder,
+    );
+  }
+
+  @Post('create-log-cat6-accommodation')
+  async createLogCat6Accommodation(
+    @Body() data: CreateLogCat6Accommodation[],
+    @Request() req,
+  ) {
+    const factory = getFactortyID(req);
+    const userid = getUserId(req);
+    return this.logcatService.createLogCat6Accommodation(data, factory, userid);
+  }
+
+  @Get('export-excel-cat6-accommodation')
+  async exportExcelCat6Accommodation(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.logcatService.exportExcelCat6Accommodation(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="LogCat6Accommodation.xlsx"`,
       'Content-Length': buffer.byteLength,
     });
     return new StreamableFile(Buffer.from(buffer));
