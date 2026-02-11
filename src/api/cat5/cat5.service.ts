@@ -297,13 +297,23 @@ export class Cat5Service {
   }
 
   // auto sent cms
-  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
+  async autoSentCMS(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    dockeyCMS: string,
+  ) {
     try {
       if (factory.trim().toUpperCase() === 'ALL') {
-        return this.autoSentCMSAllFactories(dateFrom, dateTo);
+        return this.autoSentCMSAllFactories(dateFrom, dateTo, dockeyCMS);
       }
 
-      return this.getCMSByFactory(factory as FactoryCode, dateFrom, dateTo);
+      return this.getCMSByFactory(
+        factory as FactoryCode,
+        dateFrom,
+        dateTo,
+        dockeyCMS,
+      );
       // let db: Sequelize;
       // switch (factory) {
       //   case 'LYV':
@@ -399,10 +409,14 @@ export class Cat5Service {
     }
   }
 
-  private async autoSentCMSAllFactories(dateFrom: string, dateTo: string) {
+  private async autoSentCMSAllFactories(
+    dateFrom: string,
+    dateTo: string,
+    dockeyCMS: string,
+  ) {
     const results = await Promise.all(
       FACTORY_LIST.map((factory) =>
-        this.getCMSByFactory(factory, dateFrom, dateTo),
+        this.getCMSByFactory(factory, dateFrom, dateTo, dockeyCMS),
       ),
     );
 
@@ -413,6 +427,7 @@ export class Cat5Service {
     factory: FactoryCode,
     dateFrom: string,
     dateTo: string,
+    dockeyCMS: string,
   ) {
     const db = this.getDbByFactory(factory);
     if (!db) return [];
@@ -431,7 +446,9 @@ export class Cat5Service {
       replacements,
     });
 
-    return data.flatMap((item) => this.mapToCMSFormat(item, dateFrom, dateTo));
+    return data.flatMap((item) =>
+      this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
+    );
   }
 
   private getDbByFactory(factory: FactoryCode): Sequelize | null {
@@ -447,7 +464,12 @@ export class Cat5Service {
     return dbMap[factory] ?? null;
   }
 
-  private mapToCMSFormat(item: any, dateFrom: string, dateTo: string) {
+  private mapToCMSFormat(
+    item: any,
+    dateFrom: string,
+    dateTo: string,
+    dockeyCMS: string,
+  ) {
     const custVenName = item.Vendor_ID;
     const departure = item.Factory_address;
     const destination = item.Waste_collection_address;
@@ -480,47 +502,49 @@ export class Cat5Service {
         break;
     }
 
-    return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
-      System: 'CMW', //default
-      Corporation: 'LAI YIH', //default
-      Factory: factoryName,
-      Department: '',
-      // DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
-      DocKey: activityType.trim() === '3.6' ? '3.6' : dockey, //default
-      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: activityType, //default
-      DataType: activityType.trim() === '3.6' ? '1' : '999', //default
-      DocType: 'CMS Web', //default
-      UndDoc: '',
-      DocFlow: '',
-      DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-      DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-      DocNo: '',
-      UndDocNo: '',
-      CustVenName: custVenName,
-      InvoiceNo: '',
-      TransType: '陸運', //default
-      Departure: departure,
-      Destination: destination,
-      PortType: '',
-      StPort: '',
-      ThPort: '',
-      EndPort: '',
-      Product: product,
-      Quity: '',
-      Amount: '',
-      ActivityData: activityData,
-      ActivityUnit: 'KG', //default
-      Unit: '',
-      UnitWeight: '',
-      Memo: '',
-      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-      Creator: '',
-      AccNo: '6002',
-      AccName: '其他費用',
-      ActivitySource: wasteTreatmentMethod,
-    }));
+    return ACTIVITY_TYPES.filter((item) => item === dockeyCMS).map(
+      (activityType: ActivityType) => ({
+        System: 'CMW', //default
+        Corporation: 'LAI YIH', //default
+        Factory: factoryName,
+        Department: '',
+        // DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
+        DocKey: activityType.trim() === '3.6' ? '3.6' : dockey, //default
+        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+        ActivityType: activityType, //default
+        DataType: activityType.trim() === '3.6' ? '1' : '999', //default
+        DocType: 'CMS Web', //default
+        UndDoc: '',
+        DocFlow: '',
+        DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
+        DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
+        DocNo: '',
+        UndDocNo: '',
+        CustVenName: custVenName,
+        InvoiceNo: '',
+        TransType: '陸運', //default
+        Departure: departure,
+        Destination: destination,
+        PortType: '',
+        StPort: '',
+        ThPort: '',
+        EndPort: '',
+        Product: product,
+        Quity: '',
+        Amount: '',
+        ActivityData: activityData,
+        ActivityUnit: 'KG', //default
+        Unit: '',
+        UnitWeight: '',
+        Memo: '',
+        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+        Creator: '',
+        AccNo: '6002',
+        AccName: '其他費用',
+        ActivitySource: wasteTreatmentMethod,
+      }),
+    );
   }
 
   //logging

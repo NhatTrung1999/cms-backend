@@ -1045,13 +1045,23 @@ export class Cat9andcat12Service {
     }
   }
 
-  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
+  async autoSentCMS(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    dockeyCMS: string,
+  ) {
     try {
       if (factory.trim().toUpperCase() === 'ALL') {
-        return this.autoSentCMSAllFactories(dateFrom, dateTo);
+        return this.autoSentCMSAllFactories(dateFrom, dateTo, dockeyCMS);
       }
 
-      return this.getCMSByFactory(factory as FactoryCode, dateFrom, dateTo);
+      return this.getCMSByFactory(
+        factory as FactoryCode,
+        dateFrom,
+        dateTo,
+        dockeyCMS,
+      );
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
@@ -1145,10 +1155,14 @@ export class Cat9andcat12Service {
     // return formatData;
   }
 
-  private async autoSentCMSAllFactories(dateFrom: string, dateTo: string) {
+  private async autoSentCMSAllFactories(
+    dateFrom: string,
+    dateTo: string,
+    dockeyCMS: string,
+  ) {
     const results = await Promise.all(
       FACTORY_LIST.map((factory) =>
-        this.getCMSByFactory(factory, dateFrom, dateTo),
+        this.getCMSByFactory(factory, dateFrom, dateTo, dockeyCMS),
       ),
     );
 
@@ -1159,6 +1173,7 @@ export class Cat9andcat12Service {
     factory: FactoryCode,
     dateFrom: string,
     dateTo: string,
+    dockeyCMS: string,
   ) {
     const db = this.getDbByFactory(factory);
     if (!db) return [];
@@ -1178,7 +1193,9 @@ export class Cat9andcat12Service {
       replacements,
     });
 
-    return data.flatMap((item) => this.mapToCMSFormat(item, dateFrom, dateTo));
+    return data.flatMap((item) =>
+      this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
+    );
   }
 
   private getDbByFactory(factory: FactoryCode): Sequelize | null {
@@ -1195,7 +1212,12 @@ export class Cat9andcat12Service {
     return dbMap[factory] ?? null;
   }
 
-  private mapToCMSFormat(item: any, dateFrom: string, dateTo: string) {
+  private mapToCMSFormat(
+    item: any,
+    dateFrom: string,
+    dateTo: string,
+    dockeyCMS: string,
+  ) {
     const date = item.Date;
     const factory = item.Factory;
     const factoryAddress = item.Factory_address;
@@ -1224,48 +1246,50 @@ export class Cat9andcat12Service {
         break;
     }
 
-    return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
-      System: 'ERP', // DEFAULT
-      Corporation: 'LAI YIH', // DEFAULT
-      Factory: factory,
-      Department: 'Shipping', // DEFAULT
-      // DocKey:
-      //   transportMethod.trim().toLowerCase() !== 'AIR'.trim().toLowerCase()
-      //     ? '3.2.01'
-      //     : '3.2.02', // DEFAULT
-      DocKey: activityType.trim() === '5.3'.trim() ? '5.3' : dockey, // DEFAULT
-      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: activityType, // DEFAULT
-      DataType: activityType.trim() === '3.2' ? '1' : '999', // DEFAULT
-      DocType: '應收憑單', // DEFAULT
-      UndDoc: '銷貨單', // DEFAULT
-      DocFlow: '銷貨相關流程', // DEFAULT
-      DocDate: dayjs(date).format('YYYY/MM/DD'),
-      DocDate2: dayjs(shipmentDate).format('YYYY/MM/DD'),
-      DocNo: bookingNo, // DEFAULT
-      UndDocNo: '', // DEFAULT
-      CustVenName: customerID,
-      InvoiceNo: invoiceNumber,
-      TransType: transportMethod === 'AIR' ? '空運' : '海運',
-      Departure: factoryAddress,
-      Destination: portOfArrival,
-      PortType: transportMethod === 'AIR' ? '空港' : '海港',
-      StPort: portOfDeparture,
-      ThPort: '', // DEFAULT
-      EndPort: portOfArrival,
-      Product: '', // DEFAULT
-      Quity: quantity,
-      Amount: '', // DEFAULT
-      ActivityData: +Number(grossWeight).toFixed(2),
-      ActivityUnit: '噸', // DEFAULT
-      Unit: '噸', // DEFAULT
-      UnitWeight: '', // DEFAULT
-      Memo: '', // DEFAULT
-      CreateDateTime: createdDate,
-      Creator: '',
-      ActivitySource: 'Incineration (not energy recovery)',
-    }));
+    return ACTIVITY_TYPES.filter((item) => item === dockeyCMS).map(
+      (activityType: ActivityType) => ({
+        System: 'ERP', // DEFAULT
+        Corporation: 'LAI YIH', // DEFAULT
+        Factory: factory,
+        Department: 'Shipping', // DEFAULT
+        // DocKey:
+        //   transportMethod.trim().toLowerCase() !== 'AIR'.trim().toLowerCase()
+        //     ? '3.2.01'
+        //     : '3.2.02', // DEFAULT
+        DocKey: activityType.trim() === '5.3'.trim() ? '5.3' : dockey, // DEFAULT
+        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+        ActivityType: activityType, // DEFAULT
+        DataType: activityType.trim() === '3.2' ? '1' : '999', // DEFAULT
+        DocType: '應收憑單', // DEFAULT
+        UndDoc: '銷貨單', // DEFAULT
+        DocFlow: '銷貨相關流程', // DEFAULT
+        DocDate: dayjs(date).format('YYYY/MM/DD'),
+        DocDate2: dayjs(shipmentDate).format('YYYY/MM/DD'),
+        DocNo: bookingNo, // DEFAULT
+        UndDocNo: '', // DEFAULT
+        CustVenName: customerID,
+        InvoiceNo: invoiceNumber,
+        TransType: transportMethod === 'AIR' ? '空運' : '海運',
+        Departure: factoryAddress,
+        Destination: portOfArrival,
+        PortType: transportMethod === 'AIR' ? '空港' : '海港',
+        StPort: portOfDeparture,
+        ThPort: '', // DEFAULT
+        EndPort: portOfArrival,
+        Product: '', // DEFAULT
+        Quity: quantity,
+        Amount: '', // DEFAULT
+        ActivityData: +Number(grossWeight).toFixed(2),
+        ActivityUnit: '噸', // DEFAULT
+        Unit: '噸', // DEFAULT
+        UnitWeight: '', // DEFAULT
+        Memo: '', // DEFAULT
+        CreateDateTime: createdDate,
+        Creator: '',
+        ActivitySource: 'Incineration (not energy recovery)',
+      }),
+    );
   }
   // logging
   async getLoggingCat9AndCat12(

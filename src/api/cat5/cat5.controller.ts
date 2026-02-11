@@ -34,8 +34,14 @@ export class Cat5Controller {
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,
+    @Query('dockey') dockeyCMS: string,
   ) {
-    const data = await this.cat5Service.autoSentCMS(dateFrom, dateTo, factory);
+    const data = await this.cat5Service.autoSentCMS(
+      dateFrom,
+      dateTo,
+      factory,
+      dockeyCMS,
+    );
     return data;
   }
 
