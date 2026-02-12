@@ -15,5 +15,5 @@ export interface IDataPortCodeCat1AndCat4 {
 }
 
 
-export const ACTIVITY_TYPES = ['3.1'] as const;
+export const ACTIVITY_TYPES = ['3.1', '4.1'] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];

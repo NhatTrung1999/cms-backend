@@ -46,7 +46,7 @@ export const buildQueryHRModule = (
       ,b.[Start_Date]           AS JoinDate
       ,b.Addr_now               AS PermanentAddress
       ,a.Address_Live           AS CurrentAddress
-      ,a.Vehicle                AS TransportationMode
+      ,a.Vehicle                AS TransportationMethod
       ,COUNT(c.workhours)       AS Number_of_Working_Days`
     : `a.userId                      AS ID
       ,c.Department_Name             AS Department

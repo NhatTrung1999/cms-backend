@@ -293,7 +293,7 @@ export const buildQueryTest = async (
     : `OFFSET :offset ROWS
       FETCH NEXT :limit ROWS ONLY;`;
 
-  let where = `WHERE 1=1 AND DWBH IN ('Gram' ,'MGR')`;
+  let where = `WHERE 1=1`;
   if (usage) {
     where += ` AND ISNULL(QtyUsage, 0) = 0`;
   }
@@ -1023,8 +1023,6 @@ export const buildQueryAutoSentCMS = async (
                   SELECT *
                         ,COUNT(*) OVER() AS TotalRowsCount
                         ,ROW_NUMBER() OVER(ORDER BY PurDate ,PurNo) AS [No]
-                  FROM   #Cat1AndCat4
-                  WHERE  1 = 1
-                        AND DWBH IN ('Gram' ,'MGR')`;
+                  FROM   #Cat1AndCat4`;
   return query;
 };

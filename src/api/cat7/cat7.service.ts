@@ -613,9 +613,9 @@ export class Cat7Service {
     const FactoryName = item.Factory_Name ?? '';
     const DepartmentName = item.Department_Name ?? '';
 
-    if (DepartmentName.length > 20) {
-      return [];
-    }
+    // if (DepartmentName.length > 20) {
+    //   return [];
+    // }
 
     // console.log(DepartmentName.length);
     let dockey = '';

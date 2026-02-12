@@ -662,7 +662,12 @@ export class Cat1andcat4Service {
 
   private mapToCMSFormat(item: any, dateFrom: string, dateTo: string) {
     const factory = item.FactoryCode ?? '';
-    const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
+    // const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
+    const matId = item.MatID ?? '';
+    const docKey = matId.substring(0, 3);
+    if (docKey.startsWith('W')) {
+      return [];
+    }
     const docDate = item.PurDate
       ? dayjs(item.PurDate).format('YYYY/MM/DD')
       : '';
@@ -684,8 +689,8 @@ export class Cat1andcat4Service {
       DocKey: docKey,
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: activityType,
-      DataType: '1',
+      ActivityType: activityType.trim(),
+      DataType: activityType.trim() === '3.1' ? '1' : '999',
       DocType: 'CMS Web',
       UndDoc: '',
       DocFlow: '',
@@ -718,6 +723,7 @@ export class Cat1andcat4Service {
       Memo: '',
       CreateDateTime: '',
       Creator: '',
+      ActivitySource: '',
     }));
   }
 }
