@@ -408,8 +408,10 @@ export const buildQueryTest = async (
                   AND CGDate < :endDate
                   AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
+                  AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')
+			OR EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty=CGZL.GSBH AND secmi.CLBH=c.CLBH))
                   AND ISNULL(c.Qty ,0)<>0;
-                        CREATE CLUSTERED INDEX IX_PurN233_CGZL_Key ON #PurN233_CGZL(PurNo ,MatID);
+                                    CREATE CLUSTERED INDEX IX_PurN233_CGZL_Key ON #PurN233_CGZL(PurNo ,MatID);
 
 
             SELECT N'${getFactory(factory)}'             AS FactoryCode
@@ -958,8 +960,10 @@ export const buildQueryAutoSentCMS = async (
                         AND CGDate< :endDate
                         AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                         AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
+                        AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')
+                        OR EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty=CGZL.GSBH AND secmi.CLBH=c.CLBH))
                         AND ISNULL(c.Qty ,0)<>0;
-                              CREATE CLUSTERED INDEX IX_PurN233_CGZL_Key ON #PurN233_CGZL(PurNo ,MatID);
+                                          CREATE CLUSTERED INDEX IX_PurN233_CGZL_Key ON #PurN233_CGZL(PurNo ,MatID);
 
 
                   SELECT N'${getFactory(factory)}'  AS FactoryCode

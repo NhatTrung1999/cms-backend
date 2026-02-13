@@ -723,7 +723,7 @@ export class Cat1andcat4Service {
       Memo: '',
       CreateDateTime: '',
       Creator: '',
-      ActivitySource: '',
+      ActivitySource: matId.charAt(0),
     }));
   }
 }
