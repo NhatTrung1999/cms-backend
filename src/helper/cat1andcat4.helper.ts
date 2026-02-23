@@ -623,7 +623,7 @@ export const getADataExcelFactoryCat1AndCat4 = async (
   );
   const replacements = {
     startDate: dateFrom,
-    endDate: dayjs(dateTo).add(1, 'day').toDate(),
+    endDate: dayjs(dateTo).add(1, 'day').startOf('day').format('YYYY-MM-DD'),
   };
 
   const data: any[] = await db.query(query, {
