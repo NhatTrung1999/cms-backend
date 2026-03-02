@@ -333,27 +333,27 @@ export class Cat1andcat4Service {
         } else {
           await this.EIP.query(
             `INSERT INTO CMW_PortCode_Cat1_4
-                    (
-                          Id,
-                          SupplierID,
-                          PortCode,
-                          FactoryCode,
-                          TransportMethod,
-                          CreatedBy,
-                          CreatedFactory,
-                          CreatedDate
-                    )
-                    VALUES
-                    (
-                          ?,
-                          ?,
-                          ?,
-                          ?,
-                          ?,
-                          ?,
-                          ?,
-                          GETDATE()
-                    )`,
+              (
+                    Id,
+                    SupplierID,
+                    PortCode,
+                    FactoryCode,
+                    TransportMethod,
+                    CreatedBy,
+                    CreatedFactory,
+                    CreatedDate
+              )
+              VALUES
+              (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    GETDATE()
+              )`,
             {
               replacements: [
                 id,
@@ -672,7 +672,7 @@ export class Cat1andcat4Service {
       ? dayjs(item.PurDate).format('YYYY/MM/DD')
       : '';
     const docDate2 = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
-    const docNo = item.PurNo ?? '';
+    // const docNo = item.PurNo ?? '';
     const custVenName = item.SupplierCode ?? '';
     const transType = item.TransportationMethod ?? '';
     const departure = item.Departure ?? '';
@@ -680,23 +680,25 @@ export class Cat1andcat4Service {
     const portOfArrival = item.PortOfArrival ?? '';
     const destination = item.Destination ?? '';
     const activityData = item.WeightUnitkg ?? 0;
+    const qtyReceive = item.QtyReceive ?? 0;
+    const receivedNo = item.ReceivedNo ?? '';
 
     return ACTIVITY_TYPES.map((activityType: ActivityType) => ({
       System: 'CMS Web',
       Corporation: 'Lai Yih',
       Factory: factory,
       Department: '',
-      DocKey: docKey,
+      DocKey: `${activityType.trim()}${docKey}`,
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType.trim(),
       DataType: activityType.trim() === '3.1' ? '1' : '999',
-      DocType: 'CMS Web',
+      DocType: '入庫單',
       UndDoc: '',
       DocFlow: '',
       DocDate: docDate,
       DocDate2: docDate2,
-      DocNo: docNo,
+      DocNo: receivedNo.trim(),
       UndDocNo: '',
       CustVenName: custVenName,
       InvoiceNo: '',
@@ -713,8 +715,8 @@ export class Cat1andcat4Service {
           : portOfArrival.trim().toLowerCase() === 'lym'
             ? 'MMRGN'
             : 'VNCLP',
-      Product: '',
-      Quity: '',
+      Product: matId.trim(),
+      Quity: qtyReceive,
       Amount: '',
       ActivityData: activityData,
       ActivityUnit: 'KG',

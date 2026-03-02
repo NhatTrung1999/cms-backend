@@ -1633,7 +1633,7 @@ export class LogcatService {
               ePeriodData: item.EPeriodData,
               activityType: item.ActivityType,
               dataType: item.DataType,
-              docType: item.DocKey,
+              docType: item.DocType,
               undDoc: item.UndDoc,
               docFlow: item.DocFlow,
               docDate: item.DocDate,
@@ -1674,6 +1674,7 @@ export class LogcatService {
         message: 'Create log CAT9&12 success!',
       };
     } catch (error) {
+      console.log(error);
       await transaction.rollback();
       throw new InternalServerErrorException('Error!');
     }

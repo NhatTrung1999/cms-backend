@@ -136,37 +136,9 @@ export class Cat9andcat12Service {
                                     ,id.STYLE_NAME           AS Article_Name
                                     ,id.ARTICLE              AS Article_ID
                                     ,p.Qty                   AS Quantity
-                                    ,p.GW                    AS Gross_Weight
+                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
                                     ,im.CUSTID               AS Customer_ID
                                     ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
                                     ,CAST('0' AS INT)        AS Air_Transport_Distance
@@ -175,16 +147,13 @@ export class Cat9andcat12Service {
                                             bg.SHPIDS
                                           ,CASE 
                                                 WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                            AND (do.Shipmode_1 IS NULL) THEN '10 AC'
                                                 WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                            AND (do.Shipmode_1 IS NULL) THEN '20 CC'
                                                 WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
-                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
-                                                WHEN do.ShipMode_1 IS NULL THEN '' 
-                                                ELSE 'N/A' END
+                                            AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                                WHEN do.ShipMode_1 IS NULL THEN ''
+                                                ELSE do.ShipMode_1 END
                                         )
                                       ,y.ShipMode
                                     )                       AS Transport_Method
@@ -201,7 +170,7 @@ export class Cat9andcat12Service {
                                                     ,RYNO
                                                     ,SUM(PAIRS)     Qty
                                                     ,SUM(GW)        GW
-                                              FROM   PACKING
+                                              FROM   PACKING_D
                                               GROUP BY
                                                     INV_NO
                                                     ,RYNO
@@ -214,14 +183,6 @@ export class Cat9andcat12Service {
                                           ON  do.ORDERNO = y.YSBH
                                     LEFT JOIN B_GradeOrder bg
                                           ON  bg.ORDER_B = y.YSBH
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'SEA'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                               ${where} AND NOT EXISTS (
                                                     SELECT 1
                                                     FROM   INVOICE_SAMPLE is1
@@ -235,37 +196,9 @@ export class Cat9andcat12Service {
                                     ,'SAMPLE SHOE'           AS Article_Name
                                     ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
                                     ,is1.Qty                 AS Quantity
-                                    ,is1.GW                  AS Gross_Weight
+                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
                                     ,im.CUSTID               AS Customer_ID
                                     ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
                                     ,CAST('0' AS INT)        AS Air_Transport_Distance
@@ -280,14 +213,6 @@ export class Cat9andcat12Service {
                                           ON  id.INV_NO = is1.INV_NO
                                     LEFT JOIN Ship_Booking  AS sb
                                           ON  sb.INV_NO = is1.Inv_No
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'AIR'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                               ${where1}
                           ) AS Cat9AndCat12`;
 
@@ -302,37 +227,9 @@ export class Cat9andcat12Service {
                                     ,id.STYLE_NAME           AS Article_Name
                                     ,id.ARTICLE              AS Article_ID
                                     ,p.Qty                   AS Quantity
-                                    ,p.GW                    AS Gross_Weight
+                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
                                     ,im.CUSTID               AS Customer_ID
                                     ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
                                     ,CAST('0' AS INT)        AS Air_Transport_Distance
@@ -367,7 +264,7 @@ export class Cat9andcat12Service {
                                                     ,RYNO
                                                     ,SUM(PAIRS)     Qty
                                                     ,SUM(GW)        GW
-                                              FROM   PACKING
+                                              FROM   PACKING_D
                                               GROUP BY
                                                     INV_NO
                                                     ,RYNO
@@ -380,14 +277,6 @@ export class Cat9andcat12Service {
                                           ON  do.ORDERNO = y.YSBH
                                     LEFT JOIN B_GradeOrder bg
                                           ON  bg.ORDER_B = y.YSBH
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'SEA'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                               ${where} AND NOT EXISTS (
                                                     SELECT 1
                                                     FROM   INVOICE_SAMPLE is1
@@ -400,37 +289,9 @@ export class Cat9andcat12Service {
                                     ,'SAMPLE SHOE'           AS Article_Name
                                     ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
                                     ,is1.Qty                 AS Quantity
-                                    ,is1.GW                  AS Gross_Weight
+                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
                                     ,im.CUSTID               AS Customer_ID
                                     ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
                                     ,CAST('0' AS INT)        AS Air_Transport_Distance
@@ -445,14 +306,6 @@ export class Cat9andcat12Service {
                                           ON  id.INV_NO = is1.INV_NO
                                     LEFT JOIN Ship_Booking  AS sb
                                           ON  sb.INV_NO = is1.Inv_No
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'AIR'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                               ${where1}
                           ) AS Cat9AndCat12
                         ) AS sub`;
@@ -468,9 +321,129 @@ export class Cat9andcat12Service {
         }),
       ]);
 
-      // console.log(dataResults);
+      let data: any = dataResults;
+      data = await Promise.all(
+        data.map(async (item) => {
+          if (
+            item?.Article_ID.trim().toLowerCase() ===
+            'SAMPLE SHOE'.trim().toLowerCase()
+          ) {
+            item.Transport_Method = 'AIR';
+            item.Port_Of_Departure = 'SGN';
+          } else {
+            switch (item?.Transport_Method.trim().toLowerCase()) {
+              case '11 SC'.trim().toLowerCase():
+              case 'Ocean'.trim().toLowerCase():
+              case 'Sea Air Collect'.trim().toLowerCase():
+              case 'SC'.trim().toLowerCase():
+              case 'Sea/Air'.trim().toLowerCase():
+              case 'Partial'.trim().toLowerCase():
+                item.Transport_Method = 'SEA';
+                break;
+              case '20 CC'.trim().toLowerCase():
+              case 'AC'.trim().toLowerCase():
+              case '10 AC'.trim().toLowerCase():
+              case 'CC'.trim().toLowerCase():
+              case 'Air PP'.trim().toLowerCase():
+              case 'Air Express'.trim().toLowerCase():
+              case 'AE'.trim().toLowerCase():
+                item.Transport_Method = 'AIR';
+                break;
+              case 'RAIL'.trim().toLowerCase():
+              case 'Rail Collect'.trim().toLowerCase():
+              case 'Rail Colle'.trim().toLowerCase():
+                item.Transport_Method = 'Land';
+                break;
+              default:
+                item.Transport_Method = 'SEA';
+                break;
+            }
+            switch (factory.trim().toLowerCase()) {
+              case 'LYV'.trim().toLowerCase():
+              case 'LVL'.trim().toLowerCase():
+              case 'LHG'.trim().toLowerCase():
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'SEA'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'VNCLP';
+                }
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'Land'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'SOTH';
+                }
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'AIR'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'SGN';
+                }
+                break;
+              case 'LYM'.trim().toLowerCase():
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'SEA'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'MMRGN';
+                } else {
+                  item.Port_Of_Departure = 'RGN';
+                }
+                break;
+              case 'LYF'.trim().toLowerCase():
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'SEA'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'IDSRG';
+                } else {
+                  item.Port_Of_Departure = 'CGK';
+                }
+                break;
+              default:
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'SEA'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'VNCLP';
+                }
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'Land'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'SOTH';
+                }
+                if (
+                  item.Transport_Method.trim().toLowerCase() ===
+                  'AIR'.trim().toLowerCase()
+                ) {
+                  item.Port_Of_Departure = 'SGN';
+                }
+                break;
+            }
+          }
 
-      let data = dataResults;
+          const queryPoA = `SELECT PortCode
+                        FROM CMW_PortCode
+                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
+          const result: any = await this.EIP.query(queryPoA, {
+            type: QueryTypes.SELECT,
+            replacements: [
+              `%${item.Transport_Method}%`,
+              `%${item.Customer_ID}%`,
+            ],
+          });
+
+          return {
+            ...item,
+            Transport_Method: item.Transport_Method,
+            Port_Of_Departure: item.Port_Of_Departure,
+            Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
+          };
+        }),
+      );
+
       data.sort((a, b) => {
         const aValue = a[sortField];
         const bValue = b[sortField];
@@ -504,6 +477,193 @@ export class Cat9andcat12Service {
   ) {
     const offset = (page - 1) * limit;
 
+    const getQuery = (
+      factoryName: string,
+    ) => `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
+                          ,*
+                          ,'${factoryName}' AS Factory_Name
+                    FROM   (
+                              SELECT im.INV_DATE             AS [Date]
+                                    ,sb.ExFty_Date           AS Shipment_Date
+                                    ,sb.Booking_No AS Booking_No
+                                    ,im.INV_NO               AS Invoice_Number
+                                    ,id.STYLE_NAME           AS Article_Name
+                                    ,id.ARTICLE              AS Article_ID
+                                    ,p.Qty                   AS Quantity
+                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
+                                    ,im.CUSTID               AS Customer_ID
+                                    ,'Truck'                 AS Local_Land_Transportation
+                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
+                                    ,ISNULL(
+                                        ISNULL(
+                                            bg.SHPIDS
+                                          ,CASE 
+                                                WHEN (do.ShipMode='Air')
+                                            AND (do.Shipmode_1 IS NULL) THEN '10 AC'
+                                                WHEN(do.ShipMode='Air Expres')
+                                            AND (do.Shipmode_1 IS NULL) THEN '20 CC'
+                                                WHEN(do.ShipMode='Ocean')
+                                            AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                                WHEN do.ShipMode_1 IS NULL THEN ''
+                                                ELSE do.ShipMode_1 END
+                                        )
+                                      ,y.ShipMode
+                                    )                       AS Transport_Method
+                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_M im
+                                    LEFT JOIN INVOICE_D     AS id
+                                          ON  id.INV_NO = im.INV_NO
+                                    LEFT JOIN Ship_Booking  AS sb
+                                          ON  sb.INV_NO = im.INV_NO
+                                    LEFT JOIN (
+                                              SELECT INV_NO
+                                                    ,RYNO
+                                                    ,SUM(PAIRS)     Qty
+                                                    ,SUM(GW)        GW
+                                              FROM   PACKING_D
+                                              GROUP BY
+                                                    INV_NO
+                                                    ,RYNO
+                                          ) p
+                                          ON  p.INV_NO = id.INV_NO
+                                              AND p.RYNO = id.RYNO
+                                    LEFT JOIN YWDD y
+                                          ON  y.DDBH = id.RYNO
+                                    LEFT JOIN DE_ORDERM do
+                                          ON  do.ORDERNO = y.YSBH
+                                    LEFT JOIN B_GradeOrder bg
+                                          ON  bg.ORDER_B = y.YSBH
+                              ${where} AND NOT EXISTS (
+                                                    SELECT 1
+                                                    FROM   INVOICE_SAMPLE is1
+                                                    WHERE  is1.Inv_No = im.Inv_No
+                                                )
+                              UNION
+                              SELECT im.INV_DATE             AS [Date]
+                                    ,sb.ExFty_Date           AS Shipment_Date
+                                    ,sb.Booking_No AS Booking_No
+                                    ,is1.Inv_No              AS Invoice_Number
+                                    ,'SAMPLE SHOE'           AS Article_Name
+                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
+                                    ,is1.Qty                 AS Quantity
+                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
+                                    ,im.CUSTID               AS Customer_ID
+                                    ,'Truck'                 AS Local_Land_Transportation
+                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
+                                    ,'AIR'                   AS Transport_Method
+                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_SAMPLE is1
+                                    LEFT JOIN INVOICE_M im
+                                          ON  im.Inv_No = is1.Inv_No
+                                    LEFT JOIN INVOICE_D     AS id
+                                          ON  id.INV_NO = is1.INV_NO
+                                    LEFT JOIN Ship_Booking  AS sb
+                                          ON  sb.INV_NO = is1.Inv_No
+                              ${where1}
+                          ) AS Cat9AndCat1`;
+    const getCountQuery = (factoryName: string) => `SELECT COUNT(*) AS total
+                        FROM   (
+                                  SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
+                          ,*
+                          ,'${factoryName}' AS Factory_Name
+                    FROM   (
+                              SELECT im.INV_DATE             AS [Date]
+                                    ,sb.ExFty_Date           AS Shipment_Date
+                                    ,im.INV_NO               AS Invoice_Number
+                                    ,id.STYLE_NAME           AS Article_Name
+                                    ,id.ARTICLE              AS Article_ID
+                                    ,p.Qty                   AS Quantity
+                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
+                                    ,im.CUSTID               AS Customer_ID
+                                    ,'Truck'                 AS Local_Land_Transportation
+                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
+                                    ,ISNULL(
+                                        ISNULL(
+                                            bg.SHPIDS
+                                          ,CASE 
+                                                WHEN (do.ShipMode='Air')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                                WHEN(do.ShipMode='Air Expres')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                                WHEN(do.ShipMode='Ocean')
+                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
+                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
+                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
+                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
+                                                WHEN do.ShipMode_1 IS NULL THEN '' 
+                                                ELSE 'N/A' END
+                                        )
+                                      ,y.ShipMode
+                                    )                       AS Transport_Method
+                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_M im
+                                    LEFT JOIN INVOICE_D     AS id
+                                          ON  id.INV_NO = im.INV_NO
+                                    LEFT JOIN Ship_Booking  AS sb
+                                          ON  sb.INV_NO = im.INV_NO
+                                    LEFT JOIN (
+                                              SELECT INV_NO
+                                                    ,RYNO
+                                                    ,SUM(PAIRS)     Qty
+                                                    ,SUM(GW)        GW
+                                              FROM   PACKING_D
+                                              GROUP BY
+                                                    INV_NO
+                                                    ,RYNO
+                                          ) p
+                                          ON  p.INV_NO = id.INV_NO
+                                              AND p.RYNO = id.RYNO
+                                    LEFT JOIN YWDD y
+                                          ON  y.DDBH = id.RYNO
+                                    LEFT JOIN DE_ORDERM do
+                                          ON  do.ORDERNO = y.YSBH
+                                    LEFT JOIN B_GradeOrder bg
+                                          ON  bg.ORDER_B = y.YSBH
+                              ${where} AND NOT EXISTS (
+                                                    SELECT 1
+                                                    FROM   INVOICE_SAMPLE is1
+                                                    WHERE  is1.Inv_No = im.Inv_No
+                                                )
+                              UNION
+                              SELECT im.INV_DATE             AS [Date]
+                                    ,sb.ExFty_Date           AS Shipment_Date
+                                    ,is1.Inv_No              AS Invoice_Number
+                                    ,'SAMPLE SHOE'           AS Article_Name
+                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
+                                    ,is1.Qty                 AS Quantity
+                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
+                                    ,im.CUSTID               AS Customer_ID
+                                    ,'Truck'                 AS Local_Land_Transportation
+                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
+                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
+                                    ,'AIR'                   AS Transport_Method
+                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
+                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
+                              FROM   INVOICE_SAMPLE is1
+                                    LEFT JOIN INVOICE_M im
+                                          ON  im.Inv_No = is1.Inv_No
+                                    LEFT JOIN INVOICE_D     AS id
+                                          ON  id.INV_NO = is1.INV_NO
+                                    LEFT JOIN Ship_Booking  AS sb
+                                          ON  sb.INV_NO = is1.Inv_No
+                              ${where1}
+                          ) AS Cat9AndCat12
+                        ) AS sub`;
+
     let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
     let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
     const replacements: any[] = [];
@@ -513,347 +673,19 @@ export class Cat9andcat12Service {
       where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo, dateFrom, dateTo);
     }
-
-    const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
-                          ,*
-                    FROM   (
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,im.INV_NO               AS Invoice_Number
-                                    ,id.STYLE_NAME           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
-                                    ,p.Qty                   AS Quantity
-                                    ,p.GW                    AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,ISNULL(
-                                        ISNULL(
-                                            bg.SHPIDS
-                                          ,CASE 
-                                                WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
-                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
-                                                WHEN do.ShipMode_1 IS NULL THEN '' 
-                                                ELSE 'N/A' END
-                                        )
-                                      ,y.ShipMode
-                                    )                       AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_M im
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = im.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = im.INV_NO
-                                    LEFT JOIN (
-                                              SELECT INV_NO
-                                                    ,RYNO
-                                                    ,SUM(PAIRS)     Qty
-                                                    ,SUM(GW)        GW
-                                              FROM   PACKING
-                                              GROUP BY
-                                                    INV_NO
-                                                    ,RYNO
-                                          ) p
-                                          ON  p.INV_NO = id.INV_NO
-                                              AND p.RYNO = id.RYNO
-                                    LEFT JOIN YWDD y
-                                          ON  y.DDBH = id.RYNO
-                                    LEFT JOIN DE_ORDERM do
-                                          ON  do.ORDERNO = y.YSBH
-                                    LEFT JOIN B_GradeOrder bg
-                                          ON  bg.ORDER_B = y.YSBH
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'SEA'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                              ${where} AND NOT EXISTS (
-                                                    SELECT 1
-                                                    FROM   INVOICE_SAMPLE is1
-                                                    WHERE  is1.Inv_No = im.Inv_No
-                                                )
-                              UNION
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,is1.Inv_No              AS Invoice_Number
-                                    ,'SAMPLE SHOE'           AS Article_Name
-                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
-                                    ,is1.Qty                 AS Quantity
-                                    ,is1.GW                  AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'AIR'                   AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_SAMPLE is1
-                                    LEFT JOIN INVOICE_M im
-                                          ON  im.Inv_No = is1.Inv_No
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = is1.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = is1.Inv_No
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'AIR'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                              ${where1}
-                          ) AS Cat9AndCat12`;
-
-    const countQuery = `SELECT COUNT(*) AS total
-                        FROM   (
-                                  SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
-                          ,*
-                    FROM   (
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,im.INV_NO               AS Invoice_Number
-                                    ,id.STYLE_NAME           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
-                                    ,p.Qty                   AS Quantity
-                                    ,p.GW                    AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,ISNULL(
-                                        ISNULL(
-                                            bg.SHPIDS
-                                          ,CASE 
-                                                WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
-                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
-                                                WHEN do.ShipMode_1 IS NULL THEN '' 
-                                                ELSE 'N/A' END
-                                        )
-                                      ,y.ShipMode
-                                    )                       AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_M im
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = im.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = im.INV_NO
-                                    LEFT JOIN (
-                                              SELECT INV_NO
-                                                    ,RYNO
-                                                    ,SUM(PAIRS)     Qty
-                                                    ,SUM(GW)        GW
-                                              FROM   PACKING
-                                              GROUP BY
-                                                    INV_NO
-                                                    ,RYNO
-                                          ) p
-                                          ON  p.INV_NO = id.INV_NO
-                                              AND p.RYNO = id.RYNO
-                                    LEFT JOIN YWDD y
-                                          ON  y.DDBH = id.RYNO
-                                    LEFT JOIN DE_ORDERM do
-                                          ON  do.ORDERNO = y.YSBH
-                                    LEFT JOIN B_GradeOrder bg
-                                          ON  bg.ORDER_B = y.YSBH
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'SEA'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                              ${where} AND NOT EXISTS (
-                                                    SELECT 1
-                                                    FROM   INVOICE_SAMPLE is1
-                                                    WHERE  is1.Inv_No = im.Inv_No
-                                                )
-                              UNION
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,is1.Inv_No              AS Invoice_Number
-                                    ,'SAMPLE SHOE'           AS Article_Name
-                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
-                                    ,is1.Qty                 AS Quantity
-                                    ,is1.GW                  AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
-                                    ,pc.PortCode             AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'AIR'                   AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_SAMPLE is1
-                                    LEFT JOIN INVOICE_M im
-                                          ON  im.Inv_No = is1.Inv_No
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = is1.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = is1.Inv_No
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'AIR'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                              ${where1}
-                          ) AS Cat9AndCat12
-                        ) AS sub`;
     const connects = [
-      this.LYV_ERP,
-      this.LHG_ERP,
-      this.LYM_ERP,
-      this.LVL_ERP,
-      this.LYF_ERP,
-      this.JAZ_ERP,
-      this.JZS_ERP,
+      { conn: this.LYV_ERP, factoryName: 'LYV' },
+      { conn: this.LHG_ERP, factoryName: 'LHG' },
+      { conn: this.LYM_ERP, factoryName: 'LYM' },
+      { conn: this.LVL_ERP, factoryName: 'LVL' },
+      { conn: this.LYF_ERP, factoryName: 'LYF' },
+      { conn: this.JAZ_ERP, factoryName: 'JAZ' },
+      { conn: this.JZS_ERP, factoryName: 'JZS' },
     ];
     const [dataResults, countResults] = await Promise.all([
       Promise.all(
-        connects.map((conn) => {
+        connects.map(({ conn, factoryName }) => {
+          const query = getQuery(factoryName);
           return conn.query(query, {
             type: QueryTypes.SELECT,
             replacements,
@@ -861,7 +693,8 @@ export class Cat9andcat12Service {
         }),
       ),
       Promise.all(
-        connects.map((conn) => {
+        connects.map(({ conn, factoryName }) => {
+          const countQuery = getCountQuery(factoryName);
           return conn.query(countQuery, {
             type: QueryTypes.SELECT,
             replacements,
@@ -872,7 +705,126 @@ export class Cat9andcat12Service {
 
     const allData = dataResults.flat();
 
-    let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
+    let data: any = allData.map((item, index) => ({ ...item, No: index + 1 }));
+
+    data = await Promise.all(
+      data.map(async (item) => {
+        if (
+          item?.Article_ID.trim().toLowerCase() ===
+          'SAMPLE SHOE'.trim().toLowerCase()
+        ) {
+          item.Transport_Method = 'AIR';
+          item.Port_Of_Departure = 'SGN';
+        } else {
+          switch (item?.Transport_Method.trim().toLowerCase()) {
+            case '11 SC'.trim().toLowerCase():
+            case 'Ocean'.trim().toLowerCase():
+            case 'Sea Air Collect'.trim().toLowerCase():
+            case 'SC'.trim().toLowerCase():
+            case 'Sea/Air'.trim().toLowerCase():
+            case 'Partial'.trim().toLowerCase():
+              item.Transport_Method = 'SEA';
+              break;
+            case '20 CC'.trim().toLowerCase():
+            case 'AC'.trim().toLowerCase():
+            case '10 AC'.trim().toLowerCase():
+            case 'CC'.trim().toLowerCase():
+            case 'Air PP'.trim().toLowerCase():
+            case 'Air Express'.trim().toLowerCase():
+            case 'AE'.trim().toLowerCase():
+              item.Transport_Method = 'AIR';
+              break;
+            case 'RAIL'.trim().toLowerCase():
+            case 'Rail Collect'.trim().toLowerCase():
+            case 'Rail Colle'.trim().toLowerCase():
+              item.Transport_Method = 'Land';
+              break;
+            default:
+              item.Transport_Method = 'SEA';
+              break;
+          }
+          switch (factory.trim().toLowerCase()) {
+            case 'LYV'.trim().toLowerCase():
+            case 'LVL'.trim().toLowerCase():
+            case 'LHG'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'VNCLP';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'Land'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'SOTH';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'AIR'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'SGN';
+              }
+              break;
+            case 'LYM'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'MMRGN';
+              } else {
+                item.Port_Of_Departure = 'RGN';
+              }
+              break;
+            case 'LYF'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'IDSRG';
+              } else {
+                item.Port_Of_Departure = 'CGK';
+              }
+              break;
+            default:
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'VNCLP';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'Land'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'SOTH';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'AIR'.trim().toLowerCase()
+              ) {
+                item.Port_Of_Departure = 'SGN';
+              }
+              break;
+          }
+        }
+
+        const queryPoA = `SELECT PortCode
+                        FROM CMW_PortCode
+                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
+        const result: any = await this.EIP.query(queryPoA, {
+          type: QueryTypes.SELECT,
+          replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
+        });
+
+        return {
+          ...item,
+          Transport_Method: item.Transport_Method,
+          Port_Of_Departure: item.Port_Of_Departure,
+          Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
+        };
+      }),
+    );
 
     data.sort((a, b) => {
       const aValue = a[sortField];
@@ -894,7 +846,11 @@ export class Cat9andcat12Service {
     return { data, page, limit, total, hasMore };
   }
 
-  async importExcelPortCode(file: Express.Multer.File) {
+  async importExcelPortCode(
+    file: Express.Multer.File,
+    userid: string,
+    factory: string,
+  ) {
     try {
       let insertCount = 0;
       let updateCount = 0;
@@ -917,6 +873,8 @@ export class Cat9andcat12Service {
           headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
         }
       });
+
+      // console.log(headers);
 
       const requiredHeaders = [
         'Customer_Number',
@@ -948,13 +906,12 @@ export class Cat9andcat12Service {
           const headerValue = headerCell.value;
           if (headerValue !== null && headerValue !== undefined) {
             const key = headerValue.toString().trim().replace(/\s+/g, '_');
-            rowData[key] = cell.value;
-            // console.log(cell.value);
+            rowData[key] = String(cell.value);
           }
         });
         if (
-          rowData?.Customer_Number &&
-          rowData?.Transport_Method &&
+          rowData?.Customer_Number ||
+          rowData?.Transport_Method ||
           rowData?.Port_Code
         ) {
           data.push(rowData);
@@ -987,8 +944,8 @@ export class Cat9andcat12Service {
             {
               replacements: [
                 item.Port_Code,
-                'admin',
-                'LYV',
+                userid,
+                factory,
                 item.Customer_Number,
                 item.Transport_Method,
               ],
@@ -1024,8 +981,8 @@ export class Cat9andcat12Service {
                 item.Customer_Number,
                 item.Port_Code,
                 item.Transport_Method,
-                'admin',
-                'LYV',
+                userid,
+                factory,
               ],
               type: QueryTypes.INSERT,
             },
@@ -1188,11 +1145,111 @@ export class Cat9andcat12Service {
     const replacements =
       dateFrom && dateTo ? [dateFrom, dateTo, dateFrom, dateTo] : [];
 
-    const data = await db.query<any>(query, {
+    let data = await db.query<any>(query, {
       type: QueryTypes.SELECT,
       replacements,
     });
 
+    data = await Promise.all(
+      data.map(async (item: any) => {
+        let portOfDeparture = '';
+        if (
+          item?.Article_ID.trim().toLowerCase() ===
+          'SAMPLE SHOE'.trim().toLowerCase()
+        ) {
+          item.Transport_Method = 'AIR';
+          portOfDeparture = 'SGN';
+        } else {
+          switch (item?.Transport_Method.trim().toLowerCase()) {
+            case '11 SC'.trim().toLowerCase():
+            case 'Ocean'.trim().toLowerCase():
+            case 'Sea Air Collect'.trim().toLowerCase():
+            case 'SC'.trim().toLowerCase():
+            case 'Sea/Air'.trim().toLowerCase():
+            case 'Partial'.trim().toLowerCase():
+              item.Transport_Method = 'SEA';
+              break;
+            case '20 CC'.trim().toLowerCase():
+            case 'AC'.trim().toLowerCase():
+            case '10 AC'.trim().toLowerCase():
+            case 'CC'.trim().toLowerCase():
+            case 'Air PP'.trim().toLowerCase():
+            case 'Air Express'.trim().toLowerCase():
+            case 'AE'.trim().toLowerCase():
+              item.Transport_Method = 'AIR';
+              break;
+            case 'RAIL'.trim().toLowerCase():
+            case 'Rail Collect'.trim().toLowerCase():
+            case 'Rail Colle'.trim().toLowerCase():
+              item.Transport_Method = 'Land';
+              break;
+            default:
+              item.Transport_Method = 'SEA';
+              break;
+          }
+
+          switch (factory.trim().toLowerCase()) {
+            case 'LYV'.trim().toLowerCase():
+            case 'LVL'.trim().toLowerCase():
+            case 'LHG'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'VNCLP';
+              } else {
+                portOfDeparture = 'SGN';
+              }
+              break;
+            case 'LYM'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'MMRGN';
+              } else {
+                portOfDeparture = 'RGN';
+              }
+              break;
+            case 'LYF'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'IDSRG';
+              } else {
+                portOfDeparture = 'CGK';
+              }
+              break;
+            default:
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'VNCLP';
+              } else {
+                portOfDeparture = 'SGN';
+              }
+              break;
+          }
+        }
+
+        const queryPoA = `SELECT PortCode
+                        FROM CMW_PortCode
+                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
+        const result: any = await this.EIP.query(queryPoA, {
+          type: QueryTypes.SELECT,
+          replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
+        });
+        // console.log(result[0].PortCode);
+        return {
+          ...item,
+          Transport_Method: item.Transport_Method,
+          Port_Of_Departure: portOfDeparture,
+          Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
+        };
+      }),
+    );
     return data.flatMap((item) =>
       this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
     );
@@ -1241,6 +1298,9 @@ export class Cat9andcat12Service {
       case 'AIR'.trim().toLowerCase():
         dockey = '3.2.02';
         break;
+      case 'LAND'.trim().toLowerCase():
+        dockey = '3.2.03';
+        break;
       default:
         dockey = '';
         break;
@@ -1261,7 +1321,7 @@ export class Cat9andcat12Service {
         EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
         ActivityType: activityType, // DEFAULT
         DataType: activityType.trim() === '3.2' ? '1' : '999', // DEFAULT
-        DocType: '應收憑單', // DEFAULT
+        DocType: 'Invoice', // DEFAULT 應收憑單
         UndDoc: '銷貨單', // DEFAULT
         DocFlow: '銷貨相關流程', // DEFAULT
         DocDate: dayjs(date).format('YYYY/MM/DD'),
@@ -1280,9 +1340,9 @@ export class Cat9andcat12Service {
         Product: '', // DEFAULT
         Quity: quantity,
         Amount: '', // DEFAULT
-        ActivityData: +Number(grossWeight).toFixed(2),
-        ActivityUnit: '噸', // DEFAULT
-        Unit: '噸', // DEFAULT
+        ActivityData: +Number(grossWeight).toFixed(2) || 0,
+        ActivityUnit: 'Kg', // DEFAULT 噸
+        Unit: '', // DEFAULT
         UnitWeight: '', // DEFAULT
         Memo: '', // DEFAULT
         CreateDateTime: createdDate,

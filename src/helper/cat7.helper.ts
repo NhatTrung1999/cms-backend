@@ -657,7 +657,10 @@ export const buildQueryAutoSentCmsLHG = async (
                                   ,dd.Department_Name
                                   ,u.lat
                                   ,u.long
-                        ) AS a`;
+                        ) AS a
+                        ORDER BY Staff_ID 
+                        OFFSET 6221 ROWS 
+                        FETCH NEXT 6221 ROWS ONLY`;
   //   const query = `SELECT TOP 20*
   //       ,N'樂億II - LHG'  AS Factory_Name
   // FROM   (

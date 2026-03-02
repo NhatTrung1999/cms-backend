@@ -289,7 +289,7 @@ export class Cat6Service {
           case 'Domestic business trip within the group'.trim().toLowerCase():
             docKey = '3.5.1';
             break;
-          case 'Domestic husiness trin to third-nartv entities'
+          case 'Domestic husiness trin to third nartv entities'
             .trim()
             .toLowerCase():
             docKey = '3.5.2';
@@ -307,9 +307,9 @@ export class Cat6Service {
         }
         return {
           System: 'BPM',
-          Corporation: getFactory(factory),
+          Corporation: 'LAI YIH',
           Factory: getFactory(factory),
-          Department: '設計部',
+          Department: item.Dept,
           DocKey: docKey,
           ActivitySource: '',
           SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
@@ -458,13 +458,13 @@ export class Cat6Service {
   }
 
   async autoSentCMSV2(dateFrom: string, dateTo: string, factory: string) {
-    return fakeCat6LYVData.map((item) => {
+    return fakeCat6LYMData.map((item) => {
       let docKey = '';
       switch (item.BusinessTripType.trim().toLowerCase()) {
         case 'Domestic business trip within the group'.trim().toLowerCase():
           docKey = '3.5.1';
           break;
-        case 'Domestic husiness trin to third-nartv entities'
+        case 'Domestic business trip to third party entities'
           .trim()
           .toLowerCase():
           docKey = '3.5.2';
@@ -482,9 +482,9 @@ export class Cat6Service {
       }
       return {
         System: 'BPM',
-        Corporation: getFactory(factory),
+        Corporation: 'LAI YIH',
         Factory: getFactory(factory),
-        Department: '',
+        Department: item.Dept,
         DocKey: docKey,
         ActivitySource: '住宿',
         SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),

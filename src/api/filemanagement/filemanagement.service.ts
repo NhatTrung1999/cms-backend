@@ -346,28 +346,32 @@ export class FilemanagementService {
           sheet,
           dateFrom,
           dateTo,
+          factory,
         );
     }
 
-    await getADataExcelFactoryCat9AndCat12(sheet, db, dateFrom, dateTo);
+    await getADataExcelFactoryCat9AndCat12(
+      sheet,
+      db,
+      dateFrom,
+      dateTo,
+      factory,
+      this.EIP,
+    );
   }
 
   private async getAllExcelFactoryCat9AndCat12Data(
     sheet: ExcelJS.Worksheet,
     dateFrom: string,
     dateTo: string,
+    factory: string,
+    dbEIP?: Sequelize,
   ) {
-    let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-    let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-    const replacements: any[] = [];
-
-    if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
-      where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo, dateFrom, dateTo);
-    }
-    const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
+    const getQuery = (
+      factoryName: string,
+    ) => `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
                           ,*
+                          ,'${factoryName}' AS Factory_Name
                     FROM   (
                               SELECT im.INV_DATE             AS [Date]
                                     ,sb.ExFty_Date           AS Shipment_Date
@@ -378,33 +382,6 @@ export class FilemanagementService {
                                     ,p.GW                    AS Gross_Weight
                                     ,im.CUSTID               AS Customer_ID
                                     ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
                                     ,pc.PortCode             AS Port_Of_Arrival
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
@@ -414,16 +391,13 @@ export class FilemanagementService {
                                             bg.SHPIDS
                                           ,CASE 
                                                 WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                            AND (do.Shipmode_1 IS NULL) THEN '10 AC'
                                                 WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
+                                            AND (do.Shipmode_1 IS NULL) THEN '20 CC'
                                                 WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
-                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
-                                                WHEN do.ShipMode_1 IS NULL THEN '' 
-                                                ELSE 'N/A' END
+                                            AND (do.Shipmode_1 IS NULL) THEN '11 SC'
+                                                WHEN do.ShipMode_1 IS NULL THEN ''
+                                                ELSE do.ShipMode_1 END
                                         )
                                       ,y.ShipMode
                                     )                       AS Transport_Method
@@ -476,33 +450,6 @@ export class FilemanagementService {
                                     ,is1.GW                  AS Gross_Weight
                                     ,im.CUSTID               AS Customer_ID
                                     ,'Truck'                 AS Local_Land_Transportation
-                                    ,CASE 
-                                          WHEN CHARINDEX('/' ,im.INV_NO)>0 THEN CASE 
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          ) IN ('LT' ,'LT2' ,'TX') THEN 'VNCLP'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='YF' THEN 'IDSRG'
-                                                                                    WHEN SUBSTRING(
-                                                                                              im.INV_NO
-                                                                                            ,CHARINDEX('/' ,im.INV_NO)+1
-                                                                                            ,CHARINDEX('/' ,im.INV_NO ,CHARINDEX('/' ,im.INV_NO)+1)
-                                                                                            - CHARINDEX('/' ,im.INV_NO)- 1
-                                                                                          )='TY' THEN 'MMRGN'
-                                                                                    ELSE 'VNCLP'
-                                                                                END
-                                          ELSE CASE 
-                                                    WHEN LEFT(LTRIM(RTRIM(im.INV_NO)) ,3)='LYV' THEN 'SGN'
-                                                    ELSE 'VNCLP'
-                                              END
-                                    END                     AS Port_Of_Departure
                                     ,pc.PortCode             AS Port_Of_Arrival
                                     ,CAST('0' AS INT)        AS Land_Transport_Distance
                                     ,CAST('0' AS INT)        AS Sea_Transport_Distance
@@ -528,17 +475,29 @@ export class FilemanagementService {
                                           ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
                               ${where1}
                           ) AS Cat9AndCat12`;
+
+    let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
+    let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
+    const replacements: any[] = [];
+
+    if (dateFrom && dateTo) {
+      where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+      where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+      replacements.push(dateFrom, dateTo, dateFrom, dateTo);
+    }
+    // const query = ``;
     const connects = [
-      this.LYV_ERP,
-      this.LHG_ERP,
-      this.LYM_ERP,
-      this.LVL_ERP,
-      this.LYF_ERP,
-      this.JAZ_ERP,
-      this.JZS_ERP,
+      { conn: this.LYV_ERP, factoryName: 'LYV' },
+      { conn: this.LHG_ERP, factoryName: 'LHG' },
+      { conn: this.LYM_ERP, factoryName: 'LYM' },
+      { conn: this.LVL_ERP, factoryName: 'LVL' },
+      { conn: this.LYF_ERP, factoryName: 'LYF' },
+      { conn: this.JAZ_ERP, factoryName: 'JAZ' },
+      { conn: this.JZS_ERP, factoryName: 'JZS' },
     ];
     const dataResults = await Promise.all(
-      connects.map((conn) => {
+      connects.map(({ conn, factoryName }) => {
+        const query = getQuery(factoryName);
         return conn.query(query, {
           type: QueryTypes.SELECT,
           replacements,
@@ -548,7 +507,128 @@ export class FilemanagementService {
 
     const allData = dataResults.flat();
 
-    let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
+    let data: any = allData.map((item, index) => ({ ...item, No: index + 1 }));
+
+    data = await Promise.all(
+      data.map(async (item) => {
+        let portOfDeparture = '';
+        if (
+          item?.Article_ID.trim().toLowerCase() ===
+          'SAMPLE SHOE'.trim().toLowerCase()
+        ) {
+          item.Transport_Method = 'AIR';
+          portOfDeparture = 'SGN';
+        } else {
+          switch (item?.Transport_Method.trim().toLowerCase()) {
+            case '11 SC'.trim().toLowerCase():
+            case 'Ocean'.trim().toLowerCase():
+            case 'Sea Air Collect'.trim().toLowerCase():
+            case 'SC'.trim().toLowerCase():
+            case 'Sea/Air'.trim().toLowerCase():
+            case 'Partial'.trim().toLowerCase():
+              item.Transport_Method = 'SEA';
+              break;
+            case '20 CC'.trim().toLowerCase():
+            case 'AC'.trim().toLowerCase():
+            case '10 AC'.trim().toLowerCase():
+            case 'CC'.trim().toLowerCase():
+            case 'Air PP'.trim().toLowerCase():
+            case 'Air Express'.trim().toLowerCase():
+            case 'AE'.trim().toLowerCase():
+              item.Transport_Method = 'AIR';
+              break;
+            case 'RAIL'.trim().toLowerCase():
+            case 'Rail Collect'.trim().toLowerCase():
+            case 'Rail Colle'.trim().toLowerCase():
+              item.Transport_Method = 'Land';
+              break;
+            default:
+              item.Transport_Method = 'SEA';
+              break;
+          }
+
+          switch (item.Factory_Name.trim().toLowerCase()) {
+            case 'LYV'.trim().toLowerCase():
+            case 'LVL'.trim().toLowerCase():
+            case 'LHG'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'VNCLP';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'Land'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'SOTH';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'AIR'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'SGN';
+              }
+              break;
+            case 'LYM'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'MMRGN';
+              } else {
+                portOfDeparture = 'RGN';
+              }
+              break;
+            case 'LYF'.trim().toLowerCase():
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'IDSRG';
+              } else {
+                portOfDeparture = 'CGK';
+              }
+              break;
+            default:
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'SEA'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'VNCLP';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'Land'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'SOTH';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'AIR'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'SGN';
+              }
+              break;
+          }
+        }
+
+        const queryPoA = `SELECT PortCode
+                        FROM CMW_PortCode
+                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
+        const result: any = await dbEIP?.query(queryPoA, {
+          type: QueryTypes.SELECT,
+          replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
+        });
+
+        return {
+          ...item,
+          Transport_Method: item.Transport_Method,
+          Port_Of_Departure: portOfDeparture,
+          Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
+        };
+      }),
+    );
 
     sheet.columns = [
       {

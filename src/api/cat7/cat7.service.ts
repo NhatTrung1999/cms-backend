@@ -654,6 +654,10 @@ export class Cat7Service {
         dockey = '3.3.8';
         transType = '員工接駁車';
         break;
+      case 'Subway'.trim().toLowerCase(): //地鐵
+        dockey = '3.3.9';
+        transType = '地鐵';
+        break;
       default:
         break;
     }
@@ -680,17 +684,17 @@ export class Cat7Service {
       // CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
       // Creator: '',
       System: 'CMS Web',
-      Corporation: FactoryName,
+      Corporation: 'LAI YIH',
       Factory: FactoryName,
-      Department: DepartmentName,
+      Department: DepartmentName.slice(0, 20),
       DocKey: dockey,
       SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
       EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
       ActivityType: activityType,
       DataType: '2',
       DocType: 'CMS Web',
-      DocDate: dayjs().format('YYYY/MM/DD'),
-      DocDate2: dayjs().format('YYYY/MM/DD'),
+      DocDate: dayjs('2025/12/31').format('YYYY/MM/DD'),
+      DocDate2: dayjs('2025/12/31').format('YYYY/MM/DD'),
       UndDocNo: staffId,
       TransType: transType,
       Departure: Residential_address,
