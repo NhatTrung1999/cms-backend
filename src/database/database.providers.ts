@@ -20,7 +20,7 @@ export const databaseProviders = [
             requestTimeout: 300000,
           },
         },
-        // logging: false,
+        logging: false,
       });
       return sequelize;
     },
