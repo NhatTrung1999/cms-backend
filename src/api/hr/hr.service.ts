@@ -359,6 +359,7 @@ export class HrService {
         }
       });
 
+      console.log(data);
       const updatedRecords: any[] = [];
       for (let item of data) {
         const records: any[] = await db.query(
@@ -385,8 +386,8 @@ export class HrService {
                                 WHERE userId = :id`;
           const updateResults: any[] = await db.query(queryUpdate, {
             replacements: {
-              address: item.Current_Address,
-              vehicle: item.Transportation_Method,
+              address: item.Current_Address || null,
+              vehicle: item.Transportation_Method || null,
               updatedBy: userid,
               id: String(item.ID),
             },

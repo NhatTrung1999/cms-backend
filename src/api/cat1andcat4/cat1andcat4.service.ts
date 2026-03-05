@@ -104,6 +104,20 @@ export class Cat1andcat4Service {
     return records;
   }
 
+  async getTaxFreeZoneAddress(
+    sortField: string = 'No',
+    sortOrder: string = 'asc',
+  ): Promise<IDataPortCodeCat1AndCat4[]> {
+    const records: IDataPortCodeCat1AndCat4[] = await this.EIP.query(
+      `SELECT ROW_NUMBER() OVER (ORDER BY ID) AS No,*
+        FROM CMW_TAX_FREE_ZONE_ADDRESS
+        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+        `,
+      { type: QueryTypes.SELECT },
+    );
+    return records;
+  }
+
   // private async getAFactoryData(
   //   db: Sequelize,
   //   dateFrom: string,
@@ -373,6 +387,166 @@ export class Cat1andcat4Service {
       const records: any = await this.EIP.query(
         `SELECT *
           FROM CMW_PortCode_Cat1_4`,
+        { type: QueryTypes.SELECT },
+      );
+      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      return { message, records };
+    } catch (error: any) {
+      throw new InternalServerErrorException(`${error.message}`);
+    }
+  }
+
+  async importExcelTaxFreeZoneAddress(
+    file: Express.Multer.File,
+    userid: string,
+    factory: string,
+  ) {
+    try {
+      let insertCount = 0;
+      let updateCount = 0;
+      if (!file.path || !fs.existsSync(file.path)) {
+        throw new Error('File path not found!');
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(file.path);
+      const worksheet = workbook.getWorksheet(1);
+      if (!worksheet) {
+        throw new Error('No worksheet found in the Excel file');
+      }
+
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell((cell) => {
+        if (cell.value) {
+          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
+        }
+      });
+
+      const requiredHeaders = [
+        'No',
+        'Factory',
+        'Supplier_ID',
+        'Country',
+        'Tax_Free_Zone_Address',
+      ];
+      const missingHeaders = requiredHeaders.filter(
+        (h) => !headers.includes(h),
+      );
+
+      if (missingHeaders.length > 0) {
+        throw new Error(
+          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
+        );
+      }
+
+      const data: {
+        Factory: string;
+        Supplier_ID: string;
+        Country: string;
+        Tax_Free_Zone_Address: string;
+      }[] = [];
+
+      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        if (rowNumber === 1 && row.cellCount > 0) return;
+
+        const rowData: any = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const headerCell = headerRow.getCell(colNumber);
+          const headerValue = headerCell.value;
+          if (headerValue !== null && headerValue !== undefined) {
+            const key = headerValue.toString().trim().replace(/\s+/g, '_');
+            rowData[key] = cell.value;
+          }
+        });
+        if (
+          rowData?.Factory ||
+          rowData?.Supplier_ID ||
+          rowData?.Country ||
+          rowData?.Tax_Free_Zone_Address
+        ) {
+          data.push(rowData);
+        }
+      });
+
+      for (let item of data) {
+        const id = uuidv4();
+        const records: { total: number }[] = await this.EIP.query(
+          `SELECT COUNT(*) total
+            FROM CMW_TAX_FREE_ZONE_ADDRESS 
+            WHERE Factory = ? AND SupplierID = ?`,
+          {
+            replacements: [item.Factory, item.Supplier_ID],
+            type: QueryTypes.SELECT,
+          },
+        );
+
+        if (records[0].total > 0) {
+          await this.EIP.query(
+            `UPDATE CMW_TAX_FREE_ZONE_ADDRESS
+              SET
+                Country = ?,
+                TaxFreeZoneAddress = ?,
+                UpdatedBy = ?,
+                UpdatedFactory = ?,
+                UpdatedAt = GETDATE()
+              WHERE Factory = ? AND SupplierID = ?`,
+            {
+              replacements: [
+                item.Country,
+                item.Tax_Free_Zone_Address,
+                userid,
+                factory,
+                item.Factory,
+                item.Supplier_ID,
+              ],
+              type: QueryTypes.SELECT,
+            },
+          );
+          updateCount++;
+        } else {
+          await this.EIP.query(
+            `INSERT INTO CMW_TAX_FREE_ZONE_ADDRESS
+              (
+                ID,
+                Factory,
+                SupplierID,
+                Country,
+                TaxFreeZoneAddress,
+                CreatedBy,
+                CreatedFactory,
+                CreatedAt
+              )
+              VALUES
+              (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                GETDATE()
+              )`,
+            {
+              replacements: [
+                id,
+                item.Factory,
+                item.Supplier_ID,
+                item.Country,
+                item.Tax_Free_Zone_Address,
+                userid,
+                factory,
+              ],
+              type: QueryTypes.INSERT,
+            },
+          );
+          insertCount++;
+        }
+      }
+      const records: any = await this.EIP.query(
+        `SELECT *
+          FROM CMW_TAX_FREE_ZONE_ADDRESS`,
         { type: QueryTypes.SELECT },
       );
       const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;

@@ -54,6 +54,14 @@ export class Cat1andcat4Controller {
     return this.cat1andcat4Service.getPortCode(sortField, sortOrder);
   }
 
+  @Get('get-tax-free-zone-address')
+  async getTaxFreeZoneAddress(
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.cat1andcat4Service.getTaxFreeZoneAddress(sortField, sortOrder);
+  }
+
   @Post('import-excel-port-code')
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }),
@@ -67,6 +75,26 @@ export class Cat1andcat4Controller {
     if (!file) throw new BadRequestException('No file uploaded!');
 
     const data = await this.cat1andcat4Service.importExcelPortCode(
+      file,
+      userid,
+      factory,
+    );
+    return data;
+  }
+
+  @Post('import-excel-tax-free-zone-address')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }),
+  )
+  async importExcelTaxFreeZoneAddress(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    const factory = getFactortyID(req);
+    const userid = getUserId(req);
+    if (!file) throw new BadRequestException('No file uploaded!');
+
+    const data = await this.cat1andcat4Service.importExcelTaxFreeZoneAddress(
       file,
       userid,
       factory,
