@@ -594,10 +594,46 @@ export class Cat1andcat4Service {
         limit,
       };
 
-      const data: any[] = await db.query(query, {
+      let data: any[] = await db.query(query, {
         replacements,
         type: QueryTypes.SELECT,
       });
+
+      // console.log(data);
+      data = await Promise.all(
+        data.map(async (item: any) => {
+          const taxFreeZone: any[] = await this.EIP.query(
+            `SELECT TaxFreeZoneAddress
+            FROM CMW_TAX_FREE_ZONE_ADDRESS
+            WHERE SupplierID = ? AND Factory = ?`,
+            {
+              replacements: [item.SupplierCode.trim(), factory],
+              type: QueryTypes.SELECT,
+            },
+          );
+          return {
+            ...item,
+            TransportationMethod:
+              taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
+            Departure:
+              taxFreeZone.length > 0
+                ? taxFreeZone[0].TaxFreeZoneAddress
+                : item.Departure,
+          };
+        }),
+      );
+
+      // const taxFreeZone = await this.EIP.query(
+      //   `SELECT *
+      //     FROM CMW_TAX_FREE_ZONE_ADDRESS
+      //     WHERE SupplierID = ? AND Factory = ?`,
+      //   { replacements: ['VT1013', factory], type: QueryTypes.SELECT },
+      // );
+
+      // // console.log(taxFreeZone);
+      // data.map((item) => {
+
+      // });
 
       const total = data.length > 0 ? data[0].TotalRowsCount : 0;
       const hasMore = offset + data.length < total;
@@ -649,10 +685,33 @@ export class Cat1andcat4Service {
             true,
           );
 
-          const rows: any[] = await conn.query(query, {
+          let rows: any[] = await conn.query(query, {
             type: QueryTypes.SELECT,
             replacements,
           });
+
+          rows = await Promise.all(
+            rows.map(async (item: any) => {
+              const taxFreeZone: any[] = await this.EIP.query(
+                `SELECT TaxFreeZoneAddress
+                FROM CMW_TAX_FREE_ZONE_ADDRESS
+                WHERE SupplierID = ? AND Factory = ?`,
+                {
+                  replacements: [item.SupplierCode.trim(), factoryName],
+                  type: QueryTypes.SELECT,
+                },
+              );
+              return {
+                ...item,
+                TransportationMethod:
+                  taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
+                Departure:
+                  taxFreeZone.length > 0
+                    ? taxFreeZone[0].TaxFreeZoneAddress
+                    : item.Departure,
+              };
+            }),
+          );
 
           return rows;
         }),
@@ -815,10 +874,33 @@ export class Cat1andcat4Service {
           }
         : {};
 
-    const data = await db.query<any>(query, {
+    let data = await db.query<any>(query, {
       type: QueryTypes.SELECT,
       replacements,
     });
+
+    data = await Promise.all(
+      data.map(async (item: any) => {
+        const taxFreeZone: any[] = await this.EIP.query(
+          `SELECT TaxFreeZoneAddress
+          FROM CMW_TAX_FREE_ZONE_ADDRESS
+          WHERE SupplierID = ? AND Factory = ?`,
+          {
+            replacements: [item.SupplierCode.trim(), factory],
+            type: QueryTypes.SELECT,
+          },
+        );
+        return {
+          ...item,
+          TransportationMethod:
+            taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
+          Departure:
+            taxFreeZone.length > 0
+              ? taxFreeZone[0].TaxFreeZoneAddress
+              : item.Departure,
+        };
+      }),
+    );
 
     return data.flatMap((item) => this.mapToCMSFormat(item, dateFrom, dateTo));
   }

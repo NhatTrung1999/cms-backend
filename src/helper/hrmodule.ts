@@ -71,7 +71,7 @@ export const buildQueryHRModule = (
        LEFT JOIN Data_Department     AS c
             ON  b.Department_Serial_Key = c.Department_Serial_Key COLLATE Database_Default
        LEFT JOIN Data_Person_Detail  AS d
-            ON  d.Person_Serial_Key = a.Person_Serial_Key COLLATE Database_Default
+            ON  d.Person_Serial_Key = ISNULL(a.Person_Serial_Key, a.userId) COLLATE Database_Default
        LEFT JOIN Data_Work_Time      AS e
             ON  e.Person_Serial_Key = ISNULL(a.Person_Serial_Key, a.userId) COLLATE Database_Default`;
 

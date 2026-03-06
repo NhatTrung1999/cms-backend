@@ -967,11 +967,11 @@ export class FilemanagementService {
     weight?: boolean,
     departure?: boolean,
   ) {
-    const connects: { facotryName: string; conn: Sequelize }[] = [
-      { facotryName: 'LYV', conn: this.LYV_ERP },
-      { facotryName: 'LHG', conn: this.LHG_ERP },
-      { facotryName: 'LVL', conn: this.LVL_ERP },
-      { facotryName: 'LYM', conn: this.LYM_ERP },
+    const connects: { factoryName: string; conn: Sequelize }[] = [
+      { factoryName: 'LYV', conn: this.LYV_ERP },
+      { factoryName: 'LHG', conn: this.LHG_ERP },
+      { factoryName: 'LVL', conn: this.LVL_ERP },
+      { factoryName: 'LYM', conn: this.LYM_ERP },
     ];
     const replacements = {
       startDate: dateFrom,
@@ -980,21 +980,46 @@ export class FilemanagementService {
       limit: 20,
     };
     const dataResults = await Promise.all(
-      connects.map(async ({ facotryName, conn }) => {
+      connects.map(async ({ factoryName, conn }) => {
         const query = await buildQueryCat1AndCat4(
           'No',
           'asc',
-          facotryName,
+          factoryName,
           usage,
           unitWeight,
           weight,
           departure,
           this.EIP,
         );
-        return conn.query(query, {
+        let rows: any[] = await conn.query(query, {
           type: QueryTypes.SELECT,
           replacements,
         });
+
+        rows = await Promise.all(
+          rows.map(async (item: any) => {
+            const taxFreeZone: any[] = await this.EIP.query(
+              `SELECT TaxFreeZoneAddress
+              FROM CMW_TAX_FREE_ZONE_ADDRESS
+              WHERE SupplierID = ? AND Factory = ?`,
+              {
+                replacements: [item.SupplierCode.trim(), factoryName],
+                type: QueryTypes.SELECT,
+              },
+            );
+            return {
+              ...item,
+              TransportationMethod:
+                taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
+              Departure:
+                taxFreeZone.length > 0
+                  ? taxFreeZone[0].TaxFreeZoneAddress
+                  : item.Departure,
+            };
+          }),
+        );
+
+        return rows;
       }),
     );
     let data = dataResults.flat();

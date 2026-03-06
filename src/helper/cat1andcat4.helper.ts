@@ -330,17 +330,22 @@ export const buildQueryTest = async (
                   ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
                   ,ISNULL(P.Style ,ZSZL.Style)  AS Style
                   ,CASE 
-                        WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
-                        WHEN (
-                              '${factory}' IN ('LYV' ,'LVL' ,'LHG')
-                              AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                  WHEN ISNULL(isi.Transportationmethod ,'')<>'' THEN isi.Transportationmethod
+                  ELSE (
+                              CASE 
+                                    WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
+                                    WHEN (
+                                          '${factory}' IN ('LYV' ,'LVL' ,'LHG')
+                                          AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                                          )
+                              OR ('${factory}'='LYF' AND ZSZL.Country='Indonesia')
+                              OR (
+                                    '${factory}' IN ('LYM' ,'POL')
+                                    AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
+                                    ) THEN 'Land'
+                                    ELSE 'SEA + Land'
+                                    END
                         )
-                        OR ('${factory}'='LYF' AND ZSZL.Country='Indonesia')
-                        OR (
-                              '${factory}' IN ('LYM' ,'POL')
-                              AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
-                        ) THEN 'Land'
-                        ELSE 'SEA + Land'
                   END                          AS TransportationMethod
                   ,isi.SupplierFullAddress      AS Departure
                   ,CASE 
@@ -626,10 +631,34 @@ export const getADataExcelFactoryCat1AndCat4 = async (
     endDate: dayjs(dateTo).add(1, 'day').startOf('day').format('YYYY-MM-DD'),
   };
 
-  const data: any[] = await db.query(query, {
+  let data: any[] = await db.query(query, {
     replacements,
     type: QueryTypes.SELECT,
   });
+
+  data = await Promise.all(
+    data.map(async (item: any) => {
+      const taxFreeZone: any[] =
+        (await dbEIP?.query(
+          `SELECT TaxFreeZoneAddress
+          FROM CMW_TAX_FREE_ZONE_ADDRESS
+          WHERE SupplierID = ? AND Factory = ?`,
+          {
+            replacements: [item.SupplierCode.trim(), factory],
+            type: QueryTypes.SELECT,
+          },
+        )) ?? [];
+      return {
+        ...item,
+        TransportationMethod:
+          taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
+        Departure:
+          taxFreeZone.length > 0
+            ? taxFreeZone[0].TaxFreeZoneAddress
+            : item.Departure,
+      };
+    }),
+  );
 
   sheet.columns = [
     { header: 'No.', key: 'No' },
@@ -735,17 +764,22 @@ export const buildQueryAutoSentCMS = async (
                         ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
                         ,ISNULL(P.Style ,ZSZL.Style)  AS Style
                         ,CASE 
-                              WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
-                              WHEN (
-                                    '${factory}' IN ('LYV' ,'LVL' ,'LHG')
-                                    AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                        WHEN ISNULL(isi.Transportationmethod ,'')<>'' THEN isi.Transportationmethod
+                        ELSE (
+                                    CASE 
+                                          WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
+                                          WHEN (
+                                                '${factory}' IN ('LYV' ,'LVL' ,'LHG')
+                                                AND ZSZL.Country IN ('Vietnam' ,'Viet nam' ,'VN' ,' VIETNAM' ,'Viet Nam')
+                                                )
+                                    OR ('${factory}'='LYF' AND ZSZL.Country='Indonesia')
+                                    OR (
+                                          '${factory}' IN ('LYM' ,'POL')
+                                          AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
+                                          ) THEN 'Land'
+                                          ELSE 'SEA + Land'
+                                          END
                               )
-                              OR ('${factory}'='LYF' AND ZSZL.Country='Indonesia')
-                              OR (
-                                    '${factory}' IN ('LYM' ,'POL')
-                                    AND ZSZL.Country IN ('MYANMAR' ,' DA JIA MYANMAR COMPANY LIMITED' ,'MY')
-                              ) THEN 'Land'
-                              ELSE 'SEA + Land'
                         END                          AS TransportationMethod
                         ,isi.SupplierFullAddress      AS Departure
                         ,CASE 
