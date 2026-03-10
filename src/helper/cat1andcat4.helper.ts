@@ -410,8 +410,9 @@ export const buildQueryTest = async (
                         AND SN74A.SupplierID = 'ZZZZ'
                         AND SN74A.MatID = c.CLBH
             WHERE  CGDate>= :startDate
-                  AND CGDate < :endDate
-                  AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
+                  AND CGDate < :endDate 
+                  AND ('${factory}' IN ('POL' ,'LYM') AND CGZL.ZSBH<>'MT520')
+                  AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4') 
                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
                   AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')
 			OR EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty=CGZL.GSBH AND secmi.CLBH=c.CLBH))
@@ -851,8 +852,9 @@ export const buildQueryAutoSentCMS = async (
                               WHERE  FactoryCode = 'LYV'
                               ) AS pc
                               ON  pc.SupplierID = ISNULL(z.ZSDH ,CGZL.ZSBH) COLLATE Database_Default
-                  WHERE  CGDate>= :startDate
-                        AND CGDate< :endDate
+                  WHERE  CGDate >= :startDate
+                        AND CGDate < :endDate 
+                        AND ('${factory}' IN ('POL' ,'LYM') AND CGZL.ZSBH<>'MT520')
                         AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                         AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
                         AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')
