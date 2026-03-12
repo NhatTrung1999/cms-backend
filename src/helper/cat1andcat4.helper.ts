@@ -329,9 +329,10 @@ export const buildQueryTest = async (
                   END                          AS UnitWeight
                   ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
                   ,ISNULL(P.Style ,ZSZL.Style)  AS Style
-                  ,CASE 
-                  WHEN ISNULL(isi.Transportationmethod ,'')<>'' THEN isi.Transportationmethod
-                  ELSE (
+                  ,CASE
+                              WHEN ISNULL(poisi.Transportationmethod ,'')<>'' THEN poisi.Transportationmethod 
+                        WHEN ISNULL(isi.Transportationmethod ,'')<>'' AND ISNULL(poisi.Transportationmethod ,'')='' THEN isi.Transportationmethod
+                        ELSE (
                               CASE 
                                     WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
                                     WHEN (
@@ -347,18 +348,21 @@ export const buildQueryTest = async (
                                     END
                         )
                   END                          AS TransportationMethod
-                  ,isi.SupplierFullAddress      AS Departure
-                  ,CASE 
-                        WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN 'N/A'
-                        ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
-                  END                          AS ThirdCountryLandTransport
-                  ,isi.PortOfDeparture          AS PortOfDeparture
-                  ,isi.PortOfArrival            AS PortOfArrival
-                  ,isi.Factory_Port             AS FactoryDomesticLandTransport
+                  ,CASE WHEN ISNULL(poisi.SupplierFullAddress,'') <> '' THEN poisi.SupplierFullAddress ELSE isi.SupplierFullAddress END Departure
+                  ,CASE WHEN ISNULL(poisi.ThirdCountryLandTransport ,0)<>0 THEN  CAST(poisi.ThirdCountryLandTransport AS VARCHAR) 
+                        ELSE	CASE 
+                                    WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN 'N/A'
+                                    ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
+                              END 
+                        END AS ThirdCountryLandTransport
+                  ,ISNULL(poisi.PortOfDeparture ,isi.PortOfDeparture)          AS PortOfDeparture
+                  ,ISNULL(poisi.PortOfArrival,isi.PortOfArrival)            AS PortOfArrival
+                  ,ISNULL(poisi.Factory_Port ,isi.Factory_Port)            AS FactoryDomesticLandTransport
                   ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Destination
-                  ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) AS LandTransportDistance
-                  ,isi.SeaTransportDistance     AS SeaTransportDistance
-                  ,isi.AirTransportDistance     AS AirTransportDistance
+                  ,CASE WHEN ISNULL(poisi.ThirdCountryLandTransport ,0)<>0 or ISNULL(poisi.Factory_Port ,0)<>0 THEN ISNULL(poisi.ThirdCountryLandTransport ,0)+ISNULL(poisi.Factory_Port ,0)
+                  ELSE ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) END LandTransportDistance
+                  ,ISNULL(poisi.SeaTransportDistance,isi.SeaTransportDistance)     AS SeaTransportDistance
+                  ,ISNULL(poisi.AirTransportDistance,isi.AirTransportDistance)     AS AirTransportDistance
                   ,clzl.dwbh
                   ,c.Qty
             INTO   #PurN233_CGZL
@@ -373,7 +377,9 @@ export const buildQueryTest = async (
                   LEFT JOIN ZSZL z
                         ON  z.zsdh = ISNULL(P.MZSDH ,ZSZL.MZSDH)
                   LEFT JOIN Imp_SuppIDCombine AS isi
-                        ON  isi.ZSDH = ISNULL(z.ZSDH ,CGZL.ZSBH)
+                        ON  isi.ZSDH = z.ZSDH
+                  LEFT JOIN Imp_SuppIDCombine AS poisi
+                        ON  poisi.ZSDH = CGZL.ZSBH   
                   LEFT JOIN clzl
                         ON  cldh = c.CLBH
                   LEFT JOIN YWWX2 AS y
@@ -411,7 +417,7 @@ export const buildQueryTest = async (
                         AND SN74A.MatID = c.CLBH
             WHERE  CGDate>= :startDate
                   AND CGDate < :endDate 
-                  AND ('${factory}' IN ('POL' ,'LYM') AND CGZL.ZSBH<>'MT520')
+                  ${factory === 'LYM' ? `AND CGZL.ZSBH<>'MT520'` : ''}
                   AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4') 
                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
                   AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')
@@ -764,9 +770,10 @@ export const buildQueryAutoSentCMS = async (
                         END                          AS UnitWeight
                         ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
                         ,ISNULL(P.Style ,ZSZL.Style)  AS Style
-                        ,CASE 
-                        WHEN ISNULL(isi.Transportationmethod ,'')<>'' THEN isi.Transportationmethod
-                        ELSE (
+                        ,CASE
+                                    WHEN ISNULL(poisi.Transportationmethod ,'')<>'' THEN poisi.Transportationmethod 
+                              WHEN ISNULL(isi.Transportationmethod ,'')<>'' AND ISNULL(poisi.Transportationmethod ,'')='' THEN isi.Transportationmethod
+                              ELSE (
                                     CASE 
                                           WHEN ISNULL(ZSZL.Country ,'')='' THEN NULL
                                           WHEN (
@@ -782,18 +789,21 @@ export const buildQueryAutoSentCMS = async (
                                           END
                               )
                         END                          AS TransportationMethod
-                        ,isi.SupplierFullAddress      AS Departure
-                        ,CASE 
-                              WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN 'N/A'
-                              ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
-                        END                          AS ThirdCountryLandTransport
-                        ,pc.PortCode                  AS PortOfDeparture
-                        ,N'${factory}'                AS PortOfArrival
-                        ,isi.Factory_Port             AS FactoryDomesticLandTransport
+                        ,CASE WHEN ISNULL(poisi.SupplierFullAddress,'') <> '' THEN poisi.SupplierFullAddress ELSE isi.SupplierFullAddress END Departure
+                        ,CASE WHEN ISNULL(poisi.ThirdCountryLandTransport ,0)<>0 THEN  CAST(poisi.ThirdCountryLandTransport AS VARCHAR) 
+                              ELSE	CASE 
+                                          WHEN ISNULL(isi.ThirdCountryLandTransport ,'')='' THEN 'N/A'
+                                          ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
+                                    END 
+                              END AS ThirdCountryLandTransport
+                        ,ISNULL(poisi.PortOfDeparture ,isi.PortOfDeparture)          AS PortOfDeparture
+                        ,ISNULL(poisi.PortOfArrival,isi.PortOfArrival)            AS PortOfArrival
+                        ,ISNULL(poisi.Factory_Port ,isi.Factory_Port)            AS FactoryDomesticLandTransport
                         ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Destination
-                        ,ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) AS LandTransportDistance
-                        ,isi.SeaTransportDistance     AS SeaTransportDistance
-                        ,isi.AirTransportDistance     AS AirTransportDistance
+                        ,CASE WHEN ISNULL(poisi.ThirdCountryLandTransport ,0)<>0 or ISNULL(poisi.Factory_Port ,0)<>0 THEN ISNULL(poisi.ThirdCountryLandTransport ,0)+ISNULL(poisi.Factory_Port ,0)
+                        ELSE ISNULL(isi.ThirdCountryLandTransport ,0)+ISNULL(isi.Factory_Port ,0) END LandTransportDistance
+                        ,ISNULL(poisi.SeaTransportDistance,isi.SeaTransportDistance)     AS SeaTransportDistance
+                        ,ISNULL(poisi.AirTransportDistance,isi.AirTransportDistance)     AS AirTransportDistance
                         ,clzl.dwbh
                         ,c.Qty
                   INTO   #PurN233_CGZL
@@ -808,7 +818,9 @@ export const buildQueryAutoSentCMS = async (
                         LEFT JOIN ZSZL z
                               ON  z.zsdh = ISNULL(P.MZSDH ,ZSZL.MZSDH)
                         LEFT JOIN Imp_SuppIDCombine AS isi
-                              ON  isi.ZSDH = ISNULL(z.ZSDH ,CGZL.ZSBH)
+                              ON  isi.ZSDH = z.ZSDH
+                        LEFT JOIN Imp_SuppIDCombine AS poisi
+                              ON  poisi.ZSDH = CGZL.ZSBH   
                         LEFT JOIN clzl
                               ON  cldh = c.CLBH
                         LEFT JOIN YWWX2 AS y
@@ -854,7 +866,7 @@ export const buildQueryAutoSentCMS = async (
                               ON  pc.SupplierID = ISNULL(z.ZSDH ,CGZL.ZSBH) COLLATE Database_Default
                   WHERE  CGDate >= :startDate
                         AND CGDate < :endDate 
-                        AND ('${factory}' IN ('POL' ,'LYM') AND CGZL.ZSBH<>'MT520')
+                        ${factory === 'LYM' ? `AND CGZL.ZSBH<>'MT520'` : ''}
                         AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                         AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
                         AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')

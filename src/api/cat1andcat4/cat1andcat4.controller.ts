@@ -108,11 +108,13 @@ export class Cat1andcat4Controller {
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,
+    @Query('dockey') dockeyCMS: string,
   ) {
     const data = await this.cat1andcat4Service.autoSentCMS(
       dateFrom,
       dateTo,
       factory,
+      dockeyCMS,
     );
     return data;
   }

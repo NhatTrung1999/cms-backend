@@ -1188,7 +1188,7 @@ export class Cat9andcat12Service {
               break;
           }
 
-          switch (factory.trim().toLowerCase()) {
+          switch (item.Factory_Name.trim().toLowerCase()) {
             case 'LYV'.trim().toLowerCase():
             case 'LVL'.trim().toLowerCase():
             case 'LHG'.trim().toLowerCase():
@@ -1197,7 +1197,17 @@ export class Cat9andcat12Service {
                 'SEA'.trim().toLowerCase()
               ) {
                 portOfDeparture = 'VNCLP';
-              } else {
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'Land'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'SOTH';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'AIR'.trim().toLowerCase()
+              ) {
                 portOfDeparture = 'SGN';
               }
               break;
@@ -1227,7 +1237,17 @@ export class Cat9andcat12Service {
                 'SEA'.trim().toLowerCase()
               ) {
                 portOfDeparture = 'VNCLP';
-              } else {
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'Land'.trim().toLowerCase()
+              ) {
+                portOfDeparture = 'SOTH';
+              }
+              if (
+                item.Transport_Method.trim().toLowerCase() ===
+                'AIR'.trim().toLowerCase()
+              ) {
                 portOfDeparture = 'SGN';
               }
               break;
@@ -1290,16 +1310,24 @@ export class Cat9andcat12Service {
     const createdDate = dayjs().format('YYYY-MM-DD HH:mm:ss');
 
     let dockey = '';
+    let transtType = '';
+    let portType = '';
 
     switch (transportMethod.trim().toLowerCase()) {
       case 'SEA'.trim().toLowerCase():
         dockey = '3.2.01';
+        transtType = '海運';
+        portType = '海港';
         break;
       case 'AIR'.trim().toLowerCase():
         dockey = '3.2.02';
+        transtType = '空運';
+        portType = '空港';
         break;
       case 'LAND'.trim().toLowerCase():
         dockey = '3.2.03';
+        transtType = '陸運';
+        portType = '';
         break;
       default:
         dockey = '';
@@ -1330,10 +1358,10 @@ export class Cat9andcat12Service {
         UndDocNo: '', // DEFAULT
         CustVenName: customerID,
         InvoiceNo: invoiceNumber,
-        TransType: transportMethod === 'AIR' ? '空運' : '海運',
+        TransType: transtType,
         Departure: factoryAddress,
         Destination: portOfArrival,
-        PortType: transportMethod === 'AIR' ? '空港' : '海港',
+        PortType: portType,
         StPort: portOfDeparture,
         ThPort: '', // DEFAULT
         EndPort: portOfArrival,

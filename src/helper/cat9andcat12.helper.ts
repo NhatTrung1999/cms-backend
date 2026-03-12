@@ -364,6 +364,7 @@ export const buildQueryAutoSentCMS = async (
                           ,*
                           , N'${getFactory(factory)}' AS Factory
                           , N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Factory_address
+                          ,'${factory}' AS Factory_Name
                   FROM   (
                             SELECT im.INV_DATE             AS [Date]
                                     ,sb.ExFty_Date           AS Shipment_Date
