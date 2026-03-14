@@ -355,8 +355,8 @@ export const buildQueryTest = async (
                                     ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
                               END 
                         END AS ThirdCountryLandTransport
-                  ,ISNULL(poisi.PortOfDeparture ,isi.PortOfDeparture)          AS PortOfDeparture
-                  ,ISNULL(poisi.PortOfArrival,isi.PortOfArrival)            AS PortOfArrival
+                  --,ISNULL(poisi.PortOfDeparture ,isi.PortOfDeparture)          AS PortOfDeparture
+                  --,ISNULL(poisi.PortOfArrival,isi.PortOfArrival)            AS PortOfArrival
                   ,ISNULL(poisi.Factory_Port ,isi.Factory_Port)            AS FactoryDomesticLandTransport
                   ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Destination
                   ,CASE WHEN ISNULL(poisi.ThirdCountryLandTransport ,0)<>0 or ISNULL(poisi.Factory_Port ,0)<>0 THEN ISNULL(poisi.ThirdCountryLandTransport ,0)+ISNULL(poisi.Factory_Port ,0)
@@ -441,6 +441,13 @@ export const buildQueryTest = async (
                   ,CAST('0' AS INT)        AS LandTransportTonKilometers
                   ,CAST('0' AS INT)        AS SeaTransportTonKilometers
                   ,CAST('0' AS INT)        AS AirTransportTonKilometers
+                  ,pc.PortCode             AS PortOfDeparture
+                  ,CASE 
+                        WHEN '${factory}' IN ('LYV' ,'LVL' ,'LHG') AND pnc.TransportationMethod = 'SEA+LAND' THEN 'VNCLP'
+                        WHEN '${factory}' IN ('LYM' ,'POL') AND pnc.TransportationMethod = 'SEA+LAND' THEN 'MMRGN'
+                        WHEN '${factory}' IN ('LYF') AND pnc.TransportationMethod = 'SEA+LAND' THEN 'IDSRG'
+                        ELSE                  NULL
+                  END AS PortOfArrival
             INTO   #Cat1AndCat4
             FROM   #PurN233_CGZL pnc
                   INNER JOIN (
@@ -481,7 +488,14 @@ export const buildQueryTest = async (
                               ,S2.CLBH
                         ) ZLCLSL
                         ON  ZLCLSL.CGNO = pnc.PurNo
-                        AND ZLCLSL.CLBH = pnc.MatID;
+                        AND ZLCLSL.CLBH = pnc.MatID
+                  LEFT JOIN (
+                        SELECT SupplierID
+                              ,PortCode
+                        FROM   CMW.CMW.dbo.CMW_PortCode_Cat1_4
+                        WHERE  FactoryCode = '${factory}'
+                  ) AS pc
+                        ON  pc.SupplierID = pnc.SupplierCode COLLATE Database_Default
 
 
             SELECT *
@@ -796,8 +810,8 @@ export const buildQueryAutoSentCMS = async (
                                           ELSE CAST(isi.ThirdCountryLandTransport AS VARCHAR)
                                     END 
                               END AS ThirdCountryLandTransport
-                        ,ISNULL(poisi.PortOfDeparture ,isi.PortOfDeparture)          AS PortOfDeparture
-                        ,ISNULL(poisi.PortOfArrival,isi.PortOfArrival)            AS PortOfArrival
+                        --,ISNULL(poisi.PortOfDeparture ,isi.PortOfDeparture)          AS PortOfDeparture
+                        --,ISNULL(poisi.PortOfArrival,isi.PortOfArrival)            AS PortOfArrival
                         ,ISNULL(poisi.Factory_Port ,isi.Factory_Port)            AS FactoryDomesticLandTransport
                         ,N'${factoryAddress.length === 0 ? 'N/A' : factoryAddress[0]['Address']}' AS Destination
                         ,CASE WHEN ISNULL(poisi.ThirdCountryLandTransport ,0)<>0 or ISNULL(poisi.Factory_Port ,0)<>0 THEN ISNULL(poisi.ThirdCountryLandTransport ,0)+ISNULL(poisi.Factory_Port ,0)
@@ -890,6 +904,13 @@ export const buildQueryAutoSentCMS = async (
                         ,CAST('0' AS INT)           AS LandTransportTonKilometers
                         ,CAST('0' AS INT)           AS SeaTransportTonKilometers
                         ,CAST('0' AS INT)           AS AirTransportTonKilometers
+                        ,pc.PortCode             AS PortOfDeparture
+                        ,CASE 
+                              WHEN '${factory}' IN ('LYV' ,'LVL' ,'LHG') AND pnc.TransportationMethod = 'SEA+LAND' THEN 'VNCLP'
+                              WHEN '${factory}' IN ('LYM' ,'POL') AND pnc.TransportationMethod = 'SEA+LAND' THEN 'MMRGN'
+                              WHEN '${factory}' IN ('LYF') AND pnc.TransportationMethod = 'SEA+LAND' THEN 'IDSRG'
+                              ELSE                  NULL
+                        END AS PortOfArrival
                   INTO   #Cat1AndCat4
                   FROM   #PurN233_CGZL pnc
                         INNER JOIN (
@@ -930,7 +951,14 @@ export const buildQueryAutoSentCMS = async (
                                     ,S2.CLBH
                               ) ZLCLSL
                               ON  ZLCLSL.CGNO = pnc.PurNo
-                              AND ZLCLSL.CLBH = pnc.MatID;
+                              AND ZLCLSL.CLBH = pnc.MatID
+                        LEFT JOIN (
+                              SELECT SupplierID
+                                    ,PortCode
+                              FROM   CMW.CMW.dbo.CMW_PortCode_Cat1_4
+                              WHERE  FactoryCode = '${factory}'
+                        ) AS pc
+                        ON  pc.SupplierID = pnc.SupplierCode COLLATE Database_Default
                                     
 
                   SELECT *

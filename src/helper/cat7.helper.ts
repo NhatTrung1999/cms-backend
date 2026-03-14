@@ -11,8 +11,8 @@ export const buildQuery = (
   const isLYM = factory === 'LYM';
 
   const baseWhere = !isLYM
-    ? "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0"
-    : 'WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0';
+    ? "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0 AND u.lock = '0'"
+    : `WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0 AND u.lock = '0'`;
 
   const dateFilter = !isLYM
     ? 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?'
@@ -658,9 +658,9 @@ export const buildQueryAutoSentCmsLHG = async (
                                   ,u.lat
                                   ,u.long
                         ) AS a
-                        ORDER BY Staff_ID 
-                        OFFSET 6330 ROWS 
-                        FETCH NEXT 6331 ROWS ONLY`;
+                        --ORDER BY Staff_ID 
+                        --OFFSET 6330 ROWS 
+                        --FETCH NEXT 6331 ROWS ONLY`;
   //   const query = `SELECT TOP 20*
   //       ,N'樂億II - LHG'  AS Factory_Name
   // FROM   (
@@ -1414,7 +1414,7 @@ export const buildQueryAutoSentCmsLYM = async (
   // const baseWhere =
   //   'WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0 AND u.Address_Live IS NOT NULL';
 
-  const baseWhere = `WHERE 1=1 AND dwt.workhours > 0 AND u.lock = '0'`;
+  const baseWhere = `WHERE 1=1 AND dwt.workhours > 0 AND u.lock = '0' AND u.Vehicle IS NOT NULL`;
 
   const dateFilter = 'AND CONVERT(DATE ,dwt.CDate) BETWEEN ? AND ?';
 
@@ -2549,8 +2549,8 @@ export const buildQueryCustomExport = (
 ) => {
   const baseWhere: string =
     factory !== 'LYM'
-      ? `WHERE a.lock = '0' AND e.Work_Or_Not<>'2' AND e.Working_Time>0`
-      : `WHERE  c.workhours>0 AND a.lock = '0'`;
+      ? `WHERE a.lock = '0' AND e.Work_Or_Not<>'2' AND e.Working_Time>0 AND a.Vehicle IS NOT NULL`
+      : `WHERE  c.workhours>0 AND a.lock = '0' AND a.Vehicle IS NOT NULL`;
 
   const dateFilter: string =
     factory !== 'LYM'

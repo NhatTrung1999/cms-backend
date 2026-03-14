@@ -10,7 +10,7 @@ export const buildQueryHRModule = (
   const isLYM = factory === 'LYM';
   const baseWhere: string = isLYM
     ? `WHERE  c.workhours>0 AND a.lock = '0'`
-    : `WHERE a.lock = '0' AND e.Work_Or_Not<>'2' AND e.Working_Time>0`;
+    : `WHERE a.lock = '0' AND e.Work_Or_Not<>'2' AND e.Working_Time>0 AND a.Vehicle IS NOT NULL`;
 
   const conditions: string[] = [];
   if (dateFrom && dateTo) {

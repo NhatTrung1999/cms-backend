@@ -850,10 +850,10 @@ export class Cat1andcat4Service {
     if (docKey.startsWith('W')) {
       return [];
     }
-    const docDate = item.PurDate
+    const docDate = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
+    const docDate2 = item.PurDate
       ? dayjs(item.PurDate).format('YYYY/MM/DD')
       : '';
-    const docDate2 = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
     // const docNo = item.PurNo ?? '';
     const custVenName = item.SupplierCode ?? '';
     const transType = item.TransportationMethod ?? '';
@@ -864,6 +864,26 @@ export class Cat1andcat4Service {
     const activityData = item.WeightUnitkg ?? 0;
     const qtyReceive = item.QtyReceive ?? 0;
     const receivedNo = item.ReceivedNo ?? '';
+
+    let transtType = '';
+    let portType = '';
+
+    switch (transType.trim().toLowerCase()) {
+      case 'SEA'.trim().toLowerCase():
+        transtType = '海運';
+        portType = '海港';
+        break;
+      case 'AIR'.trim().toLowerCase():
+        transtType = '空運';
+        portType = '空港';
+        break;
+      case 'LAND'.trim().toLowerCase():
+        transtType = '陸運';
+        portType = '';
+        break;
+      default:
+        break;
+    }
 
     return ACTIVITY_TYPES.filter((item) => item === dockeyCMS).map(
       (activityType: ActivityType) => ({
@@ -891,16 +911,10 @@ export class Cat1andcat4Service {
         TransType: transType,
         Departure: departure,
         Destination: destination,
-        PortType:
-          transType.trim().toLowerCase() === 'land' || !transType ? '' : '海港',
+        PortType: portType,
         StPort: portOfDeparture,
         ThPort: '',
-        EndPort:
-          transType.trim().toLowerCase() === 'land' || !transType
-            ? ''
-            : portOfArrival.trim().toLowerCase() === 'lym'
-              ? 'MMRGN'
-              : 'VNCLP',
+        EndPort: portOfArrival,
         Product: matId.trim(),
         Quity: qtyReceive,
         Amount: '',
