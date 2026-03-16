@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -9,6 +10,7 @@ import { Sequelize } from 'sequelize-typescript';
 import { buildQueryHRModule } from 'src/helper/hrmodule';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
+import { buildReplacements } from 'src/helper/cat7.helper';
 
 @Injectable()
 export class HrService {
@@ -20,6 +22,125 @@ export class HrService {
     @Inject('JAZ_HRIS') private readonly JAZ_HRIS: Sequelize,
     @Inject('JZS_HRIS') private readonly JZS_HRIS: Sequelize,
   ) {}
+
+  private get factoryDbMap(): Record<string, Sequelize> {
+    return {
+      LYV: this.LYV_HRIS,
+      LHG: this.LHG_HRIS,
+      LVL: this.LVL_HRIS,
+      LYM: this.LYM_HRIS,
+      JAZ: this.JAZ_HRIS,
+      JZS: this.JZS_HRIS,
+    };
+  }
+
+  private readonly sortFieldMapHRModule: Record<string, string> = {
+    ID: 'a.userId',
+    Department: 'c.Department_Name',
+    FullName: 'a.fullName',
+    JoinDate: 'b.Date_Come_In',
+    PermanentAddress: 'd.Address_Live',
+    CurrentAddress: 'a.Address_Live',
+    TransportationMethod: 'a.Vehicle',
+    Number_of_Working_Days: 'e.Number_of_Working_Days',
+  };
+
+  // async findAll(
+  //   dateFrom: string,
+  //   dateTo: string,
+  //   fullName: string,
+  //   id: string,
+  //   department: string,
+  //   joinDate: string,
+  //   factory: string,
+  //   page: number = 1,
+  //   limit: number = 20,
+  //   sortField: string = 'ID',
+  //   sortOrder: string = 'asc',
+  // ) {
+  //   let db: Sequelize;
+  //   switch (factory.trim().toUpperCase()) {
+  //     case 'LYV':
+  //       db = this.LYV_HRIS;
+  //       break;
+  //     case 'LHG':
+  //       db = this.LHG_HRIS;
+  //       break;
+  //     case 'LVL':
+  //       db = this.LVL_HRIS;
+  //       break;
+  //     case 'LYM':
+  //       db = this.LYM_HRIS;
+  //       break;
+  //     case 'JAZ':
+  //       db = this.JAZ_HRIS;
+  //       break;
+  //     case 'JZS':
+  //       db = this.JZS_HRIS;
+  //       break;
+  //     default:
+  //       throw new Error('Invalid factory code');
+  //   }
+  //   const offset = (page - 1) * limit;
+  //   const { query, countQuery } = buildQueryHRModule(
+  //     dateFrom,
+  //     dateTo,
+  //     fullName,
+  //     id,
+  //     department,
+  //     joinDate,
+  //     factory,
+  //   );
+  //   const replacements: any = [];
+  //   if (dateFrom && dateTo) {
+  //     replacements.push(dateFrom, dateTo);
+  //   }
+
+  //   if (fullName) {
+  //     replacements.push(`%${fullName}%`);
+  //   }
+
+  //   if (id) {
+  //     replacements.push(`%${id}%`);
+  //   }
+
+  //   if (department) {
+  //     replacements.push(
+  //       `${factory.trim().toUpperCase() === 'LYM' ? department : `%${department}%`}`,
+  //     );
+  //   }
+
+  //   if (joinDate) {
+  //     replacements.push(joinDate);
+  //   }
+
+  //   const [dataResults, countResults] = await Promise.all([
+  //     db.query(query, { replacements, type: QueryTypes.SELECT }),
+  //     db.query(countQuery, {
+  //       type: QueryTypes.SELECT,
+  //       replacements,
+  //     }),
+  //   ]);
+
+  //   let data = dataResults;
+
+  //   data.sort((a, b) => {
+  //     const aValue = a[sortField];
+  //     const bValue = b[sortField];
+  //     if (sortOrder === 'asc') {
+  //       return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+  //     } else {
+  //       return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+  //     }
+  //   });
+
+  //   data = data.slice(offset, offset + limit);
+
+  //   const total = (countResults[0] as { total: number })?.total || 0;
+
+  //   const hasMore = offset + data.length < total;
+  //   return { data, page, limit, total, hasMore };
+  // }
 
   async findAll(
     dateFrom: string,
@@ -34,88 +155,57 @@ export class HrService {
     sortField: string = 'ID',
     sortOrder: string = 'asc',
   ) {
-    let db: Sequelize;
-    switch (factory.trim().toUpperCase()) {
-      case 'LYV':
-        db = this.LYV_HRIS;
-        break;
-      case 'LHG':
-        db = this.LHG_HRIS;
-        break;
-      case 'LVL':
-        db = this.LVL_HRIS;
-        break;
-      case 'LYM':
-        db = this.LYM_HRIS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_HRIS;
-        break;
-      case 'JZS':
-        db = this.JZS_HRIS;
-        break;
-      default:
-        throw new Error('Invalid factory code');
-    }
+    const normalizedFactory = factory.trim().toUpperCase();
+    const db = this.factoryDbMap[normalizedFactory];
+
+    if (!db) throw new BadRequestException('Invalid factory code');
+
     const offset = (page - 1) * limit;
+    const { dateToExclusive, hasDate } = buildReplacements(dateFrom, dateTo);
+    const isLYM = normalizedFactory === 'LYM';
+
     const { query, countQuery } = buildQueryHRModule(
       dateFrom,
-      dateTo,
+      dateToExclusive,
       fullName,
       id,
       department,
       joinDate,
-      factory,
+      normalizedFactory,
     );
-    const replacements: any = [];
-    if (dateFrom && dateTo) {
-      replacements.push(dateFrom, dateTo);
-    }
 
-    if (fullName) {
-      replacements.push(`%${fullName}%`);
-    }
+    const replacements: any[] = [];
+    if (hasDate) replacements.push(dateFrom, dateToExclusive);
+    if (fullName) replacements.push(`%${fullName}%`);
+    if (id) replacements.push(`%${id}%`);
+    if (department) replacements.push(isLYM ? department : `%${department}%`);
+    if (joinDate) replacements.push(joinDate);
 
-    if (id) {
-      replacements.push(`%${id}%`);
-    }
+    const safeSortField = this.sortFieldMapHRModule[sortField] ?? 'a.userId';
+    const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
+    const sortedQuery = query.replace(
+      'ORDER BY a.userId',
+      `ORDER BY ${safeSortField} ${safeSortOrder}`,
+    );
 
-    if (department) {
-      replacements.push(
-        `${factory.trim().toUpperCase() === 'LYM' ? department : `%${department}%`}`,
-      );
-    }
-
-    if (joinDate) {
-      replacements.push(joinDate);
-    }
+    const dataReplacements = [...replacements, offset, limit];
+    const countReplacements = [...replacements];
 
     const [dataResults, countResults] = await Promise.all([
-      db.query(query, { replacements, type: QueryTypes.SELECT }),
-      db.query(countQuery, {
+      db.query(sortedQuery, {
+        replacements: dataReplacements,
         type: QueryTypes.SELECT,
-        replacements,
+      }),
+      db.query(countQuery, {
+        replacements: countReplacements,
+        type: QueryTypes.SELECT,
       }),
     ]);
 
-    let data = dataResults;
-
-    data.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-
-    data = data.slice(offset, offset + limit);
-
     const total = (countResults[0] as { total: number })?.total || 0;
+    const hasMore = offset + dataResults.length < total;
 
-    const hasMore = offset + data.length < total;
-    return { data, page, limit, total, hasMore };
+    return { data: dataResults, page, limit, total, hasMore };
   }
 
   async findAllDepartment(factory: string) {
@@ -430,6 +520,130 @@ export class HrService {
     }
   }
 
+  // async exportToExcel(
+  //   dateFrom: string,
+  //   dateTo: string,
+  //   fullName: string,
+  //   id: string,
+  //   department: string,
+  //   joinDate: string,
+  //   factory: string,
+  // ) {
+  //   let db: Sequelize;
+  //   switch (factory.trim().toUpperCase()) {
+  //     case 'LYV':
+  //       db = this.LYV_HRIS;
+  //       break;
+  //     case 'LHG':
+  //       db = this.LHG_HRIS;
+  //       break;
+  //     case 'LVL':
+  //       db = this.LVL_HRIS;
+  //       break;
+  //     case 'LYM':
+  //       db = this.LYM_HRIS;
+  //       break;
+  //     case 'JAZ':
+  //       db = this.JAZ_HRIS;
+  //       break;
+  //     case 'JZS':
+  //       db = this.JZS_HRIS;
+  //       break;
+  //     default:
+  //       throw new Error('Invalid factory code');
+  //   }
+  //   const { query } = await buildQueryHRModule(
+  //     dateFrom,
+  //     dateTo,
+  //     fullName,
+  //     id,
+  //     department,
+  //     joinDate,
+  //     factory,
+  //   );
+  //   const replacements: any = [];
+  //   if (dateFrom && dateTo) {
+  //     replacements.push(dateFrom, dateTo);
+  //   }
+
+  //   if (fullName) {
+  //     replacements.push(`%${fullName}%`);
+  //   }
+
+  //   if (id) {
+  //     replacements.push(`%${id}%`);
+  //   }
+
+  //   if (department) {
+  //     replacements.push(`%${department}%`);
+  //   }
+
+  //   if (joinDate) {
+  //     replacements.push(joinDate);
+  //   }
+
+  //   const data = await db.query(query, {
+  //     type: QueryTypes.SELECT,
+  //     replacements,
+  //   });
+
+  //   const workbook = new ExcelJS.Workbook();
+  //   const worksheet = workbook.addWorksheet('List');
+
+  //   worksheet.columns = [
+  //     {
+  //       header: 'ID',
+  //       key: 'ID',
+  //     },
+  //     {
+  //       header: 'Full Name',
+  //       key: 'FullName',
+  //     },
+  //     {
+  //       header: 'Department',
+  //       key: 'Department',
+  //     },
+  //     {
+  //       header: 'Join Date',
+  //       key: 'JoinDate',
+  //     },
+  //     {
+  //       header: 'Permanent Address',
+  //       key: 'PermanentAddress',
+  //     },
+  //     {
+  //       header: 'Current Address',
+  //       key: 'CurrentAddress',
+  //     },
+  //     {
+  //       header: 'Transportation Method',
+  //       key: 'TransportationMethod',
+  //     },
+  //     {
+  //       header: 'Number of Working Days',
+  //       key: 'Number_of_Working_Days',
+  //     },
+  //   ];
+
+  //   worksheet.addRows(data);
+
+  //   worksheet.columns.forEach((column, index) => {
+  //     let maxLength = 10;
+  //     if (typeof column.eachCell === 'function') {
+  //       column.eachCell({ includeEmpty: true }, (cell) => {
+  //         const cellValue = cell.value ? cell.value.toString() : '';
+  //         const cellLength = cellValue.length;
+
+  //         if (cellLength > maxLength) {
+  //           maxLength = cellLength;
+  //         }
+  //       });
+  //     }
+  //     column.width = Math.min(maxLength + 4, 50);
+  //   });
+
+  //   return await workbook.xlsx.writeBuffer();
+  // }
   async exportToExcel(
     dateFrom: string,
     dateTo: string,
@@ -439,119 +653,99 @@ export class HrService {
     joinDate: string,
     factory: string,
   ) {
-    let db: Sequelize;
-    switch (factory.trim().toUpperCase()) {
-      case 'LYV':
-        db = this.LYV_HRIS;
-        break;
-      case 'LHG':
-        db = this.LHG_HRIS;
-        break;
-      case 'LVL':
-        db = this.LVL_HRIS;
-        break;
-      case 'LYM':
-        db = this.LYM_HRIS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_HRIS;
-        break;
-      case 'JZS':
-        db = this.JZS_HRIS;
-        break;
-      default:
-        throw new Error('Invalid factory code');
-    }
-    const { query } = await buildQueryHRModule(
+    const normalizedFactory = factory.trim().toUpperCase();
+    const db = this.factoryDbMap[normalizedFactory];
+
+    if (!db) throw new BadRequestException('Invalid factory code');
+
+    const { dateToExclusive, hasDate } = buildReplacements(dateFrom, dateTo);
+    const isLYM = normalizedFactory === 'LYM';
+
+    const { query } = buildQueryHRModule(
       dateFrom,
-      dateTo,
+      dateToExclusive,
       fullName,
       id,
       department,
       joinDate,
-      factory,
+      normalizedFactory,
     );
-    const replacements: any = [];
-    if (dateFrom && dateTo) {
-      replacements.push(dateFrom, dateTo);
-    }
 
-    if (fullName) {
-      replacements.push(`%${fullName}%`);
-    }
-
-    if (id) {
-      replacements.push(`%${id}%`);
-    }
-
-    if (department) {
-      replacements.push(`%${department}%`);
-    }
-
-    if (joinDate) {
-      replacements.push(joinDate);
-    }
+    const replacements: any[] = [];
+    if (hasDate) replacements.push(dateFrom, dateToExclusive);
+    if (fullName) replacements.push(`%${fullName}%`);
+    if (id) replacements.push(`%${id}%`);
+    if (department) replacements.push(isLYM ? department : `%${department}%`);
+    if (joinDate) replacements.push(joinDate);
+    replacements.push(0, 999999);
 
     const data = await db.query(query, {
-      type: QueryTypes.SELECT,
       replacements,
+      type: QueryTypes.SELECT,
     });
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('List');
 
     worksheet.columns = [
-      {
-        header: 'ID',
-        key: 'ID',
-      },
-      {
-        header: 'Full Name',
-        key: 'FullName',
-      },
-      {
-        header: 'Department',
-        key: 'Department',
-      },
-      {
-        header: 'Join Date',
-        key: 'JoinDate',
-      },
-      {
-        header: 'Permanent Address',
-        key: 'PermanentAddress',
-      },
-      {
-        header: 'Current Address',
-        key: 'CurrentAddress',
-      },
-      {
-        header: 'Transportation Method',
-        key: 'TransportationMethod',
-      },
-      {
-        header: 'Number of Working Days',
-        key: 'Number_of_Working_Days',
-      },
+      { header: 'ID', key: 'ID' },
+      { header: 'Full Name', key: 'FullName' },
+      { header: 'Department', key: 'Department' },
+      { header: 'Join Date', key: 'JoinDate' },
+      { header: 'Permanent Address', key: 'PermanentAddress' },
+      { header: 'Current Address', key: 'CurrentAddress' },
+      { header: 'Transportation Method', key: 'TransportationMethod' },
+      { header: 'Number of Working Days', key: 'Number_of_Working_Days' },
     ];
 
-    worksheet.addRows(data);
-
-    worksheet.columns.forEach((column, index) => {
-      let maxLength = 10;
-      if (typeof column.eachCell === 'function') {
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const cellValue = cell.value ? cell.value.toString() : '';
-          const cellLength = cellValue.length;
-
-          if (cellLength > maxLength) {
-            maxLength = cellLength;
-          }
-        });
-      }
-      column.width = Math.min(maxLength + 4, 50);
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1F4E78' },
+      };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      } as ExcelJS.Borders;
     });
 
-    return await workbook.xlsx.writeBuffer();
+    data.forEach((item, index) => {
+      const row = worksheet.addRow(item);
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        } as ExcelJS.Borders;
+        cell.alignment = { vertical: 'middle' };
+        if (index % 2 === 0) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF2F2F2' },
+          };
+        }
+      });
+    });
+
+    worksheet.columns.forEach((column) => {
+      let maxLength = column.header ? String(column.header).length : 10;
+      column.eachCell?.({ includeEmpty: true }, (cell) => {
+        maxLength = Math.max(
+          maxLength,
+          cell.value ? String(cell.value).length : 0,
+        );
+      });
+      column.width = Math.min(maxLength * 1.2, 50);
+    });
+
+    return workbook.xlsx.writeBuffer();
   }
 }

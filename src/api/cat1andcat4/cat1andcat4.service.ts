@@ -2,6 +2,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
@@ -116,6 +117,51 @@ export class Cat1andcat4Service {
       { type: QueryTypes.SELECT },
     );
     return records;
+  }
+
+  async update(
+    id: string,
+    updateDto: {
+      TaxFreeZoneAddress: string;
+    },
+    factory: string,
+    userid: string,
+  ) {
+    try {
+      const query = `
+          UPDATE CMW_TAX_FREE_ZONE_ADDRESS
+          SET
+            TaxFreeZoneAddress = :taxFreeZoneAddress,
+            UpdatedBy = :updatedBy,
+            UpdatedFactory = :updatedFactory,
+            UpdatedAt = GETDATE()
+          OUTPUT
+            INSERTED.ID AS ID,
+            INSERTED.TaxFreeZoneAddress AS TaxFreeZoneAddress,
+            INSERTED.UpdatedBy AS UpdatedBy,
+            INSERTED.UpdatedAt AS UpdatedAt
+          WHERE ID = :id
+        `;
+
+      const results = await this.EIP.query(query, {
+        replacements: {
+          taxFreeZoneAddress: updateDto.TaxFreeZoneAddress,
+          updatedBy: userid,
+          updatedFactory: factory,
+          id: id,
+        },
+        type: QueryTypes.SELECT,
+      });
+      if (!results || results.length === 0) {
+        throw new NotFoundException('Update failed!');
+      }
+      return results[0];
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(error.message);
+    }
   }
 
   // private async getAFactoryData(

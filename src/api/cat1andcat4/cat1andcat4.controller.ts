@@ -1,7 +1,10 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
+  Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -60,6 +63,20 @@ export class Cat1andcat4Controller {
     @Query('sortOrder') sortOrder: string,
   ) {
     return this.cat1andcat4Service.getTaxFreeZoneAddress(sortField, sortOrder);
+  }
+
+  @Patch('tax-free-zone-address/:id')
+  async update(
+    @Param('id') id: string,
+    @Body()
+    updateDto: {
+      TaxFreeZoneAddress: string;
+    },
+    @Request() req,
+  ) {
+    const factory = getFactortyID(req);
+    const userid = getUserId(req);
+    return this.cat1andcat4Service.update(id, updateDto, factory, userid);
   }
 
   @Post('import-excel-port-code')

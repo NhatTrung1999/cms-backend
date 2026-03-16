@@ -39,6 +39,17 @@ export class Cat7Service {
     @Inject('JZS_HRIS') private readonly JZS_HRIS: Sequelize,
   ) {}
 
+  private get factoryDbMap(): Record<string, Sequelize> {
+    return {
+      LYV: this.LYV_HRIS,
+      LHG: this.LHG_HRIS,
+      LYM: this.LYM_HRIS,
+      LVL: this.LVL_HRIS,
+      JAZ: this.JAZ_HRIS,
+      JZS: this.JZS_HRIS,
+    };
+  }
+
   private readonly buildQueryMap: Record<FactoryCode, BuildQueryFn> = {
     LYV: buildQueryAutoSentCmsLYV,
     LHG: buildQueryAutoSentCmsLHG,
@@ -47,6 +58,28 @@ export class Cat7Service {
     JAZ: buildQueryAutoSentCmsJAZ,
     JZS: buildQueryAutoSentCmsJZS,
   };
+
+  private readonly sortFieldMap: Record<string, string> = {
+    Staff_ID: 'u.userId',
+    Residential_Address: 'u.Address_Live',
+    Main_Transportation_Type: 'u.Vehicle',
+    Number_of_Working_Days: 'e.Number_of_Working_Days',
+  };
+
+  private buildReplacements(
+    dateFrom: string,
+    dateTo: string,
+  ): {
+    dateToExclusive: string;
+    hasDate: boolean;
+  } {
+    return {
+      dateToExclusive: dateTo
+        ? dayjs(dateTo).add(1, 'day').format('YYYY-MM-DD')
+        : '',
+      hasDate: !!(dateFrom && dateTo),
+    };
+  }
 
   async getDataCat7(
     dateFrom: string,
@@ -57,38 +90,20 @@ export class Cat7Service {
     sortField: string = 'Staff_ID',
     sortOrder: string = 'asc',
   ) {
-    let db: Sequelize;
-    switch (factory) {
-      case 'LYV':
-        db = this.LYV_HRIS;
-        break;
-      case 'LHG':
-        db = this.LHG_HRIS;
-        break;
-      case 'LYM':
-        db = this.LYM_HRIS;
-        break;
-      case 'LVL':
-        db = this.LVL_HRIS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_HRIS;
-        break;
-      case 'JZS':
-        db = this.JZS_HRIS;
-        break;
-      default:
-        return await this.getAllDataFactory(
-          dateFrom,
-          dateTo,
-          page,
-          limit,
-          sortField,
-          sortOrder,
-        );
+    const db = this.factoryDbMap[factory];
+
+    if (!db) {
+      return this.getAllDataFactory(
+        dateFrom,
+        dateTo,
+        page,
+        limit,
+        sortField,
+        sortOrder,
+      );
     }
 
-    return await this.getDataFactory(
+    return this.getDataFactory(
       db,
       dateFrom,
       dateTo,
@@ -99,71 +114,6 @@ export class Cat7Service {
       sortOrder,
     );
   }
-
-  // private buildQuery(factory: string, dateFrom?: string, dateTo?: string) {
-  //   const isLYM = factory === 'LYM';
-
-  //   const baseWhere = !isLYM
-  //     ? "WHERE 1=1 AND Work_Or_Not<>'2' AND u.Vehicle IS NOT NULL AND dwt.Working_Time > 0"
-  //     : 'WHERE 1=1 AND u.Vehicle IS NOT NULL AND dwt.workhours > 0';
-
-  //   const dateFilter = !isLYM
-  //     ? 'AND CONVERT(DATE, dwt.Check_Day) BETWEEN ? AND ?'
-  //     : 'AND CONVERT(DATE ,dwt.CDate) BETWEEN ? AND ?';
-
-  //   const where = dateFrom && dateTo ? `${baseWhere} ${dateFilter}` : baseWhere;
-
-  //   const workCol = !isLYM ? 'WORKING_TIME' : 'workhours';
-
-  //   const table = !isLYM ? 'Data_Work_Time' : 'HR_Attendance';
-
-  //   const join = !isLYM
-  //     ? 'u.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS = dwt.Person_Serial_Key COLLATE Chinese_Taiwan_Stroke_CI_AS'
-  //     : 'u.userId = dwt.UserNo';
-
-  //   const query = `SELECT u.userId                       AS Staff_ID
-  //                         ,CASE
-  //                               WHEN u.Address_Live IS NULL THEN u.Bus_Route
-  //                               ELSE u.Address_Live
-  //                         END                            AS Residential_address
-  //                         ,u.Vehicle                      AS Main_transportation_type
-  //                         ,'API Calculation'              AS km
-  //                         ,COUNT(${workCol})  AS Number_of_working_days
-  //                         ,'API Calculation'              AS PKT_p_km
-  //                   FROM   ${table}                 AS dwt
-  //                         LEFT JOIN users                AS u
-  //                               ON  ${join}
-  //                   ${where}
-  //                   GROUP BY
-  //                           u.userId
-  //                           ,u.Address_Live
-  //                           ,u.Vehicle
-  //                           ,u.Bus_Route`;
-
-  //   // console.log(query);
-  //   const countQuery = `SELECT COUNT(*) AS total
-  //                       FROM   (
-  //                                 SELECT u.userId                       AS Staff_ID
-  //                                       ,CASE
-  //                                             WHEN u.Address_Live IS NULL THEN u.Bus_Route
-  //                                             ELSE u.Address_Live
-  //                                       END                            AS Residential_address
-  //                                       ,u.Vehicle                      AS Main_transportation_type
-  //                                       ,'API Calculation'              AS km
-  //                                       ,COUNT(${workCol})  AS Number_of_working_days
-  //                                       ,'API Calculation'              AS PKT_p_km
-  //                                 FROM   ${table}                 AS dwt
-  //                                       LEFT JOIN users                AS u
-  //                                             ON  ${join}
-  //                                 ${where}
-  //                                 GROUP BY
-  //                                         u.userId
-  //                                         ,u.Address_Live
-  //                                         ,u.Vehicle
-  //                                         ,u.Bus_Route
-  //                       ) AS Sub`;
-  //   return { query, countQuery };
-  // }
 
   private async getDataFactory(
     db: Sequelize,
@@ -176,37 +126,44 @@ export class Cat7Service {
     sortOrder: string,
   ) {
     const offset = (page - 1) * limit;
+    const { dateToExclusive, hasDate } = this.buildReplacements(
+      dateFrom,
+      dateTo,
+    );
 
-    const { query, countQuery } = buildQuery(factory, dateFrom, dateTo);
+    const { query, countQuery } = buildQuery(
+      factory,
+      dateFrom,
+      dateToExclusive,
+    );
 
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+    const safeSortField = this.sortFieldMap[sortField] ?? 'u.userId';
+    const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
+    const sortedQuery = query.replace(
+      'ORDER BY u.userId',
+      `ORDER BY ${safeSortField} ${safeSortOrder}`,
+    );
+
+    const dataReplacements = hasDate
+      ? [dateFrom, dateToExclusive, offset, limit]
+      : [offset, limit];
+    const countReplacements = hasDate ? [dateFrom, dateToExclusive] : [];
 
     const [dataResults, countResults] = await Promise.all([
-      db.query(query, { replacements, type: QueryTypes.SELECT }),
-      db.query(countQuery, {
+      db.query(sortedQuery, {
+        replacements: dataReplacements,
         type: QueryTypes.SELECT,
-        replacements,
+      }),
+      db.query(countQuery, {
+        replacements: countReplacements,
+        type: QueryTypes.SELECT,
       }),
     ]);
 
-    let data = dataResults;
-    data.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-
-    data = data.slice(offset, offset + limit);
-
     const total = (countResults[0] as { total: number })?.total || 0;
+    const hasMore = offset + dataResults.length < total;
 
-    const hasMore = offset + data.length < total;
-
-    return { data, page, limit, total, hasMore };
+    return { data: dataResults, page, limit, total, hasMore };
   }
 
   private async getAllDataFactory(
@@ -219,62 +176,253 @@ export class Cat7Service {
   ) {
     try {
       const offset = (page - 1) * limit;
+      const { dateToExclusive, hasDate } = this.buildReplacements(
+        dateFrom,
+        dateTo,
+      );
 
-      const connects: { factoryName: string; conn: Sequelize }[] = [
-        { factoryName: 'LYV', conn: this.LYV_HRIS },
-        { factoryName: 'LHG', conn: this.LHG_HRIS },
-        { factoryName: 'LVL', conn: this.LVL_HRIS },
-        { factoryName: 'LYM', conn: this.LYM_HRIS },
-        { factoryName: 'JAZ', conn: this.JAZ_HRIS },
-        { factoryName: 'JZS', conn: this.JZS_HRIS },
-      ];
+      const factories = Object.entries(this.factoryDbMap);
 
-      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+      const countReplacements = hasDate ? [dateFrom, dateToExclusive] : [];
 
-      const [dataResults, countResults] = await Promise.all([
-        Promise.all(
-          connects.map(({ factoryName, conn }) => {
-            const { query } = buildQuery(factoryName, dateFrom, dateTo);
-            return conn.query(query, { type: QueryTypes.SELECT, replacements });
-          }),
-        ),
-        Promise.all(
-          connects.map(({ factoryName, conn }) => {
-            const { countQuery } = buildQuery(factoryName, dateFrom, dateTo);
-            return conn.query(countQuery, {
+      const results = await Promise.all(
+        factories.map(([factoryName, conn]) => {
+          const { query, countQuery } = buildQuery(
+            factoryName,
+            dateFrom,
+            dateToExclusive,
+          );
+
+          const safeSortField = this.sortFieldMap[sortField] ?? 'u.userId';
+          const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
+          const sortedQuery = query.replace(
+            'ORDER BY u.userId',
+            `ORDER BY ${safeSortField} ${safeSortOrder}`,
+          );
+
+          const dataReplacements = hasDate
+            ? [dateFrom, dateToExclusive, 0, 999999]
+            : [0, 999999];
+
+          return Promise.all([
+            conn.query(sortedQuery, {
+              replacements: dataReplacements,
               type: QueryTypes.SELECT,
-              replacements,
-            });
-          }),
-        ),
-      ]);
+            }),
+            conn.query(countQuery, {
+              replacements: countReplacements,
+              type: QueryTypes.SELECT,
+            }),
+          ]);
+        }),
+      );
 
-      let data = dataResults.flat();
+      const allData = results.flatMap(([data]) => data);
+      const allCount = results.reduce((sum, [, count]) => {
+        return sum + ((count[0] as { total: number })?.total || 0);
+      }, 0);
 
-      data.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        if (sortOrder === 'asc') {
-          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-        } else {
-          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-        }
+      allData.sort((a, b) => {
+        const aVal = a[sortField];
+        const bVal = b[sortField];
+        if (sortOrder === 'asc') return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        else return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
       });
 
-      data = data.slice(offset, offset + limit);
+      const data = allData.slice(offset, offset + limit);
+      const hasMore = offset + data.length < allCount;
 
-      const total = countResults.reduce((sum, result) => {
-        return sum + ((result[0] as { total: number })?.total || 0);
-      }, 0);
-      const hasMore = offset + data.length < total;
-
-      return { data, page, limit, total, hasMore };
+      return { data, page, limit, total: allCount, hasMore };
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
   }
 
   // custom export
+  // async getCustomExport(
+  //   dateFrom: string,
+  //   dateTo: string,
+  //   factory: string,
+  //   page: number = 1,
+  //   limit: number = 20,
+  //   sortField: string = 'ID',
+  //   sortOrder: string = 'asc',
+  // ) {
+  //   let db: Sequelize;
+  //   switch (factory) {
+  //     case 'LYV':
+  //       db = this.LYV_HRIS;
+  //       break;
+  //     case 'LHG':
+  //       db = this.LHG_HRIS;
+  //       break;
+  //     case 'LYM':
+  //       db = this.LYM_HRIS;
+  //       break;
+  //     case 'LVL':
+  //       db = this.LVL_HRIS;
+  //       break;
+  //     case 'JAZ':
+  //       db = this.JAZ_HRIS;
+  //       break;
+  //     case 'JZS':
+  //       db = this.JZS_HRIS;
+  //       break;
+  //     default:
+  //       return await this.getAllDataCustomExport(
+  //         dateFrom,
+  //         dateTo,
+  //         page,
+  //         limit,
+  //         sortField,
+  //         sortOrder,
+  //       );
+  //   }
+  //   return await this.getDataCustomExport(
+  //     db,
+  //     dateFrom,
+  //     dateTo,
+  //     page,
+  //     factory,
+  //     limit,
+  //     sortField,
+  //     sortOrder,
+  //   );
+  // }
+
+  // private async getDataCustomExport(
+  //   db: Sequelize,
+  //   dateFrom: string,
+  //   dateTo: string,
+  //   page: number,
+  //   factory: string,
+  //   limit: number,
+  //   sortField: string,
+  //   sortOrder: string,
+  // ) {
+  //   // console.log(sortField, sortOrder, page, limit);
+  //   const offset = (page - 1) * limit;
+
+  //   const { query, countQuery } = buildQueryCustomExport(
+  //     dateFrom,
+  //     dateTo,
+  //     factory,
+  //   );
+
+  //   const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+  //   const [dataResults, countResults] = await Promise.all([
+  //     db.query(query, { replacements, type: QueryTypes.SELECT }),
+  //     db.query(countQuery, {
+  //       replacements,
+  //       type: QueryTypes.SELECT,
+  //     }),
+  //   ]);
+  //   let data = dataResults;
+  //   data.sort((a, b) => {
+  //     const aValue = a[sortField];
+  //     const bValue = b[sortField];
+  //     if (sortOrder === 'asc') {
+  //       return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+  //     } else {
+  //       return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+  //     }
+  //   });
+
+  //   data = data.slice(offset, offset + limit);
+
+  //   const total = (countResults[0] as { total: number })?.total || 0;
+
+  //   const hasMore = offset + data.length < total;
+
+  //   return { data, page, limit, total, hasMore };
+  // }
+
+  // private async getAllDataCustomExport(
+  //   dateFrom: string,
+  //   dateTo: string,
+  //   page: number,
+  //   limit: number,
+  //   sortField: string,
+  //   sortOrder: string,
+  // ) {
+  //   try {
+  //     const offset = (page - 1) * limit;
+
+  //     const connects: { factoryName: string; conn: Sequelize }[] = [
+  //       { factoryName: 'LYV', conn: this.LYV_HRIS },
+  //       { factoryName: 'LHG', conn: this.LHG_HRIS },
+  //       { factoryName: 'LVL', conn: this.LVL_HRIS },
+  //       { factoryName: 'LYM', conn: this.LYM_HRIS },
+  //       { factoryName: 'JAZ', conn: this.JAZ_HRIS },
+  //       { factoryName: 'JZS', conn: this.JZS_HRIS },
+  //     ];
+
+  //     const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+
+  //     const [dataResults, countResults] = await Promise.all([
+  //       Promise.all(
+  //         connects.map(({ factoryName, conn }) => {
+  //           const { query } = buildQueryCustomExport(
+  //             dateFrom,
+  //             dateTo,
+  //             factoryName,
+  //           );
+  //           return conn.query(query, { type: QueryTypes.SELECT, replacements });
+  //         }),
+  //       ),
+  //       Promise.all(
+  //         connects.map(({ factoryName, conn }) => {
+  //           const { countQuery } = buildQueryCustomExport(
+  //             dateFrom,
+  //             dateTo,
+  //             factoryName,
+  //           );
+  //           return conn.query(countQuery, {
+  //             type: QueryTypes.SELECT,
+  //             replacements,
+  //           });
+  //         }),
+  //       ),
+  //     ]);
+
+  //     const allData = dataResults.flat();
+
+  //     let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
+
+  //     data.sort((a, b) => {
+  //       const aValue = a[sortField];
+  //       const bValue = b[sortField];
+  //       if (sortOrder === 'asc') {
+  //         return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+  //       } else {
+  //         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+  //       }
+  //     });
+
+  //     data = data.slice(offset, offset + limit);
+
+  //     const total = countResults.reduce((sum, result) => {
+  //       return sum + ((result[0] as { total: number })?.total || 0);
+  //     }, 0);
+  //     const hasMore = offset + data.length < total;
+
+  //     return { data, page, limit, total, hasMore };
+  //   } catch (error: any) {
+  //     throw new InternalServerErrorException(error);
+  //   }
+  // }
+  private readonly sortFieldMapCustomExport: Record<string, string> = {
+    No: 'a.userId',
+    ID: 'a.userId',
+    Department: 'c.Department_Name',
+    Full_Name: 'a.fullName',
+    Current_Address: 'a.Address_Live',
+    Transportation_Mode: 'a.Vehicle',
+    Bus_Route: 'a.Bus_Route',
+    Pickup_Point: 'a.PickupDropoffStation',
+    Number_of_Working_Days: 'e.Number_of_Working_Days',
+  };
   async getCustomExport(
     dateFrom: string,
     dateTo: string,
@@ -284,38 +432,20 @@ export class Cat7Service {
     sortField: string = 'ID',
     sortOrder: string = 'asc',
   ) {
-    // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
-    let db: Sequelize;
-    switch (factory) {
-      case 'LYV':
-        db = this.LYV_HRIS;
-        break;
-      case 'LHG':
-        db = this.LHG_HRIS;
-        break;
-      case 'LYM':
-        db = this.LYM_HRIS;
-        break;
-      case 'LVL':
-        db = this.LVL_HRIS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_HRIS;
-        break;
-      case 'JZS':
-        db = this.JZS_HRIS;
-        break;
-      default:
-        return await this.getAllDataCustomExport(
-          dateFrom,
-          dateTo,
-          page,
-          limit,
-          sortField,
-          sortOrder,
-        );
+    const db = this.factoryDbMap[factory];
+
+    if (!db) {
+      return this.getAllDataCustomExport(
+        dateFrom,
+        dateTo,
+        page,
+        limit,
+        sortField,
+        sortOrder,
+      );
     }
-    return await this.getDataCustomExport(
+
+    return this.getDataCustomExport(
       db,
       dateFrom,
       dateTo,
@@ -326,7 +456,6 @@ export class Cat7Service {
       sortOrder,
     );
   }
-
   private async getDataCustomExport(
     db: Sequelize,
     dateFrom: string,
@@ -337,42 +466,47 @@ export class Cat7Service {
     sortField: string,
     sortOrder: string,
   ) {
-    // console.log(sortField, sortOrder, page, limit);
     const offset = (page - 1) * limit;
+    const { dateToExclusive, hasDate } = this.buildReplacements(
+      dateFrom,
+      dateTo,
+    );
 
     const { query, countQuery } = buildQueryCustomExport(
       dateFrom,
-      dateTo,
+      dateToExclusive,
       factory,
     );
 
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+    const safeSortField =
+      this.sortFieldMapCustomExport[sortField] ?? 'a.userId';
+    const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
+    const sortedQuery = query.replace(
+      'ORDER BY a.userId',
+      `ORDER BY ${safeSortField} ${safeSortOrder}`,
+    );
+
+    // ✅ Sort + pagination trong SQL
+    const dataReplacements = hasDate
+      ? [dateFrom, dateToExclusive, offset, limit]
+      : [offset, limit];
+    const countReplacements = hasDate ? [dateFrom, dateToExclusive] : [];
 
     const [dataResults, countResults] = await Promise.all([
-      db.query(query, { replacements, type: QueryTypes.SELECT }),
+      db.query(sortedQuery, {
+        replacements: dataReplacements,
+        type: QueryTypes.SELECT,
+      }),
       db.query(countQuery, {
-        replacements,
+        replacements: countReplacements,
         type: QueryTypes.SELECT,
       }),
     ]);
-    let data = dataResults;
-    data.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-
-    data = data.slice(offset, offset + limit);
 
     const total = (countResults[0] as { total: number })?.total || 0;
+    const hasMore = offset + dataResults.length < total;
 
-    const hasMore = offset + data.length < total;
-
-    return { data, page, limit, total, hasMore };
+    return { data: dataResults, page, limit, total, hasMore };
   }
 
   private async getAllDataCustomExport(
@@ -385,63 +519,63 @@ export class Cat7Service {
   ) {
     try {
       const offset = (page - 1) * limit;
+      const { dateToExclusive, hasDate } = this.buildReplacements(
+        dateFrom,
+        dateTo,
+      );
 
-      const connects: { factoryName: string; conn: Sequelize }[] = [
-        { factoryName: 'LYV', conn: this.LYV_HRIS },
-        { factoryName: 'LHG', conn: this.LHG_HRIS },
-        { factoryName: 'LVL', conn: this.LVL_HRIS },
-        { factoryName: 'LYM', conn: this.LYM_HRIS },
-        { factoryName: 'JAZ', conn: this.JAZ_HRIS },
-        { factoryName: 'JZS', conn: this.JZS_HRIS },
-      ];
+      const safeSortField =
+        this.sortFieldMapCustomExport[sortField] ?? 'a.userId';
+      const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
+      const countReplacements = hasDate ? [dateFrom, dateToExclusive] : [];
 
-      const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+      // ✅ Gộp data + count vào 1 Promise.all duy nhất
+      const results = await Promise.all(
+        Object.entries(this.factoryDbMap).map(([factoryName, conn]) => {
+          const { query, countQuery } = buildQueryCustomExport(
+            dateFrom,
+            dateToExclusive,
+            factoryName,
+          );
 
-      const [dataResults, countResults] = await Promise.all([
-        Promise.all(
-          connects.map(({ factoryName, conn }) => {
-            const { query } = buildQueryCustomExport(
-              dateFrom,
-              dateTo,
-              factoryName,
-            );
-            return conn.query(query, { type: QueryTypes.SELECT, replacements });
-          }),
-        ),
-        Promise.all(
-          connects.map(({ factoryName, conn }) => {
-            const { countQuery } = buildQueryCustomExport(
-              dateFrom,
-              dateTo,
-              factoryName,
-            );
-            return conn.query(countQuery, {
+          const sortedQuery = query.replace(
+            'ORDER BY a.userId',
+            `ORDER BY ${safeSortField} ${safeSortOrder}`,
+          );
+          const dataReplacements = hasDate
+            ? [dateFrom, dateToExclusive, 0, 999999]
+            : [0, 999999];
+
+          return Promise.all([
+            conn.query(sortedQuery, {
+              replacements: dataReplacements,
               type: QueryTypes.SELECT,
-              replacements,
-            });
-          }),
-        ),
-      ]);
+            }),
+            conn.query(countQuery, {
+              replacements: countReplacements,
+              type: QueryTypes.SELECT,
+            }),
+          ]);
+        }),
+      );
 
-      const allData = dataResults.flat();
+      // ✅ Merge + đánh lại số No sau khi gộp tất cả factory
+      const allData = results
+        .flatMap(([data]) => data)
+        .map((item, index) => ({ ...item, No: index + 1 }));
 
-      let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
-
-      data.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        if (sortOrder === 'asc') {
-          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-        } else {
-          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-        }
+      allData.sort((a, b) => {
+        const aVal = a[sortField];
+        const bVal = b[sortField];
+        if (sortOrder === 'asc') return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        else return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
       });
 
-      data = data.slice(offset, offset + limit);
-
-      const total = countResults.reduce((sum, result) => {
-        return sum + ((result[0] as { total: number })?.total || 0);
-      }, 0);
+      const total = results.reduce(
+        (sum, [, count]) => sum + ((count[0] as { total: number })?.total || 0),
+        0,
+      );
+      const data = allData.slice(offset, offset + limit);
       const hasMore = offset + data.length < total;
 
       return { data, page, limit, total, hasMore };
