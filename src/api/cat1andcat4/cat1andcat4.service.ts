@@ -902,7 +902,7 @@ export class Cat1andcat4Service {
       : '';
     // const docNo = item.PurNo ?? '';
     const custVenName = item.SupplierCode ?? '';
-    const transType = item.TransportationMethod ?? '';
+    const transportationMethod = item.TransportationMethod ?? '';
     const departure = item.Departure ?? '';
     const portOfDeparture = item.PortOfDeparture ?? '';
     const portOfArrival = item.PortOfArrival ?? '';
@@ -911,20 +911,21 @@ export class Cat1andcat4Service {
     const qtyReceive = item.QtyReceive ?? 0;
     const receivedNo = item.ReceivedNo ?? '';
 
-    let transtType = '';
+    let transType = '';
     let portType = '';
 
-    switch (transType.trim().toLowerCase()) {
+    switch (transportationMethod.trim().toLowerCase()) {
       case 'SEA'.trim().toLowerCase():
-        transtType = '海運';
+      case 'SEA+LAND'.trim().toLowerCase():
+        transType = '海運';
         portType = '海港';
         break;
       case 'AIR'.trim().toLowerCase():
-        transtType = '空運';
+        transType = '空運';
         portType = '空港';
         break;
       case 'LAND'.trim().toLowerCase():
-        transtType = '陸運';
+        transType = '陸運';
         portType = '';
         break;
       default:

@@ -310,6 +310,24 @@ export const buildQueryTest = async (
     where += ` AND ISNULL(Departure, '') = ''`;
   }
 
+  let notIn = '';
+  switch (factory.trim().toLowerCase()) {
+    case 'LYM'.trim().toLowerCase():
+      notIn += `AND CGZL.ZSBH not in ('MT520', 'VT35')`;
+      break;
+    case 'LHG'.trim().toLowerCase():
+      notIn += `AND CGZL.ZSBH <> 'VL889'`;
+      break;
+    case 'LYV'.trim().toLowerCase():
+      notIn += `AND CGZL.ZSBH <> 'VL888'`;
+      break;
+    case 'LVL'.trim().toLowerCase():
+      notIn += `AND CGZL.ZSBH <> 'VT205'`;
+      break;
+    default:
+      break;
+  }
+
   const query = `
             IF OBJECT_ID('tempdb..#PurN233_CGZL') IS NOT NULL
                   DROP TABLE #PurN233_CGZL;
@@ -417,7 +435,7 @@ export const buildQueryTest = async (
                         AND SN74A.MatID = c.CLBH
             WHERE  CGDate>= :startDate
                   AND CGDate < :endDate 
-                  ${factory === 'LYM' ? `AND CGZL.ZSBH<>'MT520'` : ''}
+                  ${notIn}
                   AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4') 
                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
                   AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')
@@ -757,7 +775,7 @@ export const buildQueryAutoSentCMS = async (
   factory: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT ${factory?.trim().toLowerCase() === 'lym'.trim().toLowerCase() ? `N'TSANG YIH Co., Ltd /Polo/ချန်းရိ' as [Address]` : '[Address]'}
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = '${factory}'`;
 
@@ -765,6 +783,24 @@ export const buildQueryAutoSentCMS = async (
     (await db?.query(queryAddress, {
       type: QueryTypes.SELECT,
     })) || [];
+
+    let notIn = '';
+    switch (factory.trim().toLowerCase()) {
+      case 'LYM'.trim().toLowerCase():
+        notIn += `AND CGZL.ZSBH not in ('MT520', 'VT35')`;
+        break;
+      case 'LHG'.trim().toLowerCase():
+        notIn += `AND CGZL.ZSBH <> 'VL889'`;
+        break;
+      case 'LYV'.trim().toLowerCase():
+        notIn += `AND CGZL.ZSBH <> 'VL888'`;
+        break;
+      case 'LVL'.trim().toLowerCase():
+        notIn += `AND CGZL.ZSBH <> 'VT205'`;
+        break;
+      default:
+        break;
+    }
 
   const query = `IF OBJECT_ID('tempdb..#PurN233_CGZL') IS NOT NULL
                         DROP TABLE #PurN233_CGZL;
@@ -875,12 +911,12 @@ export const buildQueryAutoSentCMS = async (
                                     ,PortCode
                                     ,TransportMethod
                               FROM   CMW.CMW.dbo.CMW_PortCode_Cat1_4
-                              WHERE  FactoryCode = 'LYV'
+                              WHERE  FactoryCode = '${factory}'
                               ) AS pc
                               ON  pc.SupplierID = ISNULL(z.ZSDH ,CGZL.ZSBH) COLLATE Database_Default
                   WHERE  CGDate >= :startDate
                         AND CGDate < :endDate 
-                        ${factory === 'LYM' ? `AND CGZL.ZSBH<>'MT520'` : ''}
+                        ${notIn}
                         AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                         AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
                         AND (NOT EXISTS (SELECT 1 FROM Setup_Exclusion_Cases_MaterialID AS secmi WHERE LEFT(c.CLBH,4)=secmi.TypeMaterial AND secmi.Fty='ALL' AND secmi.CLBH='ALL')

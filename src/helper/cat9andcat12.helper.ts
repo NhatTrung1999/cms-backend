@@ -342,7 +342,7 @@ export const buildQueryAutoSentCMS = async (
   factory: string,
   db?: Sequelize,
 ) => {
-  const queryAddress = `SELECT [Address]
+  const queryAddress = `SELECT ${factory?.trim().toLowerCase() === 'lym'.trim().toLowerCase() ? `N'TSANG YIH Co., Ltd /Polo/ချန်းရိ' as [Address]` : '[Address]'}
                         FROM CMW_Info_Factory
                         WHERE CreatedFactory = '${factory}'`;
 
