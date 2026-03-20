@@ -960,7 +960,7 @@ export const buildQueryAutoSentCmsLVL = async (
     FROM       users              AS u
 
     LEFT JOIN  Data_Person        AS dp
-            ON dp.Person_Serial_Key  COLLATE DATABASE_DEFAULT = u.Person_Serial_Key                    COLLATE DATABASE_DEFAULT
+            ON dp.Person_Serial_Key  COLLATE DATABASE_DEFAULT = ISNULL(u.Person_Serial_Key, u.userId)                    COLLATE DATABASE_DEFAULT
 
     LEFT JOIN  Data_Department    AS dd
             ON dd.Department_Serial_Key = dp.Department_Serial_Key

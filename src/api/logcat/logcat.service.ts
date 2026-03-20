@@ -15,6 +15,7 @@ import {
 } from './dto/create-logcat.dto';
 import { v4 as uuidv4 } from 'uuid';
 import * as ExcelJS from 'exceljs';
+import { PassThrough } from 'stream';
 
 @Injectable()
 export class LogcatService {
@@ -51,6 +52,7 @@ export class LogcatService {
            COUNT(ID) OVER() AS total
     FROM CMW_Category_1_And_4_Log
     ${where}
+    ORDER BY CreatedAt DESC
     `,
       {
         type: QueryTypes.SELECT,
@@ -130,7 +132,7 @@ export class LogcatService {
             CustVenName, InvoiceNo, TransType, Departure, Destination,
             PortType, StPort, ThPort, EndPort, Product, Quity, Amount,
             ActivityData, ActivityUnit, Unit, UnitWeight, Memo,
-            CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt
+            CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt, ActivitySource
           )
           VALUES
           (
@@ -140,7 +142,7 @@ export class LogcatService {
             :custVenName, :invoiceNo, :transType, :departure, :destination,
             :portType, :stPort, :thPort, :endPort, :product, :quity, :amount,
             :activityData, :activityUnit, :unit, :unitWeight, :memo,
-            :createDateTime, :creator, :createdUser, :createdFactory, GETDATE()
+            :createDateTime, :creator, :createdUser, :createdFactory, GETDATE(), :activitySource
           );
           `,
           {
@@ -186,6 +188,7 @@ export class LogcatService {
               creator: item.Creator,
               createdUser: userid,
               createdFactory: factory,
+              activitySource: item.ActivitySource,
             },
           },
         );
@@ -203,6 +206,226 @@ export class LogcatService {
     }
   }
 
+  // async exportExcelCat1And4(dateFrom: string, dateTo: string, factory: string) {
+  //   try {
+  //     let where: string = 'WHERE 1=1';
+  //     const replacements: any[] = [];
+
+  //     if (dateFrom && dateTo) {
+  //       where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+  //       replacements.push(dateFrom, dateTo);
+  //     }
+
+  //     if (factory) {
+  //       where += ' AND Fac LIKE ?';
+  //       replacements.push(`%${factory}%`);
+  //     }
+
+  //     const dataResults = await this.EIP.query(
+  //       `
+  //         SELECT *
+  //         FROM CMW_Category_1_And_4_Log
+  //         ${where}
+  //       `,
+  //       {
+  //         type: QueryTypes.SELECT,
+  //         replacements,
+  //       },
+  //     );
+
+  //     let data = dataResults as any[];
+
+  //     const workbook = new ExcelJS.Workbook();
+  //     const worksheet = workbook.addWorksheet('LogCat');
+
+  //     worksheet.columns = [
+  //       { header: 'System', key: 'System' },
+  //       { header: 'Corporation', key: 'Corporation' },
+  //       { header: 'Factory', key: 'Factory' },
+  //       { header: 'Department', key: 'Department' },
+  //       { header: 'DocKey', key: 'DocKey' },
+  //       { header: 'SPeriodData', key: 'SPeriodData' },
+  //       { header: 'EPeriodData', key: 'EPeriodData' },
+  //       { header: 'ActivityType', key: 'ActivityType' },
+  //       { header: 'DataType', key: 'DataType' },
+  //       { header: 'DocType', key: 'DocType' },
+  //       { header: 'UndDoc', key: 'UndDoc' },
+  //       { header: 'DocFlow', key: 'DocFlow' },
+  //       { header: 'DocDate', key: 'DocDate' },
+  //       { header: 'DocDate2', key: 'DocDate2' },
+  //       { header: 'DocNo', key: 'DocNo' },
+  //       { header: 'UndDocNo', key: 'UndDocNo' },
+  //       { header: 'CustVenName', key: 'CustVenName' },
+  //       { header: 'InvoiceNo', key: 'InvoiceNo' },
+  //       { header: 'TransType', key: 'TransType' },
+  //       { header: 'Departure', key: 'Departure' },
+  //       { header: 'Destination', key: 'Destination' },
+  //       { header: 'PortType', key: 'PortType' },
+  //       { header: 'StPort', key: 'StPort' },
+  //       { header: 'ThPort', key: 'ThPort' },
+  //       { header: 'EndPort', key: 'EndPort' },
+  //       { header: 'Product', key: 'Product' },
+  //       { header: 'Quity', key: 'Quity' },
+  //       { header: 'Amount', key: 'Amount' },
+  //       { header: 'ActivityData', key: 'ActivityData' },
+  //       { header: 'ActivityUnit', key: 'ActivityUnit' },
+  //       { header: 'Unit', key: 'Unit' },
+  //       { header: 'UnitWeight', key: 'UnitWeight' },
+  //       { header: 'Memo', key: 'Memo' },
+  //       { header: 'CreateDateTime', key: 'CreateDateTime' },
+  //       { header: 'Creator', key: 'Creator' },
+  //       { header: 'CreatedUser', key: 'CreatedUser' },
+  //       { header: 'CreatedFactory', key: 'CreatedFactory' },
+  //       { header: 'CreatedAt', key: 'CreatedAt' },
+  //     ];
+
+  //     worksheet.getRow(1).font = { bold: true };
+
+  //     worksheet.addRows(data);
+
+  //     worksheet.columns.forEach((column) => {
+  //       let maxColumnLength = 0;
+
+  //       if (typeof column.eachCell === 'function') {
+  //         column.eachCell({ includeEmpty: true }, (cell) => {
+  //           const cellValue = cell.value ? cell.value.toString() : '';
+
+  //           if (cellValue.length > maxColumnLength) {
+  //             maxColumnLength = cellValue.length;
+  //           }
+  //         });
+  //       }
+
+  //       const newWidth = maxColumnLength + 2;
+  //       column.width = newWidth < 10 ? 10 : newWidth > 50 ? 50 : newWidth;
+  //     });
+
+  //     worksheet.eachRow((row) => {
+  //       row.eachCell((cell) => {
+  //         cell.border = {
+  //           top: { style: 'thin' },
+  //           left: { style: 'thin' },
+  //           bottom: { style: 'thin' },
+  //           right: { style: 'thin' },
+  //         };
+  //       });
+  //     });
+
+  //     const buffer = await workbook.xlsx.writeBuffer();
+  //     return buffer;
+  //   } catch (error) {
+  //     throw new InternalServerErrorException(error);
+  //   }
+  // }
+
+  // async exportExcelCat1And4(dateFrom: string, dateTo: string, factory: string) {
+  //   try {
+  //     let where: string = 'WHERE 1=1';
+  //     const replacements: any[] = [];
+
+  //     if (dateFrom && dateTo) {
+  //       where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+  //       replacements.push(dateFrom, dateTo);
+  //     }
+
+  //     if (factory) {
+  //       where += ' AND Fac LIKE ?';
+  //       replacements.push(`%${factory}%`);
+  //     }
+
+  //     const passThrough = new PassThrough();
+
+  //     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+  //       stream: passThrough,
+  //       useStyles: true,
+  //       useSharedStrings: false,
+  //     });
+
+  //     const worksheet = workbook.addWorksheet('LogCat');
+
+  //     worksheet.columns = [
+  //       { header: 'System', key: 'System', width: 15 },
+  //       { header: 'Corporation', key: 'Corporation', width: 15 },
+  //       { header: 'Factory', key: 'Factory', width: 15 },
+  //       { header: 'Department', key: 'Department', width: 15 },
+  //       { header: 'DocKey', key: 'DocKey', width: 15 },
+  //       { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
+  //       { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
+  //       { header: 'ActivityType', key: 'ActivityType', width: 15 },
+  //       { header: 'DataType', key: 'DataType', width: 15 },
+  //       { header: 'DocType', key: 'DocType', width: 15 },
+  //       { header: 'UndDoc', key: 'UndDoc', width: 15 },
+  //       { header: 'DocFlow', key: 'DocFlow', width: 15 },
+  //       { header: 'DocDate', key: 'DocDate', width: 15 },
+  //       { header: 'DocDate2', key: 'DocDate2', width: 15 },
+  //       { header: 'DocNo', key: 'DocNo', width: 15 },
+  //       { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
+  //       { header: 'CustVenName', key: 'CustVenName', width: 25 },
+  //       { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
+  //       { header: 'TransType', key: 'TransType', width: 15 },
+  //       { header: 'Departure', key: 'Departure', width: 15 },
+  //       { header: 'Destination', key: 'Destination', width: 15 },
+  //       { header: 'PortType', key: 'PortType', width: 15 },
+  //       { header: 'StPort', key: 'StPort', width: 15 },
+  //       { header: 'ThPort', key: 'ThPort', width: 15 },
+  //       { header: 'EndPort', key: 'EndPort', width: 15 },
+  //       { header: 'Product', key: 'Product', width: 20 },
+  //       { header: 'Quity', key: 'Quity', width: 12 },
+  //       { header: 'Amount', key: 'Amount', width: 12 },
+  //       { header: 'ActivityData', key: 'ActivityData', width: 15 },
+  //       { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
+  //       { header: 'Unit', key: 'Unit', width: 10 },
+  //       { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
+  //       { header: 'Memo', key: 'Memo', width: 20 },
+  //       { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
+  //       { header: 'Creator', key: 'Creator', width: 15 },
+  //       { header: 'CreatedUser', key: 'CreatedUser', width: 15 },
+  //       { header: 'CreatedFactory', key: 'CreatedFactory', width: 15 },
+  //       { header: 'CreatedAt', key: 'CreatedAt', width: 20 },
+  //     ];
+
+  //     worksheet.getRow(1).font = { bold: true };
+  //     worksheet.getRow(1).commit();
+
+  //     const CHUNK_SIZE = 10000;
+  //     let offset = 0;
+
+  //     while (true) {
+  //       const rows = (await this.EIP.query(
+  //         `SELECT * FROM CMW_Category_1_And_4_Log
+  //          ${where}
+  //          ORDER BY (SELECT NULL) OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`,
+  //         {
+  //           type: QueryTypes.SELECT,
+  //           replacements: [...replacements, offset, CHUNK_SIZE],
+  //         },
+  //       )) as any[];
+
+  //       if (rows.length === 0) break;
+
+  //       for (const row of rows) {
+  //         worksheet.addRow(row).commit();
+  //       }
+
+  //       offset += CHUNK_SIZE;
+  //     }
+
+  //     await worksheet.commit();
+  //     await workbook.commit();
+
+  //     const buffer: Buffer = await new Promise((resolve, reject) => {
+  //       const chunks: Buffer[] = [];
+  //       passThrough.on('data', (chunk) => chunks.push(chunk));
+  //       passThrough.on('end', () => resolve(Buffer.concat(chunks)));
+  //       passThrough.on('error', reject);
+  //     });
+
+  //     return buffer;
+  //   } catch (error) {
+  //     throw new InternalServerErrorException(error);
+  //   }
+  // }
+
   async exportExcelCat1And4(dateFrom: string, dateTo: string, factory: string) {
     try {
       let where: string = 'WHERE 1=1';
@@ -218,97 +441,97 @@ export class LogcatService {
         replacements.push(`%${factory}%`);
       }
 
-      const dataResults = await this.EIP.query(
-        `
-          SELECT *
-          FROM CMW_Category_1_And_4_Log
-          ${where}
-        `,
-        {
-          type: QueryTypes.SELECT,
-          replacements,
-        },
-      );
+      const passThrough = new PassThrough();
 
-      let data = dataResults as any[];
+      // ✅ Gắn listener TRƯỚC — không bỏ lỡ event 'end'
+      const bufferPromise: Promise<Buffer> = new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        passThrough.on('data', (chunk) => chunks.push(chunk));
+        passThrough.on('end', () => resolve(Buffer.concat(chunks)));
+        passThrough.on('error', reject);
+      });
 
-      const workbook = new ExcelJS.Workbook();
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+        stream: passThrough,
+        useStyles: true,
+        useSharedStrings: false,
+      });
+
       const worksheet = workbook.addWorksheet('LogCat');
 
       worksheet.columns = [
-        { header: 'System', key: 'System' },
-        { header: 'Corporation', key: 'Corporation' },
-        { header: 'Factory', key: 'Factory' },
-        { header: 'Department', key: 'Department' },
-        { header: 'DocKey', key: 'DocKey' },
-        { header: 'SPeriodData', key: 'SPeriodData' },
-        { header: 'EPeriodData', key: 'EPeriodData' },
-        { header: 'ActivityType', key: 'ActivityType' },
-        { header: 'DataType', key: 'DataType' },
-        { header: 'DocType', key: 'DocType' },
-        { header: 'UndDoc', key: 'UndDoc' },
-        { header: 'DocFlow', key: 'DocFlow' },
-        { header: 'DocDate', key: 'DocDate' },
-        { header: 'DocDate2', key: 'DocDate2' },
-        { header: 'DocNo', key: 'DocNo' },
-        { header: 'UndDocNo', key: 'UndDocNo' },
-        { header: 'CustVenName', key: 'CustVenName' },
-        { header: 'InvoiceNo', key: 'InvoiceNo' },
-        { header: 'TransType', key: 'TransType' },
-        { header: 'Departure', key: 'Departure' },
-        { header: 'Destination', key: 'Destination' },
-        { header: 'PortType', key: 'PortType' },
-        { header: 'StPort', key: 'StPort' },
-        { header: 'ThPort', key: 'ThPort' },
-        { header: 'EndPort', key: 'EndPort' },
-        { header: 'Product', key: 'Product' },
-        { header: 'Quity', key: 'Quity' },
-        { header: 'Amount', key: 'Amount' },
-        { header: 'ActivityData', key: 'ActivityData' },
-        { header: 'ActivityUnit', key: 'ActivityUnit' },
-        { header: 'Unit', key: 'Unit' },
-        { header: 'UnitWeight', key: 'UnitWeight' },
-        { header: 'Memo', key: 'Memo' },
-        { header: 'CreateDateTime', key: 'CreateDateTime' },
-        { header: 'Creator', key: 'Creator' },
-        { header: 'CreatedUser', key: 'CreatedUser' },
-        { header: 'CreatedFactory', key: 'CreatedFactory' },
-        { header: 'CreatedAt', key: 'CreatedAt' },
+        { header: 'System', key: 'System', width: 15 },
+        { header: 'Corporation', key: 'Corporation', width: 15 },
+        { header: 'Factory', key: 'Factory', width: 15 },
+        { header: 'Department', key: 'Department', width: 15 },
+        { header: 'DocKey', key: 'DocKey', width: 15 },
+        { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
+        { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
+        { header: 'ActivityType', key: 'ActivityType', width: 15 },
+        { header: 'DataType', key: 'DataType', width: 15 },
+        { header: 'DocType', key: 'DocType', width: 15 },
+        { header: 'UndDoc', key: 'UndDoc', width: 15 },
+        { header: 'DocFlow', key: 'DocFlow', width: 15 },
+        { header: 'DocDate', key: 'DocDate', width: 15 },
+        { header: 'DocDate2', key: 'DocDate2', width: 15 },
+        { header: 'DocNo', key: 'DocNo', width: 15 },
+        { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
+        { header: 'CustVenName', key: 'CustVenName', width: 25 },
+        { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
+        { header: 'TransType', key: 'TransType', width: 15 },
+        { header: 'Departure', key: 'Departure', width: 15 },
+        { header: 'Destination', key: 'Destination', width: 15 },
+        { header: 'PortType', key: 'PortType', width: 15 },
+        { header: 'StPort', key: 'StPort', width: 15 },
+        { header: 'ThPort', key: 'ThPort', width: 15 },
+        { header: 'EndPort', key: 'EndPort', width: 15 },
+        { header: 'Product', key: 'Product', width: 20 },
+        { header: 'Quity', key: 'Quity', width: 12 },
+        { header: 'Amount', key: 'Amount', width: 12 },
+        { header: 'ActivityData', key: 'ActivityData', width: 15 },
+        { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
+        { header: 'Unit', key: 'Unit', width: 10 },
+        { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
+        { header: 'Memo', key: 'Memo', width: 20 },
+        { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
+        { header: 'Creator', key: 'Creator', width: 15 },
+        { header: 'CreatedUser', key: 'CreatedUser', width: 15 },
+        { header: 'CreatedFactory', key: 'CreatedFactory', width: 15 },
+        { header: 'CreatedAt', key: 'CreatedAt', width: 20 },
+        { header: 'ActivitySource', key: 'ActivitySource', width: 20 },
       ];
 
       worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).commit();
 
-      worksheet.addRows(data);
+      const CHUNK_SIZE = 10000;
+      let offset = 0;
 
-      worksheet.columns.forEach((column) => {
-        let maxColumnLength = 0;
+      while (true) {
+        const rows = (await this.EIP.query(
+          `SELECT * FROM CMW_Category_1_And_4_Log
+           ${where}
+           ORDER BY (SELECT NULL) OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`,
+          {
+            type: QueryTypes.SELECT,
+            replacements: [...replacements, offset, CHUNK_SIZE],
+          },
+        )) as any[];
 
-        if (typeof column.eachCell === 'function') {
-          column.eachCell({ includeEmpty: true }, (cell) => {
-            const cellValue = cell.value ? cell.value.toString() : '';
+        if (rows.length === 0) break;
 
-            if (cellValue.length > maxColumnLength) {
-              maxColumnLength = cellValue.length;
-            }
-          });
+        for (const row of rows) {
+          worksheet.addRow(row).commit();
         }
 
-        const newWidth = maxColumnLength + 2;
-        column.width = newWidth < 10 ? 10 : newWidth > 50 ? 50 : newWidth;
-      });
+        offset += CHUNK_SIZE;
+      }
 
-      worksheet.eachRow((row) => {
-        row.eachCell((cell) => {
-          cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
-          };
-        });
-      });
+      await worksheet.commit();
+      await workbook.commit(); 
 
-      const buffer = await workbook.xlsx.writeBuffer();
+      const buffer = await bufferPromise;
+
       return buffer;
     } catch (error) {
       throw new InternalServerErrorException(error);
@@ -346,6 +569,7 @@ export class LogcatService {
            COUNT(ID) OVER() AS total
     FROM CMW_Category_5_Log
     ${where}
+    ORDER BY CreatedAt DESC
     `,
       {
         type: QueryTypes.SELECT,
@@ -421,7 +645,7 @@ export class LogcatService {
             CustVenName, InvoiceNo, TransType, Departure, Destination,
             PortType, StPort, ThPort, EndPort, Product, Quity, Amount,
             ActivityData, ActivityUnit, Unit, UnitWeight, Memo,
-            CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt
+            CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt, ActivitySource
           )
           VALUES
           (
@@ -431,7 +655,7 @@ export class LogcatService {
             :custVenName, :invoiceNo, :transType, :departure, :destination,
             :portType, :stPort, :thPort, :endPort, :product, :quity, :amount,
             :activityData, :activityUnit, :unit, :unitWeight, :memo,
-            :createDateTime, :creator, :createdUser, :createdFactory, GETDATE()
+            :createDateTime, :creator, :createdUser, :createdFactory, GETDATE(), :activitySource
           )
           `,
           {
@@ -477,6 +701,7 @@ export class LogcatService {
               creator: item.Creator,
               createdUser: userid,
               createdFactory: factory,
+              activitySource: item.ActivitySource,
             },
           },
         );
@@ -564,6 +789,7 @@ export class LogcatService {
         { header: 'CreatedUser', key: 'CreatedUser' },
         { header: 'CreatedFactory', key: 'CreatedFactory' },
         { header: 'CreatedAt', key: 'CreatedAt' },
+        { header: 'ActivitySource', key: 'ActivitySource' },
       ];
 
       worksheet.getRow(1).font = { bold: true };
@@ -1458,6 +1684,7 @@ export class LogcatService {
            COUNT(ID) OVER() AS total
     FROM CMW_Category_9_And_12_Log
     ${where}
+    ORDER BY CreatedAt DESC
     `,
       {
         type: QueryTypes.SELECT,
@@ -1571,7 +1798,8 @@ export class LogcatService {
             ActivitySource,
             CreatedUser,
             CreatedFactory,
-            CreatedAt
+            CreatedAt,
+            ActivitySource
           )
           VALUES
           (
