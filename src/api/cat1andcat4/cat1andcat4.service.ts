@@ -897,9 +897,9 @@ export class Cat1andcat4Service {
       return [];
     }
     const docDate = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
-    const docDate2 = item.PurDate
-      ? dayjs(item.PurDate).format('YYYY/MM/DD')
-      : '';
+    // const docDate2 = item.PurDate
+    //   ? dayjs(item.PurDate).format('YYYY/MM/DD')
+    //   : '';
     // const docNo = item.PurNo ?? '';
     const custVenName = item.SupplierCode ?? '';
     const transportationMethod = item.TransportationMethod ?? '';
@@ -950,7 +950,7 @@ export class Cat1andcat4Service {
         UndDoc: '',
         DocFlow: '',
         DocDate: docDate,
-        DocDate2: docDate2,
+        DocDate2: docDate,
         DocNo: receivedNo.trim(),
         UndDocNo: '',
         CustVenName: custVenName,

@@ -16,8 +16,8 @@ export const getADataExcelFactoryCat9AndCat12 = async (
   const replacements: any[] = [];
 
   if (dateFrom && dateTo) {
-    where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
-    where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+    where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
+    where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
     replacements.push(dateFrom, dateTo, dateFrom, dateTo);
   }
 
@@ -356,8 +356,8 @@ export const buildQueryAutoSentCMS = async (
   const replacements: any[] = [];
 
   if (dateFrom && dateTo) {
-    where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
-    where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+    where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
+    where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
     replacements.push(dateFrom, dateTo, dateFrom, dateTo);
   }
   const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]

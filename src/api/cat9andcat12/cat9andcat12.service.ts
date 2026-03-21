@@ -121,8 +121,8 @@ export class Cat9andcat12Service {
       const replacements: any[] = [];
 
       if (dateFrom && dateTo) {
-        where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
-        where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+        where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
+        where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
         replacements.push(dateFrom, dateTo, dateFrom, dateTo);
       }
 
@@ -669,8 +669,8 @@ export class Cat9andcat12Service {
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
-      where1 += ` AND CONVERT(VARCHAR ,im.INV_DATE ,23) BETWEEN ? AND ?`;
+      where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
+      where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo, dateFrom, dateTo);
     }
     const connects = [
