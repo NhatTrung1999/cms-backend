@@ -21,6 +21,7 @@ import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import dayjs from 'dayjs';
 import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
+import { PassThrough } from 'stream';
 dayjs().format();
 
 @Injectable()
@@ -975,5 +976,104 @@ export class Cat1andcat4Service {
         ActivitySource: matId.charAt(0),
       }),
     );
+  }
+
+  async exportPreviewPayload(
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+    dockeyCMS: string,
+  ) {
+    try {
+      // Lấy data giống autoSentCMS
+      let data: any[];
+      if (factory.trim().toUpperCase() === 'ALL') {
+        const results = await Promise.all(
+          FACTORY_LIST.map((f) =>
+            this.getCMSByFactory(f, dateFrom, dateTo, dockeyCMS),
+          ),
+        );
+        data = results.flat();
+      } else {
+        data = await this.getCMSByFactory(
+          factory as FactoryCode,
+          dateFrom,
+          dateTo,
+          dockeyCMS,
+        );
+      }
+
+      // Xuất Excel
+      const passThrough = new PassThrough();
+
+      const bufferPromise: Promise<Buffer> = new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        passThrough.on('data', (chunk) => chunks.push(chunk));
+        passThrough.on('end', () => resolve(Buffer.concat(chunks)));
+        passThrough.on('error', reject);
+      });
+
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+        stream: passThrough,
+        useStyles: true,
+        useSharedStrings: false,
+      });
+
+      const worksheet = workbook.addWorksheet('PreviewPayload');
+
+      worksheet.columns = [
+        { header: 'System', key: 'System', width: 15 },
+        { header: 'Corporation', key: 'Corporation', width: 15 },
+        { header: 'Factory', key: 'Factory', width: 15 },
+        { header: 'Department', key: 'Department', width: 15 },
+        { header: 'DocKey', key: 'DocKey', width: 15 },
+        { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
+        { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
+        { header: 'ActivityType', key: 'ActivityType', width: 15 },
+        { header: 'DataType', key: 'DataType', width: 15 },
+        { header: 'DocType', key: 'DocType', width: 15 },
+        { header: 'UndDoc', key: 'UndDoc', width: 15 },
+        { header: 'DocFlow', key: 'DocFlow', width: 15 },
+        { header: 'DocDate', key: 'DocDate', width: 15 },
+        { header: 'DocDate2', key: 'DocDate2', width: 15 },
+        { header: 'DocNo', key: 'DocNo', width: 15 },
+        { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
+        { header: 'CustVenName', key: 'CustVenName', width: 25 },
+        { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
+        { header: 'TransType', key: 'TransType', width: 15 },
+        { header: 'Departure', key: 'Departure', width: 25 },
+        { header: 'Destination', key: 'Destination', width: 15 },
+        { header: 'PortType', key: 'PortType', width: 15 },
+        { header: 'StPort', key: 'StPort', width: 15 },
+        { header: 'ThPort', key: 'ThPort', width: 15 },
+        { header: 'EndPort', key: 'EndPort', width: 15 },
+        { header: 'Product', key: 'Product', width: 20 },
+        { header: 'Quity', key: 'Quity', width: 12 },
+        { header: 'Amount', key: 'Amount', width: 12 },
+        { header: 'ActivityData', key: 'ActivityData', width: 15 },
+        { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
+        { header: 'Unit', key: 'Unit', width: 10 },
+        { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
+        { header: 'Memo', key: 'Memo', width: 20 },
+        { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
+        { header: 'Creator', key: 'Creator', width: 15 },
+        { header: 'ActivitySource', key: 'ActivitySource', width: 20 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).commit();
+
+      for (const row of data) {
+        worksheet.addRow(row).commit();
+      }
+
+      await worksheet.commit();
+      await workbook.commit();
+
+      const buffer = await bufferPromise;
+      return buffer;
+    } catch (error: any) {
+      throw new InternalServerErrorException(error);
+    }
   }
 }

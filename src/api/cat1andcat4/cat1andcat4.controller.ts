@@ -8,6 +8,8 @@ import {
   Post,
   Query,
   Request,
+  Res,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -15,6 +17,9 @@ import { Cat1andcat4Service } from './cat1andcat4.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { getFactortyID, getUserId } from 'src/helper/common.helper';
 import { Public } from 'src/decorators';
+import { Response } from 'express';
+import dayjs from 'dayjs';
+dayjs().format();
 
 @Controller('cat1andcat4')
 export class Cat1andcat4Controller {
@@ -134,5 +139,30 @@ export class Cat1andcat4Controller {
       dockeyCMS,
     );
     return data;
+  }
+
+  @Public()
+  @Get('export-preview-payload')
+  async exportPreviewPayload(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Query('dockey') dockeyCMS: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.cat1andcat4Service.exportPreviewPayload(
+      dateFrom,
+      dateTo,
+      factory,
+      dockeyCMS,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="PreviewPayload_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx"`,
+      'Content-Length': buffer.byteLength,
+    });
+    return new StreamableFile(Buffer.from(buffer));
   }
 }

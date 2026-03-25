@@ -333,7 +333,7 @@ export class Cat6Service {
   }
 
   async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
-    return await this.transformData(fakeCat6LYMData, factory, dateFrom, dateTo);
+    return await this.transformData(fakeCat6LVLData, factory, dateFrom, dateTo);
     // return fakeCat6LYVData.map((item) => ({
     // System: 'BPM',
     // Corporation: getFactory(factory),
@@ -458,7 +458,7 @@ export class Cat6Service {
   }
 
   async autoSentCMSV2(dateFrom: string, dateTo: string, factory: string) {
-    return fakeCat6LYMData.map((item) => {
+    return fakeCat6LVLData.map((item) => {
       let docKey = '';
       switch (item.BusinessTripType.trim().toLowerCase()) {
         case 'Domestic business trip within the group'.trim().toLowerCase():

@@ -1112,7 +1112,7 @@ export const fakeCat6LVLData: AutoCMSCat6Data[] = [
     LandTransportDistanceA: 'API Auto calculate',
     LandTrasportationTypeA: 'Company Shuttle Car',
     DestinationAirport: 'Guangzhou Baiyun International Airport',
-    ThirdCountryTransferDestination: '中國廣州 清遠 萬邦鞋廠APH',
+    ThirdCountryTransferDestination: '廣東省清遠市清新縣太平鎮工業區',
     LandTransportDistanceB: 'API Auto calculate',
     LandTrasportationTypeB: '高鐵',
     Destination2: '',
