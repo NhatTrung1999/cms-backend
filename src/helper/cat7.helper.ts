@@ -74,41 +74,137 @@ dayjs().format();
 //   return { query, countQuery };
 // };
 
+// export const buildQuery = (
+//   factory: string,
+//   dateFrom?: string,
+//   dateTo?: string,
+// ) => {
+//   const isLYM = factory === 'LYM';
+
+//   const workCol = isLYM ? 'workhours' : 'WORKING_TIME';
+//   const table = isLYM ? 'HR_Attendance' : 'Data_Work_Time';
+//   const dateCol = isLYM ? 'CDate' : 'Check_Day';
+//   const workFilter = isLYM
+//     ? 'workhours > 0'
+//     : "Work_Or_Not <> '2' AND Working_Time > 0";
+
+//   const cteGroupKey = isLYM ? 'UserNo' : 'Person_Serial_Key';
+
+//   const join = isLYM
+//     ? 'e.UserNo = u.userId'
+//     : 'e.Person_Serial_Key COLLATE DATABASE_DEFAULT = ISNULL(u.Person_Serial_Key, u.userId) COLLATE DATABASE_DEFAULT';
+
+//   const dateFilter =
+//     dateFrom && dateTo
+//       ? `AND CONVERT(DATE, ${dateCol}) >= CONVERT(DATE, ?) AND CONVERT(DATE, ${dateCol}) < CONVERT(DATE, ?)`
+//       : '';
+
+//   const cte = `
+//     WITH WorkTime AS (
+//       SELECT ${cteGroupKey}
+//             ,COUNT(${workCol}) AS Number_of_Working_Days
+//       FROM   ${table}
+//       WHERE  ${workFilter}
+//              ${dateFilter}
+//       GROUP BY ${cteGroupKey}
+//     )
+//   `;
+
+//   const selectBody = `
+//     SELECT u.userId                                                  AS Staff_ID
+//           ,CASE
+//                 WHEN u.Address_Live IS NULL THEN u.PickupDropoffStation COLLATE DATABASE_DEFAULT
+//                 ELSE u.Address_Live COLLATE DATABASE_DEFAULT
+//            END                                                       AS Residential_address
+//           ,u.Vehicle                                                 AS Main_transportation_type
+//           ,'API Calculation'                                         AS km
+//           ,ISNULL(e.Number_of_Working_Days, 0)                      AS Number_of_working_days
+//           ,'API Calculation'                                         AS PKT_p_km
+//     FROM       users    AS u
+//     LEFT JOIN  WorkTime AS e ON ${join}
+//     WHERE  u.lock     = '0'
+//        AND u.Vehicle IS NOT NULL
+//   `;
+
+//   const query = `${cte} ${selectBody} ORDER BY u.userId OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`;
+//   const exportQuery = `${cte} ${selectBody} ORDER BY u.userId`;
+//   const countQuery = `${cte} SELECT COUNT(*) AS total FROM (${selectBody}) AS Sub`;
+
+//   return { query, countQuery, exportQuery };
+// };
+
 export const buildQuery = (
   factory: string,
   dateFrom?: string,
   dateTo?: string,
 ) => {
   const isLYM = factory === 'LYM';
+  const isLYV = factory === 'LYV';
+  const isLVL = factory === 'LVL';
 
   const workCol = isLYM ? 'workhours' : 'WORKING_TIME';
   const table = isLYM ? 'HR_Attendance' : 'Data_Work_Time';
   const dateCol = isLYM ? 'CDate' : 'Check_Day';
+  const cteGroupKey = isLYM ? 'UserNo' : 'Person_Serial_Key';
   const workFilter = isLYM
     ? 'workhours > 0'
     : "Work_Or_Not <> '2' AND Working_Time > 0";
-
-  const cteGroupKey = isLYM ? 'UserNo' : 'Person_Serial_Key';
 
   const join = isLYM
     ? 'e.UserNo = u.userId'
     : 'e.Person_Serial_Key COLLATE DATABASE_DEFAULT = ISNULL(u.Person_Serial_Key, u.userId) COLLATE DATABASE_DEFAULT';
 
   const dateFilter =
-    dateFrom && dateTo
-      ? `AND CONVERT(DATE, ${dateCol}) >= CONVERT(DATE, ?) AND CONVERT(DATE, ${dateCol}) < CONVERT(DATE, ?)`
-      : '';
+    dateFrom && dateTo ? `AND ${dateCol} >= ? AND ${dateCol} < ?` : '';
 
-  const cte = `
-    WITH WorkTime AS (
-      SELECT ${cteGroupKey}
-            ,COUNT(${workCol}) AS Number_of_Working_Days
-      FROM   ${table}
-      WHERE  ${workFilter}
-             ${dateFilter}
-      GROUP BY ${cteGroupKey}
-    )
-  `;
+  const checkInOutFilter = isLYM
+    ? `AND ISNULL(NULLIF(MatTime1, ''), MatTime1) <> '1900-01-01 00:00:00.000'
+       AND ISNULL(NULLIF(MatTime2, ''), MatTime2) <> '1900-01-01 00:00:00.000'`
+    : isLYV
+      ? `AND ISNULL(ISNULL(Check_In_Hand,  NULLIF(Re_Check_In,  '')), Check_In)  <> '1900-01-01 00:00:00.000'
+       AND ISNULL(ISNULL(Check_Out_Hand, NULLIF(Re_Check_Out, '')), Check_Out) <> '1900-01-01 00:00:00.000'`
+      : isLVL
+        ? `AND ISNULL(dwt.Re_Check_In,  cio.Check_In)  <> '1900-01-01 00:00:00.000'
+       AND ISNULL(dwt.Re_Check_Out, cio.Check_Out) <> '1900-01-01 00:00:00.000'`
+        : `AND ISNULL(NULLIF(Re_Check_In,  ''), Check_In)  <> '1900-01-01 00:00:00.000'
+       AND ISNULL(NULLIF(Re_Check_Out, ''), Check_Out) <> '1900-01-01 00:00:00.000'`;
+
+  const cteFrom = isLVL
+    ? `Data_Work_Time AS dwt
+       LEFT JOIN Choose_In_Out AS cio
+              ON cio.Person_Serial_Key = dwt.Person_Serial_Key
+             AND cio.Check_day         = dwt.Check_Day
+             AND cio.Shift_Serial_key  = dwt.Shift_Serial_key`
+    : `${table}${isLVL ? '' : ''}`;
+
+  // const cteWhere = isLVL
+  //   ? `dwt.Work_Or_Not <> '2' AND dwt.Working_Time > 0 AND dwt.${dateCol}`
+  //   : workFilter;
+
+  const cte = isLVL
+    ? `
+      WITH WorkTime AS (
+        SELECT dwt.Person_Serial_Key
+              ,COUNT(dwt.${workCol}) AS Number_of_Working_Days
+        FROM   ${cteFrom}
+        WHERE  dwt.Work_Or_Not <> '2'
+               AND dwt.Working_Time > 0
+               ${dateFrom && dateTo ? `AND dwt.${dateCol} >= ? AND dwt.${dateCol} < ?` : ''}
+               ${checkInOutFilter}
+        GROUP BY dwt.Person_Serial_Key
+      )
+    `
+    : `
+      WITH WorkTime AS (
+        SELECT ${cteGroupKey}
+              ,COUNT(${workCol}) AS Number_of_Working_Days
+        FROM   ${table}
+        WHERE  ${workFilter}
+               ${dateFilter}
+               ${checkInOutFilter}
+        GROUP BY ${cteGroupKey}
+      )
+    `;
 
   const selectBody = `
     SELECT u.userId                                                  AS Staff_ID
@@ -122,8 +218,8 @@ export const buildQuery = (
           ,'API Calculation'                                         AS PKT_p_km
     FROM       users    AS u
     LEFT JOIN  WorkTime AS e ON ${join}
-    WHERE  u.lock     = '0'
-       AND u.Vehicle IS NOT NULL
+    WHERE  u.Vehicle IS NOT NULL
+       AND ISNULL(e.Number_of_Working_Days, 0) <> 0
   `;
 
   const query = `${cte} ${selectBody} ORDER BY u.userId OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`;
@@ -692,6 +788,11 @@ export const buildQueryAutoSentCmsLYV = async (
       WHERE  Work_Or_Not <> '2'
              AND Working_Time > 0
              ${hasDate ? `AND CONVERT(DATE, Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, Check_Day) < CONVERT(DATE, ?)` : ''}
+             AND ISNULL(ISNULL(Check_In_Hand ,NULLIF(Re_Check_In ,'')) ,Check_In)<>'1900-01-01 00:00:00.000'
+                AND ISNULL(
+                        ISNULL(Check_Out_Hand ,NULLIF(Re_Check_Out ,''))
+                       ,Check_Out
+                    )<>'1900-01-01 00:00:00.000'
       GROUP BY Person_Serial_Key
     )
   `;
@@ -728,8 +829,7 @@ export const buildQueryAutoSentCmsLYV = async (
     LEFT JOIN  WorkTime           AS e
             ON e.Person_Serial_Key COLLATE DATABASE_DEFAULT = u.Person_Serial_Key COLLATE DATABASE_DEFAULT
 
-    WHERE  u.lock     = '0'
-       AND u.Vehicle IS NOT NULL
+    WHERE u.Vehicle IS NOT NULL AND ISNULL(e.Number_of_Working_Days ,0)<>0
   `;
 
   return query;
@@ -818,6 +918,8 @@ export const buildQueryAutoSentCmsLHG = async (
       FROM   Data_Work_Time
       WHERE  Work_Or_Not <> '2'
              AND Working_Time > 0
+             AND ISNULL(NULLIF(Re_Check_In ,'') ,Check_In)<>'1900-01-01 00:00:00.000'
+             AND ISNULL(NULLIF(Re_Check_Out ,'') ,Check_Out)<>'1900-01-01 00:00:00.000'
              ${hasDate ? `AND CONVERT(DATE, Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, Check_Day) < CONVERT(DATE, ?)` : ''}
       GROUP BY Person_Serial_Key
     )
@@ -849,8 +951,7 @@ export const buildQueryAutoSentCmsLHG = async (
     LEFT JOIN  WorkTime           AS e
             ON e.Person_Serial_Key COLLATE DATABASE_DEFAULT = u.Person_Serial_Key COLLATE DATABASE_DEFAULT
 
-    WHERE  u.lock     = '0'
-       AND u.Vehicle IS NOT NULL
+    WHERE  u.Vehicle IS NOT NULL AND ISNULL(e.Number_of_Working_Days ,0)<>0
   `;
 
   return query;
@@ -932,13 +1033,20 @@ export const buildQueryAutoSentCmsLVL = async (
 
   const cte = `
     WITH WorkTime AS (
-      SELECT Person_Serial_Key
-            ,COUNT(WORKING_TIME) AS Number_of_Working_Days
-      FROM   Data_Work_Time
-      WHERE  Work_Or_Not <> '2'
-             AND Working_Time > 0
-             ${hasDate ? `AND CONVERT(DATE, Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, Check_Day) < CONVERT(DATE, ?)` : ''}
-      GROUP BY Person_Serial_Key
+      SELECT dwt.Person_Serial_Key
+               ,COUNT(dwt.WORKING_TIME)  AS Number_of_Working_Days
+         FROM   Data_Work_Time           AS dwt
+                LEFT JOIN Choose_In_Out  AS cio
+                     ON  cio.Person_Serial_Key = dwt.Person_Serial_Key
+                         AND cio.Check_day = dwt.Check_Day
+                         AND cio.Shift_Serial_key = dwt.Shift_Serial_key
+         WHERE  dwt.Work_Or_Not<>'2'
+                AND dwt.Working_Time>0
+                ${hasDate ? `AND CONVERT(DATE, dwt.Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, dwt.Check_Day) < CONVERT(DATE, ?)` : ''}
+                AND ISNULL(dwt.Re_Check_In ,cio.Check_In)<>'1900-01-01 00:00:00.000'
+                AND ISNULL(dwt.Re_Check_Out ,cio.Check_Out)<>'1900-01-01 00:00:00.000'
+         GROUP BY
+                dwt.Person_Serial_Key
     )
   `;
 
@@ -968,8 +1076,7 @@ export const buildQueryAutoSentCmsLVL = async (
     LEFT JOIN  WorkTime           AS e
             ON e.Person_Serial_Key   COLLATE DATABASE_DEFAULT = ISNULL(u.Person_Serial_Key, u.userId) COLLATE DATABASE_DEFAULT
 
-    WHERE  u.lock     = '0'
-       AND u.Vehicle IS NOT NULL
+    WHERE  u.Vehicle IS NOT NULL AND ISNULL(e.Number_of_Working_Days ,0)<>0
   `;
 
   return query;
@@ -1055,6 +1162,8 @@ export const buildQueryAutoSentCmsLYM = async (
       FROM   HR_Attendance
       WHERE  workhours > 0
              ${hasDate ? `AND CONVERT(DATE, CDate) >= CONVERT(DATE, ?) AND CONVERT(DATE, CDate) < CONVERT(DATE, ?)` : ''}
+             AND ISNULL(NULLIF(MatTime1 ,'') ,MatTime1)<>'1900-01-01 00:00:00.000'
+              AND ISNULL(NULLIF(MatTime2 ,'') ,MatTime2)<>'1900-01-01 00:00:00.000'
       GROUP BY UserNo
     )
   `;
@@ -1082,8 +1191,7 @@ export const buildQueryAutoSentCmsLYM = async (
     LEFT JOIN  WorkTime      AS e
             ON e.UserNo      = u.userId
 
-    WHERE  u.lock     = '0'
-       AND u.Vehicle IS NOT NULL
+    WHERE  u.Vehicle IS NOT NULL AND ISNULL(e.Number_of_Working_Days ,0)<>0
   `;
 
   return query;
@@ -1174,6 +1282,8 @@ export const buildQueryAutoSentCmsJAZ = async (
       WHERE  Work_Or_Not <> '2'
              AND Working_Time > 0
              ${hasDate ? `AND CONVERT(DATE, Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, Check_Day) < CONVERT(DATE, ?)` : ''}
+             AND ISNULL(NULLIF(Re_Check_In ,'') ,Check_In)<>'1900-01-01 00:00:00.000'
+                 AND ISNULL(NULLIF(Re_Check_Out ,'') ,Check_Out)<>'1900-01-01 00:00:00.000'
       GROUP BY Person_Serial_Key
     )
   `;
@@ -1204,8 +1314,7 @@ export const buildQueryAutoSentCmsJAZ = async (
     LEFT JOIN  WorkTime           AS e
             ON e.Person_Serial_Key   COLLATE DATABASE_DEFAULT = ISNULL(u.Person_Serial_Key, u.userId) COLLATE DATABASE_DEFAULT
 
-    WHERE  u.lock     = '0'
-       AND u.Vehicle IS NOT NULL
+    WHERE u.Vehicle IS NOT NULL AND ISNULL(e.Number_of_Working_Days ,0)<>0
   `;
 
   return query;
@@ -1296,6 +1405,8 @@ export const buildQueryAutoSentCmsJZS = async (
       WHERE  Work_Or_Not <> '2'
              AND Working_Time > 0
              ${hasDate ? `AND Check_Day >= ? AND Check_Day < ?` : ''}
+             AND ISNULL(NULLIF(Re_Check_In ,'') ,Check_In) <>'1900-01-01 00:00:00.000'
+                AND ISNULL(NULLIF(Re_Check_Out ,'') ,Check_Out) <>'1900-01-01 00:00:00.000'
       GROUP BY Person_Serial_Key
     )
   `;
@@ -1326,8 +1437,7 @@ export const buildQueryAutoSentCmsJZS = async (
     LEFT JOIN  WorkTime           AS e
             ON e.Person_Serial_Key COLLATE DATABASE_DEFAULT = u.Person_Serial_Key COLLATE DATABASE_DEFAULT
 
-    WHERE  u.lock     = '0'
-       AND u.Vehicle IS NOT NULL
+    WHERE  u.Vehicle IS NOT NULL AND ISNULL(e.Number_of_Working_Days ,0)<>0
   `;
 
   return query;
@@ -1441,15 +1551,113 @@ export const buildQueryAutoSentCmsJZS = async (
 //   return { query, countQuery };
 // };
 
+// export const buildQueryCustomExport = (
+//   dateFrom: string,
+//   dateTo: string,
+//   factory: string,
+// ) => {
+//   const isLYM = factory === 'LYM';
+
+//   const department = isLYM ? 'b.Part' : 'c.Department_Name';
+//   const addrLive = isLYM ? 'b.Addr_now' : 'd.Address_Live';
+//   const cte = isLYM
+//     ? `
+//       WITH WorkTime AS (
+//         SELECT UserNo
+//               ,COUNT(workhours) AS Number_of_Working_Days
+//         FROM   HR_Attendance
+//         WHERE  workhours > 0
+//                ${dateFrom && dateTo ? `AND CONVERT(DATE, CDate) >= CONVERT(DATE, ?) AND CONVERT(DATE, CDate) < CONVERT(DATE, ?)` : ''}
+//         GROUP BY UserNo
+//       )
+//     `
+//     : `
+//       WITH WorkTime AS (
+//         SELECT Person_Serial_Key
+//               ,COUNT(WORKING_TIME) AS Number_of_Working_Days
+//         FROM   Data_Work_Time
+//         WHERE  Work_Or_Not <> '2'
+//                AND Working_Time > 0
+//                ${dateFrom && dateTo ? `AND CONVERT(DATE, Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, Check_Day) < CONVERT(DATE, ?)` : ''}
+//         GROUP BY Person_Serial_Key
+//       )
+//     `;
+
+//   const joins = isLYM
+//     ? `
+//       LEFT JOIN HR_Users      AS b ON b.UserNo            = a.userId
+//       LEFT JOIN WorkTime      AS e ON e.UserNo            = a.userId
+//     `
+//     : `
+//       LEFT JOIN Data_Person        AS b ON b.Person_ID             COLLATE DATABASE_DEFAULT = a.userId                COLLATE DATABASE_DEFAULT
+//       LEFT JOIN Data_Department    AS c ON c.Department_Serial_Key COLLATE DATABASE_DEFAULT = b.Department_Serial_Key COLLATE DATABASE_DEFAULT
+//       LEFT JOIN Data_Person_Detail AS d ON d.Person_Serial_Key     COLLATE DATABASE_DEFAULT = a.Person_Serial_Key     COLLATE DATABASE_DEFAULT
+//       LEFT JOIN WorkTime           AS e ON e.Person_Serial_Key     COLLATE DATABASE_DEFAULT = ISNULL(a.Person_Serial_Key, a.userId) COLLATE DATABASE_DEFAULT
+//     `;
+
+//   const selectBody = `
+//     SELECT CAST(ROW_NUMBER() OVER (ORDER BY a.userId) AS INT)    AS [No]
+//           ,'${factory}'                                           AS Factory
+//           ,${department}                                          AS Department
+//           ,a.userId                                               AS ID
+//           ,a.fullName                                             AS Full_Name
+//           ,CASE
+//                 WHEN a.Vehicle = 'Company shuttle bus' THEN ${addrLive} COLLATE DATABASE_DEFAULT
+//                 ELSE a.Address_Live COLLATE DATABASE_DEFAULT
+//            END                                                    AS Current_Address
+//           ,a.Vehicle                                              AS Transportation_Mode
+//           ,CASE
+//                 WHEN a.Vehicle = 'Company shuttle bus' THEN a.Bus_Route COLLATE DATABASE_DEFAULT
+//                 ELSE 'N/A'
+//            END                                                    AS Bus_Route
+//           ,CASE
+//                 WHEN a.Vehicle = 'Company shuttle bus' THEN a.PickupDropoffStation COLLATE DATABASE_DEFAULT
+//                 ELSE 'N/A'
+//            END                                                    AS Pickup_Point
+//           ,ISNULL(e.Number_of_Working_Days, 0)                   AS Number_of_Working_Days
+//     FROM       users AS a
+//     ${joins}
+//     WHERE  a.lock     = '0'
+//        AND a.Vehicle IS NOT NULL
+//   `;
+
+//   const query = `${cte} ${selectBody} ORDER BY a.userId OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`;
+//   const countQuery = `${cte} SELECT COUNT(*) AS total FROM (${selectBody}) AS Sub`;
+
+//   return { query, countQuery };
+// };
+
+
 export const buildQueryCustomExport = (
   dateFrom: string,
   dateTo: string,
   factory: string,
 ) => {
   const isLYM = factory === 'LYM';
+  const isLYV = factory === 'LYV';
+  const isLVL = factory === 'LVL';
 
   const department = isLYM ? 'b.Part' : 'c.Department_Name';
   const addrLive = isLYM ? 'b.Addr_now' : 'd.Address_Live';
+
+  const dateFilter =
+    dateFrom && dateTo
+      ? `AND CONVERT(DATE, ${isLYM ? 'CDate' : 'Check_Day'}) >= CONVERT(DATE, ?) AND CONVERT(DATE, ${isLYM ? 'CDate' : 'Check_Day'}) < CONVERT(DATE, ?)`
+      : '';
+
+  const checkInOutFilter = isLYM
+    ? `AND ISNULL(NULLIF(MatTime1, ''), MatTime1) <> '1900-01-01 00:00:00.000'
+       AND ISNULL(NULLIF(MatTime2, ''), MatTime2) <> '1900-01-01 00:00:00.000'`
+    : isLYV
+      ? `AND ISNULL(ISNULL(Check_In_Hand,  NULLIF(Re_Check_In,  '')), Check_In)  <> '1900-01-01 00:00:00.000'
+       AND ISNULL(ISNULL(Check_Out_Hand, NULLIF(Re_Check_Out, '')), Check_Out) <> '1900-01-01 00:00:00.000'`
+      : isLVL
+        ? `AND ISNULL(dwt.Re_Check_In,  cio.Check_In)  <> '1900-01-01 00:00:00.000'
+       AND ISNULL(dwt.Re_Check_Out, cio.Check_Out) <> '1900-01-01 00:00:00.000'`
+        : 
+          `AND ISNULL(NULLIF(Re_Check_In,  ''), Check_In)  <> '1900-01-01 00:00:00.000'
+       AND ISNULL(NULLIF(Re_Check_Out, ''), Check_Out) <> '1900-01-01 00:00:00.000'`;
+
   const cte = isLYM
     ? `
       WITH WorkTime AS (
@@ -1457,26 +1665,45 @@ export const buildQueryCustomExport = (
               ,COUNT(workhours) AS Number_of_Working_Days
         FROM   HR_Attendance
         WHERE  workhours > 0
-               ${dateFrom && dateTo ? `AND CONVERT(DATE, CDate) >= CONVERT(DATE, ?) AND CONVERT(DATE, CDate) < CONVERT(DATE, ?)` : ''}
+               ${dateFilter}
+               ${checkInOutFilter}
         GROUP BY UserNo
       )
     `
-    : `
+    : isLVL
+      ? `
+      WITH WorkTime AS (
+        SELECT dwt.Person_Serial_Key
+              ,COUNT(dwt.WORKING_TIME) AS Number_of_Working_Days
+        FROM   Data_Work_Time          AS dwt
+        LEFT JOIN Choose_In_Out        AS cio
+               ON cio.Person_Serial_Key = dwt.Person_Serial_Key
+              AND cio.Check_day         = dwt.Check_Day
+              AND cio.Shift_Serial_key  = dwt.Shift_Serial_key
+        WHERE  dwt.Work_Or_Not <> '2'
+               AND dwt.Working_Time > 0
+               ${dateFrom && dateTo ? `AND CONVERT(DATE, dwt.Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, dwt.Check_Day) < CONVERT(DATE, ?)` : ''}
+               ${checkInOutFilter}
+        GROUP BY dwt.Person_Serial_Key
+      )
+    `
+      : `
       WITH WorkTime AS (
         SELECT Person_Serial_Key
               ,COUNT(WORKING_TIME) AS Number_of_Working_Days
         FROM   Data_Work_Time
         WHERE  Work_Or_Not <> '2'
                AND Working_Time > 0
-               ${dateFrom && dateTo ? `AND CONVERT(DATE, Check_Day) >= CONVERT(DATE, ?) AND CONVERT(DATE, Check_Day) < CONVERT(DATE, ?)` : ''}
+               ${dateFilter}
+               ${checkInOutFilter}
         GROUP BY Person_Serial_Key
       )
     `;
 
   const joins = isLYM
     ? `
-      LEFT JOIN HR_Users      AS b ON b.UserNo            = a.userId
-      LEFT JOIN WorkTime      AS e ON e.UserNo            = a.userId
+      LEFT JOIN HR_Users      AS b ON b.UserNo        = a.userId
+      LEFT JOIN WorkTime      AS e ON e.UserNo        = a.userId
     `
     : `
       LEFT JOIN Data_Person        AS b ON b.Person_ID             COLLATE DATABASE_DEFAULT = a.userId                COLLATE DATABASE_DEFAULT
@@ -1486,29 +1713,29 @@ export const buildQueryCustomExport = (
     `;
 
   const selectBody = `
-    SELECT CAST(ROW_NUMBER() OVER (ORDER BY a.userId) AS INT)    AS [No]
-          ,'${factory}'                                           AS Factory
-          ,${department}                                          AS Department
-          ,a.userId                                               AS ID
-          ,a.fullName                                             AS Full_Name
+    SELECT CAST(ROW_NUMBER() OVER (ORDER BY a.userId) AS INT) AS [No]
+          ,'${factory}'                                            AS Factory
+          ,${department}                                           AS Department
+          ,a.userId                                                AS ID
+          ,a.fullName                                              AS Full_Name
           ,CASE
                 WHEN a.Vehicle = 'Company shuttle bus' THEN ${addrLive} COLLATE DATABASE_DEFAULT
                 ELSE a.Address_Live COLLATE DATABASE_DEFAULT
-           END                                                    AS Current_Address
-          ,a.Vehicle                                              AS Transportation_Mode
+           END                                                     AS Current_Address
+          ,a.Vehicle                                               AS Transportation_Mode
           ,CASE
                 WHEN a.Vehicle = 'Company shuttle bus' THEN a.Bus_Route COLLATE DATABASE_DEFAULT
                 ELSE 'N/A'
-           END                                                    AS Bus_Route
+           END                                                     AS Bus_Route
           ,CASE
                 WHEN a.Vehicle = 'Company shuttle bus' THEN a.PickupDropoffStation COLLATE DATABASE_DEFAULT
                 ELSE 'N/A'
-           END                                                    AS Pickup_Point
-          ,ISNULL(e.Number_of_Working_Days, 0)                   AS Number_of_Working_Days
+           END                                                     AS Pickup_Point
+          ,ISNULL(e.Number_of_Working_Days, 0)                    AS Number_of_Working_Days
     FROM       users AS a
     ${joins}
-    WHERE  a.lock     = '0'
-       AND a.Vehicle IS NOT NULL
+    WHERE  a.Vehicle IS NOT NULL
+       AND ISNULL(e.Number_of_Working_Days, 0) <> 0
   `;
 
   const query = `${cte} ${selectBody} ORDER BY a.userId OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`;

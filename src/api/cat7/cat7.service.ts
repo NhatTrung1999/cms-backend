@@ -482,8 +482,8 @@ export class Cat7Service {
       this.sortFieldMapCustomExport[sortField] ?? 'a.userId';
     const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
     const sortedQuery = query.replace(
-      'ORDER BY a.userId',
-      `ORDER BY ${safeSortField} ${safeSortOrder}`,
+      'ORDER BY a.userId OFFSET',
+      `ORDER BY ${safeSortField} ${safeSortOrder} OFFSET`,
     );
 
     // ✅ Sort + pagination trong SQL
@@ -529,7 +529,6 @@ export class Cat7Service {
       const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
       const countReplacements = hasDate ? [dateFrom, dateToExclusive] : [];
 
-      // ✅ Gộp data + count vào 1 Promise.all duy nhất
       const results = await Promise.all(
         Object.entries(this.factoryDbMap).map(([factoryName, conn]) => {
           const { query, countQuery } = buildQueryCustomExport(
@@ -619,9 +618,14 @@ export class Cat7Service {
     const buildQuery = this.buildQueryMap[factory];
     if (!buildQuery) return [];
 
+    const { dateToExclusive, hasDate } = this.buildReplacements(
+      dateFrom,
+      dateTo,
+    );
+
     const query = await buildQuery(dateFrom, dateTo, this.EIP);
 
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
+    const replacements = hasDate ? [dateFrom, dateToExclusive] : [];
 
     const data = await db.query<any>(query, {
       type: QueryTypes.SELECT,
