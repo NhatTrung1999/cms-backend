@@ -231,14 +231,14 @@ export const buildQueryHRModule = (
     ? `AND ISNULL(NULLIF(MatTime1, ''), MatTime1) <> '1900-01-01 00:00:00.000'
        AND ISNULL(NULLIF(MatTime2, ''), MatTime2) <> '1900-01-01 00:00:00.000'`
     : isLYV
-      ? `AND ISNULL(ISNULL(Check_In_Hand,  NULLIF(Re_Check_In,  '')), Check_In)  <> '1900-01-01 00:00:00.000'
-       AND ISNULL(ISNULL(Check_Out_Hand, NULLIF(Re_Check_Out, '')), Check_Out) <> '1900-01-01 00:00:00.000'`
+      ? `AND Check_In  <> '1900-01-01 00:00:00.000'
+       AND Check_Out <> '1900-01-01 00:00:00.000'`
       : isLVL
-        ? `AND ISNULL(dwt.Re_Check_In,  cio.Check_In)  <> '1900-01-01 00:00:00.000'
-       AND ISNULL(dwt.Re_Check_Out, cio.Check_Out) <> '1900-01-01 00:00:00.000'`
+        ? `AND cio.Check_In  <> '1900-01-01 00:00:00.000'
+       AND cio.Check_Out <> '1900-01-01 00:00:00.000'`
         : 
-          `AND ISNULL(NULLIF(Re_Check_In,  ''), Check_In)  <> '1900-01-01 00:00:00.000'
-       AND ISNULL(NULLIF(Re_Check_Out, ''), Check_Out) <> '1900-01-01 00:00:00.000'`;
+          `AND Check_In  <> '1900-01-01 00:00:00.000'
+       AND Check_Out <> '1900-01-01 00:00:00.000'`;
 
   const cte = isLYM
     ? `
@@ -308,7 +308,7 @@ export const buildQueryHRModule = (
     );
 
   const where = [
-    'a.Vehicle IS NOT NULL',
+    // 'a.Vehicle IS NOT NULL',
     'ISNULL(e.Number_of_Working_Days, 0) <> 0',
     ...conditions,
   ].join(' AND ');

@@ -20,6 +20,7 @@ import { InfofactoryModule } from './api/infofactory/infofactory.module';
 import { HrModule } from './api/hr/hr.module';
 import { LogcatModule } from './api/logcat/logcat.module';
 import { CmsModule } from './api/cms/cms.module';
+import { PreviewPayloadModule } from './api/preview-payload/preview-payload.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { CmsModule } from './api/cms/cms.module';
     Cat7Module,
     Cat6Module,
     Cat1andcat4Module,
+    PreviewPayloadModule
   ],
   controllers: [AppController],
   providers: [

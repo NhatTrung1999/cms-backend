@@ -1798,8 +1798,7 @@ export class LogcatService {
             ActivitySource,
             CreatedUser,
             CreatedFactory,
-            CreatedAt,
-            ActivitySource
+            CreatedAt
           )
           VALUES
           (

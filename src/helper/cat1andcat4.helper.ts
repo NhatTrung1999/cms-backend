@@ -336,7 +336,7 @@ export const buildQueryTest = async (
                   ,ModifyDate
             INTO   #RKList
             FROM   KCRK
-            WHERE  CONVERT(VARCHAR ,KCRK.ModifyDate ,23) BETWEEN :startDate AND :endDate
+            WHERE  KCRK.ModifyDate >= :startDate AND KCRK.ModifyDate < :endDate
             GROUP BY
                   ZSNO
                   ,RKNO
@@ -874,7 +874,7 @@ export const buildQueryAutoSentCMS = async (
                   ,ModifyDate
             INTO   #RKList
             FROM   KCRK
-            WHERE  CONVERT(VARCHAR ,KCRK.ModifyDate ,23) BETWEEN :startDate AND :endDate
+            WHERE  KCRK.ModifyDate >= :startDate AND KCRK.ModifyDate < :endDate
             GROUP BY
                   ZSNO
                   ,RKNO
@@ -1115,10 +1115,10 @@ export const buildQueryAutoSentCMS = async (
                   ,kcrk.ModifyDate
                   ,KCRK.Qty
                   ,kcrk.RKNO
-                  ,pc.PortCode      
+                  ,pc.PortCode          
             SELECT * 
-                  --,COUNT(*) OVER() AS TotalRowsCount
-                  --,ROW_NUMBER() OVER(ORDER BY PurDate ,PurNo) AS [No]
+                  ,COUNT(*) OVER() AS TotalRowsCount
+                  ,ROW_NUMBER() OVER(ORDER BY PurDate ,PurNo) AS [No]
             FROM   #Cat1AndCat4`;
   return query;
 };
