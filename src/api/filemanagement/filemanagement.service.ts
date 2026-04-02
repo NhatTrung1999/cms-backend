@@ -36,7 +36,7 @@ export class FilemanagementService {
   constructor(
     private configService: ConfigService,
     @Inject('EIP') private readonly EIP: Sequelize,
-    // cat 9 & 12
+    // cat 9 & 12 and cat 1 & 4
     @Inject('LYV_ERP') private readonly LYV_ERP: Sequelize,
     @Inject('LHG_ERP') private readonly LHG_ERP: Sequelize,
     @Inject('LVL_ERP') private readonly LVL_ERP: Sequelize,

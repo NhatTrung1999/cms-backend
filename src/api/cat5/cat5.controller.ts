@@ -44,25 +44,4 @@ export class Cat5Controller {
     );
     return data;
   }
-
-  @Get('get-logging-cat5')
-  async getLoggingCat5(
-    @Query('dateFrom') dateFrom: string,
-    @Query('dateTo') dateTo: string,
-    @Query('factory') factory: string,
-    @Query('page') page: number,
-    @Query('limit') limit: number,
-    @Query('sortField') sortField: string,
-    @Query('sortOrder') sortOrder: string,
-  ) {
-    return this.cat5Service.getLoggingCat5(
-      dateFrom,
-      dateTo,
-      factory,
-      +page,
-      +limit,
-      sortField,
-      sortOrder,
-    );
-  }
 }

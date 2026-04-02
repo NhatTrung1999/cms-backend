@@ -58,25 +58,4 @@ export class Cat7Controller {
     const data = await this.cat7Service.autoSentCMS(dateFrom, dateTo, factory);
     return data;
   }
-
-  @Get('get-logging-cat7')
-  async getLoggingCat7(
-    @Query('dateFrom') dateFrom: string,
-    @Query('dateTo') dateTo: string,
-    @Query('factory') factory: string,
-    @Query('page') page: number,
-    @Query('limit') limit: number,
-    @Query('sortField') sortField: string,
-    @Query('sortOrder') sortOrder: string,
-  ) {
-    return this.cat7Service.getLoggingCat7(
-      dateFrom,
-      dateTo,
-      factory,
-      +page,
-      +limit,
-      sortField,
-      sortOrder,
-    );
-  }
 }

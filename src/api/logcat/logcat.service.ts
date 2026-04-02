@@ -426,6 +426,117 @@ export class LogcatService {
   //   }
   // }
 
+  // async exportExcelCat1And4(dateFrom: string, dateTo: string, factory: string) {
+  //   try {
+  //     let where: string = 'WHERE 1=1';
+  //     const replacements: any[] = [];
+
+  //     if (dateFrom && dateTo) {
+  //       where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+  //       replacements.push(dateFrom, dateTo);
+  //     }
+
+  //     if (factory) {
+  //       where += ' AND Fac LIKE ?';
+  //       replacements.push(`%${factory}%`);
+  //     }
+
+  //     const passThrough = new PassThrough();
+
+  //     const bufferPromise: Promise<Buffer> = new Promise((resolve, reject) => {
+  //       const chunks: Buffer[] = [];
+  //       passThrough.on('data', (chunk) => chunks.push(chunk));
+  //       passThrough.on('end', () => resolve(Buffer.concat(chunks)));
+  //       passThrough.on('error', reject);
+  //     });
+
+  //     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+  //       stream: passThrough,
+  //       useStyles: true,
+  //       useSharedStrings: false,
+  //     });
+
+  //     const worksheet = workbook.addWorksheet('LogCat');
+
+  //     worksheet.columns = [
+  //       { header: 'System', key: 'System', width: 15 },
+  //       { header: 'Corporation', key: 'Corporation', width: 15 },
+  //       { header: 'Factory', key: 'Factory', width: 15 },
+  //       { header: 'Department', key: 'Department', width: 15 },
+  //       { header: 'DocKey', key: 'DocKey', width: 15 },
+  //       { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
+  //       { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
+  //       { header: 'ActivityType', key: 'ActivityType', width: 15 },
+  //       { header: 'DataType', key: 'DataType', width: 15 },
+  //       { header: 'DocType', key: 'DocType', width: 15 },
+  //       { header: 'UndDoc', key: 'UndDoc', width: 15 },
+  //       { header: 'DocFlow', key: 'DocFlow', width: 15 },
+  //       { header: 'DocDate', key: 'DocDate', width: 15 },
+  //       { header: 'DocDate2', key: 'DocDate2', width: 15 },
+  //       { header: 'DocNo', key: 'DocNo', width: 15 },
+  //       { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
+  //       { header: 'CustVenName', key: 'CustVenName', width: 25 },
+  //       { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
+  //       { header: 'TransType', key: 'TransType', width: 15 },
+  //       { header: 'Departure', key: 'Departure', width: 15 },
+  //       { header: 'Destination', key: 'Destination', width: 15 },
+  //       { header: 'PortType', key: 'PortType', width: 15 },
+  //       { header: 'StPort', key: 'StPort', width: 15 },
+  //       { header: 'ThPort', key: 'ThPort', width: 15 },
+  //       { header: 'EndPort', key: 'EndPort', width: 15 },
+  //       { header: 'Product', key: 'Product', width: 20 },
+  //       { header: 'Quity', key: 'Quity', width: 12 },
+  //       { header: 'Amount', key: 'Amount', width: 12 },
+  //       { header: 'ActivityData', key: 'ActivityData', width: 15 },
+  //       { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
+  //       { header: 'Unit', key: 'Unit', width: 10 },
+  //       { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
+  //       { header: 'Memo', key: 'Memo', width: 20 },
+  //       { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
+  //       { header: 'Creator', key: 'Creator', width: 15 },
+  //       { header: 'CreatedUser', key: 'CreatedUser', width: 15 },
+  //       { header: 'CreatedFactory', key: 'CreatedFactory', width: 15 },
+  //       { header: 'CreatedAt', key: 'CreatedAt', width: 20 },
+  //       { header: 'ActivitySource', key: 'ActivitySource', width: 20 },
+  //     ];
+
+  //     worksheet.getRow(1).font = { bold: true };
+  //     worksheet.getRow(1).commit();
+
+  //     const CHUNK_SIZE = 10000;
+  //     let offset = 0;
+
+  //     while (true) {
+  //       const rows = (await this.EIP.query(
+  //         `SELECT * FROM CMW_Category_1_And_4_Log
+  //          ${where}
+  //          ORDER BY (SELECT NULL) OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`,
+  //         {
+  //           type: QueryTypes.SELECT,
+  //           replacements: [...replacements, offset, CHUNK_SIZE],
+  //         },
+  //       )) as any[];
+
+  //       if (rows.length === 0) break;
+
+  //       for (const row of rows) {
+  //         worksheet.addRow(row).commit();
+  //       }
+
+  //       offset += CHUNK_SIZE;
+  //     }
+
+  //     await worksheet.commit();
+  //     await workbook.commit();
+
+  //     const buffer = await bufferPromise;
+
+  //     return buffer;
+  //   } catch (error) {
+  //     throw new InternalServerErrorException(error);
+  //   }
+  // }
+
   async exportExcelCat1And4(dateFrom: string, dateTo: string, factory: string) {
     try {
       let where: string = 'WHERE 1=1';
@@ -443,7 +554,6 @@ export class LogcatService {
 
       const passThrough = new PassThrough();
 
-      // ✅ Gắn listener TRƯỚC — không bỏ lỡ event 'end'
       const bufferPromise: Promise<Buffer> = new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
         passThrough.on('data', (chunk) => chunks.push(chunk));
@@ -511,7 +621,8 @@ export class LogcatService {
         const rows = (await this.EIP.query(
           `SELECT * FROM CMW_Category_1_And_4_Log
            ${where}
-           ORDER BY (SELECT NULL) OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`,
+           ORDER BY Id
+           OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`,
           {
             type: QueryTypes.SELECT,
             replacements: [...replacements, offset, CHUNK_SIZE],
@@ -528,7 +639,7 @@ export class LogcatService {
       }
 
       await worksheet.commit();
-      await workbook.commit(); 
+      await workbook.commit();
 
       const buffer = await bufferPromise;
 

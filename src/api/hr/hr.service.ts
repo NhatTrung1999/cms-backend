@@ -449,13 +449,12 @@ export class HrService {
         }
       });
 
-      console.log(data);
       const updatedRecords: any[] = [];
+      const skippedRecords: any[] = []; // ✅ thêm để track
+
       for (let item of data) {
         const records: any[] = await db.query(
-          `SELECT userId
-          FROM users
-          WHERE userId = ?`,
+          `SELECT userId FROM users WHERE userId = ?`,
           {
             replacements: [String(item.ID)],
             type: QueryTypes.SELECT,
@@ -467,6 +466,7 @@ export class HrService {
                                 SET
                                   Address_Live = :address,
                                   Vehicle = :vehicle,
+                                  rfToken = ISNULL(rfToken, 'ESG'),
                                   UpdatedBy = :updatedBy,
                                   UpdatedAt = GETDATE()
                                 OUTPUT 
@@ -487,33 +487,20 @@ export class HrService {
           if (updateResults && updateResults.length > 0) {
             updatedRecords.push(updateResults[0]);
           }
+        } else {
+          // ✅ track lại ID không tìm thấy
+          skippedRecords.push({
+            ID: item.ID,
+            Full_Name: item.Full_Name,
+            reason: 'userId not found in DB',
+          });
         }
-        // if (records[0].total > 0) {
-        //   await db.query(
-        //     `UPDATE users
-        //     SET
-        //       Address_Live = ?,
-        //       Vehicle = ?,
-        //       UpdatedBy = ?,
-        //       UpdatedAt = GETDATE()
-        //     WHERE userId = ?`,
-        //     {
-        //       replacements: [
-        //         item.Current_Address,
-        //         item.Transportation_Method,
-        //         userid,
-        //         String(item.ID),
-        //       ],
-        //       type: QueryTypes.SELECT,
-        //     },
-        //   );
-        //   updateCount++;
-        // }
       }
-      // const message = `Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+
       return {
-        message: `Updated: ${updatedRecords.length} records. Total rows processed: ${data.length}.`,
+        message: `Updated: ${updatedRecords.length} records. Skipped: ${skippedRecords.length} records. Total rows processed: ${data.length}.`,
         updatedData: updatedRecords,
+        skippedData: skippedRecords, // ✅ trả về danh sách bị skip để kiểm tra
       };
     } catch (error) {
       throw new InternalServerErrorException(`${error.message}`);
