@@ -21,7 +21,6 @@ import { ACTIVITY_TYPES, ActivityType, BuildQueryFn } from 'src/types/cat7';
 import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
 dayjs().format();
 
-
 @Injectable()
 export class Cat7Service {
   constructor(
@@ -742,6 +741,9 @@ export class Cat7Service {
       Memo: '',
       CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
       Creator: '',
-    }));
+    }))
+    // .filter(
+    //   (item) => item.Department.trim().toLowerCase() === 'G4_M08'.toLowerCase(),
+    // );
   }
 }

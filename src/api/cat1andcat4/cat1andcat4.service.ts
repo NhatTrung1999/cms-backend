@@ -34,6 +34,22 @@ export class Cat1andcat4Service {
     @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
   ) {}
 
+  private getVerificationComparisonKey(row: any) {
+    return [
+      row.DocKey,
+      row.DocNo,
+      row.InvoiceNo,
+      row.Product,
+      row.Departure,
+      row.Destination,
+      row.ActivityData,
+      row.ActivityUnit,
+      row.UnitWeight,
+    ]
+      .map((value) => String(value ?? '').trim().toLowerCase())
+      .join('|');
+  }
+
   async getDataCat1AndCat4(
     dateFrom: string,
     dateTo: string,
@@ -802,6 +818,120 @@ export class Cat1andcat4Service {
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
+  }
+
+  async getVerificationReport(payload: {
+    dateFrom: string;
+    dateTo: string;
+    factory: string;
+    category: string;
+    status: string;
+    page: number;
+    limit: number;
+  }) {
+    const {
+      dateFrom,
+      dateTo,
+      factory,
+      category,
+      status,
+      page = 1,
+      limit = 50,
+    } = payload;
+
+    const normalizedCategory = category?.trim().toUpperCase() === 'CAT4' ? 'CAT4' : 'CAT1';
+    const dockeyCMS = normalizedCategory === 'CAT4' ? '3.1' : '4.1';
+    const activityType = dockeyCMS;
+    const normalizedStatus = String(status ?? 'ALL').trim().toUpperCase();
+    const safePage = page > 0 ? page : 1;
+    const safeLimit = limit > 0 ? limit : 50;
+
+    const previewRows = (await this.autoSentCMS(
+      dateFrom,
+      dateTo,
+      factory,
+      dockeyCMS,
+    )) as any[];
+
+    let where = 'WHERE 1=1';
+    const replacements: any[] = [];
+
+    if (dateFrom && dateTo) {
+      where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (factory) {
+      where += ' AND Fac LIKE ?';
+      replacements.push(`%${factory}%`);
+    }
+
+    where += ' AND ActivityType = ?';
+    replacements.push(activityType);
+
+    const loggingRows = (await this.EIP.query(
+      `
+      SELECT *
+      FROM CMW_Category_1_And_4_Log
+      ${where}
+      ORDER BY CreatedAt DESC
+      `,
+      {
+        type: QueryTypes.SELECT,
+        replacements,
+      },
+    )) as any[];
+
+    const previewKeys = new Set(
+      previewRows.map((row) => this.getVerificationComparisonKey(row)),
+    );
+    const loggingKeys = new Set(
+      loggingRows.map((row) => this.getVerificationComparisonKey(row)),
+    );
+
+    const matchedCount = previewRows.filter((row) =>
+      loggingKeys.has(this.getVerificationComparisonKey(row)),
+    ).length;
+    const missingCount = previewRows.length - matchedCount;
+    const extraCount = loggingRows.filter(
+      (row) => !previewKeys.has(this.getVerificationComparisonKey(row)),
+    ).length;
+
+    const rowsWithStatus = previewRows.map((row) => {
+      const isMatched = loggingKeys.has(this.getVerificationComparisonKey(row));
+      return {
+        ...row,
+        VerificationStatus: isMatched ? 'MATCHED' : 'MISSING',
+      };
+    });
+
+    const filteredRows =
+      normalizedStatus === 'MATCHED'
+        ? rowsWithStatus.filter((row) => row.VerificationStatus === 'MATCHED')
+        : normalizedStatus === 'MISSING'
+          ? rowsWithStatus.filter((row) => row.VerificationStatus === 'MISSING')
+          : rowsWithStatus;
+
+    const total = filteredRows.length;
+    const offset = (safePage - 1) * safeLimit;
+    const pagedRows = filteredRows.slice(offset, offset + safeLimit);
+
+    return {
+      summary: {
+        previewCount: previewRows.length,
+        loggingCount: loggingRows.length,
+        matchedCount,
+        missingCount,
+        extraCount,
+      },
+      rows: pagedRows,
+      page: safePage,
+      limit: safeLimit,
+      total,
+      hasMore: offset + pagedRows.length < total,
+      category: normalizedCategory,
+      status: normalizedStatus,
+    };
   }
 
   private async autoSentCMSAllFactories(

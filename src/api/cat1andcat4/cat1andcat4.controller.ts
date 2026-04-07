@@ -142,6 +142,28 @@ export class Cat1andcat4Controller {
   }
 
   @Public()
+  @Get('verification-report')
+  async getVerificationReport(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+    @Query('category') category: string,
+    @Query('status') status: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+  ) {
+    return this.cat1andcat4Service.getVerificationReport({
+      dateFrom,
+      dateTo,
+      factory,
+      category,
+      status,
+      page: +page || 1,
+      limit: +limit || 50,
+    });
+  }
+
+  @Public()
   @Get('export-preview-payload')
   async exportPreviewPayload(
     @Query('dateFrom') dateFrom: string,

@@ -206,6 +206,36 @@ export class LogcatService {
     }
   }
 
+  async getLogCat1And4All(dateFrom: string, dateTo: string, factory: string) {
+    let where: string = 'WHERE 1=1';
+    const replacements: any[] = [];
+
+    if (dateFrom && dateTo) {
+      where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (factory) {
+      where += ' AND Fac LIKE ?';
+      replacements.push(`%${factory}%`);
+    }
+
+    const dataResults = await this.EIP.query(
+      `
+      SELECT *
+      FROM CMW_Category_1_And_4_Log
+      ${where}
+      ORDER BY CreatedAt DESC
+      `,
+      {
+        type: QueryTypes.SELECT,
+        replacements,
+      },
+    );
+
+    return dataResults as any[];
+  }
+
   // async exportExcelCat1And4(dateFrom: string, dateTo: string, factory: string) {
   //   try {
   //     let where: string = 'WHERE 1=1';

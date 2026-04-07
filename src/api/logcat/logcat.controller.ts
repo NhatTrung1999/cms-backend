@@ -45,6 +45,15 @@ export class LogcatController {
     );
   }
 
+  @Get('get-log-cat1-4-all')
+  async getLogCat1And4All(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+  ) {
+    return this.logcatService.getLogCat1And4All(dateFrom, dateTo, factory);
+  }
+
   @Post('create-log-cat1-4')
   async createLogCat1And4(@Body() data: CreateLogCat1And4[], @Request() req) {
     const factory = getFactortyID(req);
