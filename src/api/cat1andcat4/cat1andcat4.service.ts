@@ -45,34 +45,67 @@ export class Cat1andcat4Service {
       return data;
     }
 
-    return Promise.all(
-      data.map(async (item: any) => {
-        const supplierCode = String(item.SupplierCode ?? '').trim();
-        if (!supplierCode) {
-          return item;
-        }
-
-        const taxFreeZone: any[] = await this.EIP.query(
-          `SELECT TaxFreeZoneAddress
-           FROM CMW_TAX_FREE_ZONE_ADDRESS
-           WHERE SupplierID = ? AND Factory = ?`,
-          {
-            replacements: [supplierCode, factory],
-            type: QueryTypes.SELECT,
-          },
-        );
-
-        if (taxFreeZone.length === 0) {
-          return item;
-        }
-
-        return {
-          ...item,
-          TransportationMethod: 'Land',
-          Departure: taxFreeZone[0].TaxFreeZoneAddress,
-        };
-      }),
+    const supplierCodes = Array.from(
+      new Set(
+        data
+          .map((item: any) => String(item.SupplierCode ?? '').trim())
+          .filter(Boolean),
+      ),
     );
+
+    if (supplierCodes.length === 0) {
+      return data;
+    }
+
+    const supplierPlaceholders = supplierCodes
+      .map((_, index) => `:supplierCode${index}`)
+      .join(', ');
+    const replacements = supplierCodes.reduce<Record<string, string>>(
+      (acc, supplierCode, index) => {
+        acc[`supplierCode${index}`] = supplierCode;
+        return acc;
+      },
+      { factory },
+    );
+
+    const taxFreeZoneRows: Array<{
+      SupplierID: string;
+      TaxFreeZoneAddress: string;
+    }> = await this.EIP.query(
+      `SELECT SupplierID, TaxFreeZoneAddress
+       FROM CMW_TAX_FREE_ZONE_ADDRESS
+       WHERE Factory = :factory
+         AND SupplierID IN (${supplierPlaceholders})`,
+      {
+        replacements,
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const taxFreeZoneMap = new Map<string, string>();
+    for (const row of taxFreeZoneRows) {
+      const supplierCode = String(row.SupplierID ?? '').trim();
+      if (!supplierCode || taxFreeZoneMap.has(supplierCode)) {
+        continue;
+      }
+
+      taxFreeZoneMap.set(supplierCode, row.TaxFreeZoneAddress);
+    }
+
+    return data.map((item: any) => {
+      const supplierCode = String(item.SupplierCode ?? '').trim();
+      const taxFreeZoneAddress = taxFreeZoneMap.get(supplierCode);
+
+      if (!taxFreeZoneAddress) {
+        return item;
+      }
+
+      return {
+        ...item,
+        TransportationMethod: 'Land',
+        Departure: taxFreeZoneAddress,
+      };
+    });
   }
 
   async getDataCat1AndCat4(
@@ -659,8 +692,10 @@ export class Cat1andcat4Service {
     sortOrder: string = 'asc',
   ) {
     try {
+      const startedAt = Date.now();
       const offset = (page - 1) * limit;
 
+      const buildQueryStartedAt = Date.now();
       const query = await buildQueryTest(
         sortField,
         sortOrder,
@@ -671,6 +706,7 @@ export class Cat1andcat4Service {
         departure,
         this.EIP,
       );
+      const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
 
       const replacements = {
         startDate: dateFrom,
@@ -682,28 +718,23 @@ export class Cat1andcat4Service {
         limit,
       };
 
+      const queryStartedAt = Date.now();
       let data: any[] = await db.query(query, {
         replacements,
         type: QueryTypes.SELECT,
       });
+      const queryDurationMs = Date.now() - queryStartedAt;
 
-      // console.log(data);
+      const overrideStartedAt = Date.now();
       data = await this.applyTaxFreeZoneOverrides(data, factory);
-
-      // const taxFreeZone = await this.EIP.query(
-      //   `SELECT *
-      //     FROM CMW_TAX_FREE_ZONE_ADDRESS
-      //     WHERE SupplierID = ? AND Factory = ?`,
-      //   { replacements: ['VT1013', factory], type: QueryTypes.SELECT },
-      // );
-
-      // // console.log(taxFreeZone);
-      // data.map((item) => {
-
-      // });
+      const overrideDurationMs = Date.now() - overrideStartedAt;
 
       const total = data.length > 0 ? data[0].TotalRowsCount : 0;
       const hasMore = offset + data.length < total;
+      const totalDurationMs = Date.now() - startedAt;
+      console.log(
+        `[Cat1AndCat4][getAFactoryDataTest] factory=${factory} page=${page} limit=${limit} rows=${data.length} total=${total} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
+      );
       return { data, page, limit, total, hasMore };
     } catch (error: any) {
       throw error;
@@ -723,6 +754,7 @@ export class Cat1andcat4Service {
     sortOrder: string,
   ) {
     try {
+      const startedAt = Date.now();
       const offset = (page - 1) * limit;
       const connects: { factoryName: string; conn: Sequelize }[] = [
         { factoryName: 'LYV', conn: this.LYV_ERP },
@@ -740,6 +772,8 @@ export class Cat1andcat4Service {
 
       const results = await Promise.all(
         connects.map(async ({ factoryName, conn }) => {
+          const factoryStartedAt = Date.now();
+          const buildQueryStartedAt = Date.now();
           const query = await buildQueryTest(
             sortField,
             sortOrder,
@@ -751,13 +785,22 @@ export class Cat1andcat4Service {
             this.EIP,
             true,
           );
+          const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
 
+          const queryStartedAt = Date.now();
           let rows: any[] = await conn.query(query, {
             type: QueryTypes.SELECT,
             replacements,
           });
+          const queryDurationMs = Date.now() - queryStartedAt;
 
+          const overrideStartedAt = Date.now();
           rows = await this.applyTaxFreeZoneOverrides(rows, factoryName);
+          const overrideDurationMs = Date.now() - overrideStartedAt;
+          const totalDurationMs = Date.now() - factoryStartedAt;
+          console.log(
+            `[Cat1AndCat4][getAllFactoryDataTest] factory=${factoryName} rows=${rows.length} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
+          );
 
           return rows;
         }),
@@ -777,6 +820,10 @@ export class Cat1andcat4Service {
         .slice(offset, offset + limit)
         .map((row, index) => ({ ...row, No: offset + index + 1 }));
       const hasMore = offset + data.length < total;
+      const totalDurationMs = Date.now() - startedAt;
+      console.log(
+        `[Cat1AndCat4][getAllFactoryDataTest] page=${page} limit=${limit} mergedRows=${allData.length} returnedRows=${data.length} totalMs=${totalDurationMs}`,
+      );
       return { data, page, limit, total, hasMore };
     } catch (error) {}
   }
@@ -940,7 +987,10 @@ export class Cat1andcat4Service {
     const db = this.getDbByFactory(factory);
     if (!db) return [];
 
+    const startedAt = Date.now();
+    const buildQueryStartedAt = Date.now();
     const query = await buildQueryAutoSentCMS(factory, this.EIP);
+    const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
 
     const replacements =
       dateFrom && dateTo
@@ -953,37 +1003,26 @@ export class Cat1andcat4Service {
           }
         : {};
 
+    const queryStartedAt = Date.now();
     let data = await db.query<any>(query, {
       type: QueryTypes.SELECT,
       replacements,
     });
+    const queryDurationMs = Date.now() - queryStartedAt;
 
-    data = await Promise.all(
-      data.map(async (item: any) => {
-        const taxFreeZone: any[] = await this.EIP.query(
-          `SELECT TaxFreeZoneAddress
-          FROM CMW_TAX_FREE_ZONE_ADDRESS
-          WHERE SupplierID = ? AND Factory = ?`,
-          {
-            replacements: [item.SupplierCode.trim(), factory],
-            type: QueryTypes.SELECT,
-          },
-        );
-        return {
-          ...item,
-          TransportationMethod:
-            taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
-          Departure:
-            taxFreeZone.length > 0
-              ? taxFreeZone[0].TaxFreeZoneAddress
-              : item.Departure,
-        };
-      }),
-    );
+    const overrideStartedAt = Date.now();
+    data = await this.applyTaxFreeZoneOverrides(data, factory);
+    const overrideDurationMs = Date.now() - overrideStartedAt;
 
-    return data.flatMap((item) =>
+    const mapped = data.flatMap((item) =>
       this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
     );
+    const totalDurationMs = Date.now() - startedAt;
+    console.log(
+      `[Cat1AndCat4][getCMSByFactory] factory=${factory} dockeyCMS=${dockeyCMS} sourceRows=${data.length} mappedRows=${mapped.length} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
+    );
+
+    return mapped;
   }
 
   private getDbByFactory(factory: FactoryCode): Sequelize | null {
