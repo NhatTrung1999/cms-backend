@@ -17,7 +17,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
         // logging: false,
@@ -41,7 +41,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -63,7 +63,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -85,7 +85,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -107,7 +107,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -129,7 +129,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -151,7 +151,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -173,7 +173,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -196,7 +196,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -218,7 +218,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -240,7 +240,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -262,7 +262,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -284,7 +284,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -306,7 +306,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -329,7 +329,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -351,7 +351,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -373,7 +373,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -395,7 +395,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -417,7 +417,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -439,7 +439,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });
@@ -462,7 +462,7 @@ export const databaseProviders = [
           options: {
             encrypt: false,
             trustServerCertificate: true,
-            requestTimeout: 300000,
+            requestTimeout: 86400000,
           },
         },
       });

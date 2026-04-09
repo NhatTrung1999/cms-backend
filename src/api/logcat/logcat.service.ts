@@ -93,34 +93,80 @@ export class LogcatService {
     const transaction = await this.EIP.transaction();
 
     try {
-      for (const item of data) {
-        let fac: string = '';
+      const CHUNK_SIZE = 40;
+      const normalizedFactoryCodeMap = Object.fromEntries(
+        Object.entries({
+          '樂億 - LYV': 'LYV',
+          '樂億II - LHG': 'LHG',
+          '億春B - LVL': 'LVL',
+          '昌億 - LYM': 'LYM',
+          '億福 - LYF': 'LYF',
+          'Jiazhi-1': 'JAZ',
+          'Jiazhi-2': 'JZS',
+        }).map(([key, value]) => [key.trim().toLowerCase(), value]),
+      ) as Record<string, string>;
+      for (let start = 0; start < data.length; start += CHUNK_SIZE) {
+        const chunk = data.slice(start, start + CHUNK_SIZE);
+        const replacements: Record<string, string | number> = {};
 
-        switch (item.Factory.trim().toLowerCase()) {
-          case '樂億 - LYV'.trim().toLowerCase():
-            fac = 'LYV';
-            break;
-          case '樂億II - LHG'.trim().toLowerCase():
-            fac = 'LHG';
-            break;
-          case '億春B - LVL'.trim().toLowerCase():
-            fac = 'LVL';
-            break;
-          case '昌億 - LYM'.trim().toLowerCase():
-            fac = 'LYM';
-            break;
-          case '億福 - LYF'.trim().toLowerCase():
-            fac = 'LYF';
-            break;
-          case 'Jiazhi-1'.trim().toLowerCase():
-            fac = 'JAZ';
-            break;
-          case 'Jiazhi-2'.trim().toLowerCase():
-            fac = 'JZS';
-            break;
-          default:
-            break;
-        }
+        const valuesSql = chunk
+          .map((item, index) => {
+            const suffix = `${start + index}`;
+            const fac =
+              normalizedFactoryCodeMap[item.Factory.trim().toLowerCase()] ?? '';
+
+            replacements[`id${suffix}`] = uuidv4();
+            replacements[`system${suffix}`] = item.System;
+            replacements[`corporation${suffix}`] = item.Corporation;
+            replacements[`factory${suffix}`] = item.Factory;
+            replacements[`fac${suffix}`] = fac;
+            replacements[`department${suffix}`] = item.Department;
+            replacements[`docKey${suffix}`] = item.DocKey;
+            replacements[`sPeriod${suffix}`] = item.SPeriodData;
+            replacements[`ePeriod${suffix}`] = item.EPeriodData;
+            replacements[`activityType${suffix}`] = item.ActivityType;
+            replacements[`dataType${suffix}`] = item.DataType;
+            replacements[`docType${suffix}`] = item.DocType;
+            replacements[`undDoc${suffix}`] = item.UndDoc;
+            replacements[`docFlow${suffix}`] = item.DocFlow;
+            replacements[`docDate${suffix}`] = item.DocDate;
+            replacements[`docDate2${suffix}`] = item.DocDate2;
+            replacements[`docNo${suffix}`] = item.DocNo;
+            replacements[`undDocNo${suffix}`] = item.UndDocNo;
+            replacements[`custVenName${suffix}`] = item.CustVenName;
+            replacements[`invoiceNo${suffix}`] = item.InvoiceNo;
+            replacements[`transType${suffix}`] = item.TransType;
+            replacements[`departure${suffix}`] = item.Departure;
+            replacements[`destination${suffix}`] = item.Destination;
+            replacements[`portType${suffix}`] = item.PortType;
+            replacements[`stPort${suffix}`] = item.StPort;
+            replacements[`thPort${suffix}`] = item.ThPort;
+            replacements[`endPort${suffix}`] = item.EndPort;
+            replacements[`product${suffix}`] = item.Product;
+            replacements[`quity${suffix}`] = item.Quity;
+            replacements[`amount${suffix}`] = item.Amount;
+            replacements[`activityData${suffix}`] = item.ActivityData;
+            replacements[`activityUnit${suffix}`] = item.ActivityUnit;
+            replacements[`unit${suffix}`] = item.Unit;
+            replacements[`unitWeight${suffix}`] = item.UnitWeight;
+            replacements[`memo${suffix}`] = item.Memo;
+            replacements[`createDateTime${suffix}`] = item.CreateDateTime;
+            replacements[`creator${suffix}`] = item.Creator;
+            replacements[`createdUser${suffix}`] = userid;
+            replacements[`createdFactory${suffix}`] = factory;
+            replacements[`activitySource${suffix}`] = item.ActivitySource;
+
+            return `(
+              :id${suffix}, :system${suffix}, :corporation${suffix}, :factory${suffix}, :fac${suffix}, :department${suffix}, :docKey${suffix},
+              :sPeriod${suffix}, :ePeriod${suffix}, :activityType${suffix}, :dataType${suffix}, :docType${suffix},
+              :undDoc${suffix}, :docFlow${suffix}, :docDate${suffix}, :docDate2${suffix}, :docNo${suffix}, :undDocNo${suffix},
+              :custVenName${suffix}, :invoiceNo${suffix}, :transType${suffix}, :departure${suffix}, :destination${suffix},
+              :portType${suffix}, :stPort${suffix}, :thPort${suffix}, :endPort${suffix}, :product${suffix}, :quity${suffix}, :amount${suffix},
+              :activityData${suffix}, :activityUnit${suffix}, :unit${suffix}, :unitWeight${suffix}, :memo${suffix},
+              :createDateTime${suffix}, :creator${suffix}, :createdUser${suffix}, :createdFactory${suffix}, GETDATE(), :activitySource${suffix}
+            )`;
+          })
+          .join(',\n');
 
         await this.EIP.query(
           `
@@ -135,61 +181,12 @@ export class LogcatService {
             CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt, ActivitySource
           )
           VALUES
-          (
-            :id, :system, :corporation, :factory, :fac, :department, :docKey,
-            :sPeriod, :ePeriod, :activityType, :dataType, :docType,
-            :undDoc, :docFlow, :docDate, :docDate2, :docNo, :undDocNo,
-            :custVenName, :invoiceNo, :transType, :departure, :destination,
-            :portType, :stPort, :thPort, :endPort, :product, :quity, :amount,
-            :activityData, :activityUnit, :unit, :unitWeight, :memo,
-            :createDateTime, :creator, :createdUser, :createdFactory, GETDATE(), :activitySource
-          );
+          ${valuesSql};
           `,
           {
             type: QueryTypes.INSERT,
             transaction,
-            replacements: {
-              id: uuidv4(),
-              system: item.System,
-              corporation: item.Corporation,
-              factory: item.Factory,
-              fac: fac,
-              department: item.Department,
-              docKey: item.DocKey,
-              sPeriod: item.SPeriodData,
-              ePeriod: item.EPeriodData,
-              activityType: item.ActivityType,
-              dataType: item.DataType,
-              docType: item.DocType,
-              undDoc: item.UndDoc,
-              docFlow: item.DocFlow,
-              docDate: item.DocDate,
-              docDate2: item.DocDate2,
-              docNo: item.DocNo,
-              undDocNo: item.UndDocNo,
-              custVenName: item.CustVenName,
-              invoiceNo: item.InvoiceNo,
-              transType: item.TransType,
-              departure: item.Departure,
-              destination: item.Destination,
-              portType: item.PortType,
-              stPort: item.StPort,
-              thPort: item.ThPort,
-              endPort: item.EndPort,
-              product: item.Product,
-              quity: item.Quity,
-              amount: item.Amount,
-              activityData: item.ActivityData,
-              activityUnit: item.ActivityUnit,
-              unit: item.Unit,
-              unitWeight: item.UnitWeight,
-              memo: item.Memo,
-              createDateTime: item.CreateDateTime,
-              creator: item.Creator,
-              createdUser: userid,
-              createdFactory: factory,
-              activitySource: item.ActivitySource,
-            },
+            replacements,
           },
         );
       }
@@ -200,6 +197,114 @@ export class LogcatService {
         success: true,
         message: 'Create log CAT1&4 success!',
       };
+
+      // for (const item of data) {
+      //   let fac: string = '';
+
+      //   switch (item.Factory.trim().toLowerCase()) {
+      //     case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
+      //       fac = 'LYV';
+      //       break;
+      //     case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
+      //       fac = 'LHG';
+      //       break;
+      //     case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
+      //       fac = 'LVL';
+      //       break;
+      //     case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
+      //       fac = 'LYM';
+      //       break;
+      //     case 'å„„ç¦ - LYF'.trim().toLowerCase():
+      //       fac = 'LYF';
+      //       break;
+      //     case 'Jiazhi-1'.trim().toLowerCase():
+      //       fac = 'JAZ';
+      //       break;
+      //     case 'Jiazhi-2'.trim().toLowerCase():
+      //       fac = 'JZS';
+      //       break;
+      //     default:
+      //       break;
+      //   }
+
+      //   await this.EIP.query(
+      //     `
+      //     INSERT INTO CMW_Category_1_And_4_Log
+      //     (
+      //       ID, [System], Corporation, Factory, Fac, Department, DocKey,
+      //       SPeriodData, EPeriodData, ActivityType, DataType, DocType,
+      //       UndDoc, DocFlow, DocDate, DocDate2, DocNo, UndDocNo,
+      //       CustVenName, InvoiceNo, TransType, Departure, Destination,
+      //       PortType, StPort, ThPort, EndPort, Product, Quity, Amount,
+      //       ActivityData, ActivityUnit, Unit, UnitWeight, Memo,
+      //       CreateDateTime, Creator, CreatedUser, CreatedFactory, CreatedAt, ActivitySource
+      //     )
+      //     VALUES
+      //     (
+      //       :id, :system, :corporation, :factory, :fac, :department, :docKey,
+      //       :sPeriod, :ePeriod, :activityType, :dataType, :docType,
+      //       :undDoc, :docFlow, :docDate, :docDate2, :docNo, :undDocNo,
+      //       :custVenName, :invoiceNo, :transType, :departure, :destination,
+      //       :portType, :stPort, :thPort, :endPort, :product, :quity, :amount,
+      //       :activityData, :activityUnit, :unit, :unitWeight, :memo,
+      //       :createDateTime, :creator, :createdUser, :createdFactory, GETDATE(), :activitySource
+      //     );
+      //     `,
+      //     {
+      //       type: QueryTypes.INSERT,
+      //       transaction,
+      //       replacements: {
+      //         id: uuidv4(),
+      //         system: item.System,
+      //         corporation: item.Corporation,
+      //         factory: item.Factory,
+      //         fac: fac,
+      //         department: item.Department,
+      //         docKey: item.DocKey,
+      //         sPeriod: item.SPeriodData,
+      //         ePeriod: item.EPeriodData,
+      //         activityType: item.ActivityType,
+      //         dataType: item.DataType,
+      //         docType: item.DocType,
+      //         undDoc: item.UndDoc,
+      //         docFlow: item.DocFlow,
+      //         docDate: item.DocDate,
+      //         docDate2: item.DocDate2,
+      //         docNo: item.DocNo,
+      //         undDocNo: item.UndDocNo,
+      //         custVenName: item.CustVenName,
+      //         invoiceNo: item.InvoiceNo,
+      //         transType: item.TransType,
+      //         departure: item.Departure,
+      //         destination: item.Destination,
+      //         portType: item.PortType,
+      //         stPort: item.StPort,
+      //         thPort: item.ThPort,
+      //         endPort: item.EndPort,
+      //         product: item.Product,
+      //         quity: item.Quity,
+      //         amount: item.Amount,
+      //         activityData: item.ActivityData,
+      //         activityUnit: item.ActivityUnit,
+      //         unit: item.Unit,
+      //         unitWeight: item.UnitWeight,
+      //         memo: item.Memo,
+      //         createDateTime: item.CreateDateTime,
+      //         creator: item.Creator,
+      //         createdUser: userid,
+      //         createdFactory: factory,
+      //         activitySource: item.ActivitySource,
+      //       },
+      //     },
+      //   );
+      // }
+
+      // await transaction.commit();
+
+      // return {
+      //   success: true,
+      //   message: 'Create log CAT1&4 success!',
+      // };
     } catch (error) {
       await transaction.rollback();
       throw new InternalServerErrorException('Error!');
@@ -751,19 +856,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case '樂億 - LYV'.trim().toLowerCase():
+          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case '樂億II - LHG'.trim().toLowerCase():
+          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case '億春B - LVL'.trim().toLowerCase():
+          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case '昌億 - LYM'.trim().toLowerCase():
+          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case '億福 - LYF'.trim().toLowerCase():
+          case 'å„„ç¦ - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1047,19 +1152,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case '樂億 - LYV'.trim().toLowerCase():
+          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case '樂億II - LHG'.trim().toLowerCase():
+          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case '億春B - LVL'.trim().toLowerCase():
+          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case '昌億 - LYM'.trim().toLowerCase():
+          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case '億福 - LYF'.trim().toLowerCase():
+          case 'å„„ç¦ - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1310,19 +1415,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case '樂億 - LYV'.trim().toLowerCase():
+          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case '樂億II - LHG'.trim().toLowerCase():
+          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case '億春B - LVL'.trim().toLowerCase():
+          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case '昌億 - LYM'.trim().toLowerCase():
+          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case '億福 - LYF'.trim().toLowerCase():
+          case 'å„„ç¦ - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1568,19 +1673,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case '樂億 - LYV'.trim().toLowerCase():
+          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case '樂億II - LHG'.trim().toLowerCase():
+          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case '億春B - LVL'.trim().toLowerCase():
+          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case '昌億 - LYM'.trim().toLowerCase():
+          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case '億福 - LYF'.trim().toLowerCase():
+          case 'å„„ç¦ - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1870,19 +1975,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case '樂億 - LYV'.trim().toLowerCase():
+          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case '樂億II - LHG'.trim().toLowerCase():
+          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case '億春B - LVL'.trim().toLowerCase():
+          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case '昌億 - LYM'.trim().toLowerCase():
+          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case '億福 - LYF'.trim().toLowerCase():
+          case 'å„„ç¦ - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():

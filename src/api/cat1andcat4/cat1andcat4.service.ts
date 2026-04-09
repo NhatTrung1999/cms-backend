@@ -35,19 +35,44 @@ export class Cat1andcat4Service {
   ) {}
 
   private getVerificationComparisonKey(row: any) {
-    return [
-      row.DocKey,
-      row.DocNo,
-      row.InvoiceNo,
-      row.Product,
-      row.Departure,
-      row.Destination,
-      row.ActivityData,
-      row.ActivityUnit,
-      row.UnitWeight,
-    ]
+    return [row.DocNo, row.Product]
       .map((value) => String(value ?? '').trim().toLowerCase())
       .join('|');
+  }
+
+  private async applyTaxFreeZoneOverrides(data: any[], factory: string) {
+    if (data.length === 0) {
+      return data;
+    }
+
+    return Promise.all(
+      data.map(async (item: any) => {
+        const supplierCode = String(item.SupplierCode ?? '').trim();
+        if (!supplierCode) {
+          return item;
+        }
+
+        const taxFreeZone: any[] = await this.EIP.query(
+          `SELECT TaxFreeZoneAddress
+           FROM CMW_TAX_FREE_ZONE_ADDRESS
+           WHERE SupplierID = ? AND Factory = ?`,
+          {
+            replacements: [supplierCode, factory],
+            type: QueryTypes.SELECT,
+          },
+        );
+
+        if (taxFreeZone.length === 0) {
+          return item;
+        }
+
+        return {
+          ...item,
+          TransportationMethod: 'Land',
+          Departure: taxFreeZone[0].TaxFreeZoneAddress,
+        };
+      }),
+    );
   }
 
   async getDataCat1AndCat4(
@@ -663,28 +688,7 @@ export class Cat1andcat4Service {
       });
 
       // console.log(data);
-      data = await Promise.all(
-        data.map(async (item: any) => {
-          const taxFreeZone: any[] = await this.EIP.query(
-            `SELECT TaxFreeZoneAddress
-            FROM CMW_TAX_FREE_ZONE_ADDRESS
-            WHERE SupplierID = ? AND Factory = ?`,
-            {
-              replacements: [item.SupplierCode.trim(), factory],
-              type: QueryTypes.SELECT,
-            },
-          );
-          return {
-            ...item,
-            TransportationMethod:
-              taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
-            Departure:
-              taxFreeZone.length > 0
-                ? taxFreeZone[0].TaxFreeZoneAddress
-                : item.Departure,
-          };
-        }),
-      );
+      data = await this.applyTaxFreeZoneOverrides(data, factory);
 
       // const taxFreeZone = await this.EIP.query(
       //   `SELECT *
@@ -753,28 +757,7 @@ export class Cat1andcat4Service {
             replacements,
           });
 
-          rows = await Promise.all(
-            rows.map(async (item: any) => {
-              const taxFreeZone: any[] = await this.EIP.query(
-                `SELECT TaxFreeZoneAddress
-                FROM CMW_TAX_FREE_ZONE_ADDRESS
-                WHERE SupplierID = ? AND Factory = ?`,
-                {
-                  replacements: [item.SupplierCode.trim(), factoryName],
-                  type: QueryTypes.SELECT,
-                },
-              );
-              return {
-                ...item,
-                TransportationMethod:
-                  taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
-                Departure:
-                  taxFreeZone.length > 0
-                    ? taxFreeZone[0].TaxFreeZoneAddress
-                    : item.Departure,
-              };
-            }),
-          );
+          rows = await this.applyTaxFreeZoneOverrides(rows, factoryName);
 
           return rows;
         }),
