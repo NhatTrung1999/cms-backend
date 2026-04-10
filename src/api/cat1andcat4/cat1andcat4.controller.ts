@@ -144,8 +144,10 @@ export class Cat1andcat4Controller {
   @Public()
   @Get('verification-report')
   async getVerificationReport(
-    @Query('dateFrom') dateFrom: string,
-    @Query('dateTo') dateTo: string,
+    @Query('previewDateFrom') previewDateFrom: string,
+    @Query('previewDateTo') previewDateTo: string,
+    @Query('loggingDateFrom') loggingDateFrom: string,
+    @Query('loggingDateTo') loggingDateTo: string,
     @Query('factory') factory: string,
     @Query('category') category: string,
     @Query('status') status: string,
@@ -153,8 +155,10 @@ export class Cat1andcat4Controller {
     @Query('limit') limit: number,
   ) {
     return this.cat1andcat4Service.getVerificationReport({
-      dateFrom,
-      dateTo,
+      previewDateFrom,
+      previewDateTo,
+      loggingDateFrom,
+      loggingDateTo,
       factory,
       category,
       status,

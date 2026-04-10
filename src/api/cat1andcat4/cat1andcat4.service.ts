@@ -851,8 +851,10 @@ export class Cat1andcat4Service {
   }
 
   async getVerificationReport(payload: {
-    dateFrom: string;
-    dateTo: string;
+    previewDateFrom: string;
+    previewDateTo: string;
+    loggingDateFrom: string;
+    loggingDateTo: string;
     factory: string;
     category: string;
     status: string;
@@ -860,8 +862,10 @@ export class Cat1andcat4Service {
     limit: number;
   }) {
     const {
-      dateFrom,
-      dateTo,
+      previewDateFrom,
+      previewDateTo,
+      loggingDateFrom,
+      loggingDateTo,
       factory,
       category,
       status,
@@ -877,8 +881,8 @@ export class Cat1andcat4Service {
     const safeLimit = limit > 0 ? limit : 50;
 
     const previewRows = (await this.autoSentCMS(
-      dateFrom,
-      dateTo,
+      previewDateFrom,
+      previewDateTo,
       factory,
       dockeyCMS,
     )) as any[];
@@ -886,9 +890,9 @@ export class Cat1andcat4Service {
     let where = 'WHERE 1=1';
     const replacements: any[] = [];
 
-    if (dateFrom && dateTo) {
+    if (loggingDateFrom && loggingDateTo) {
       where += ' AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?';
-      replacements.push(dateFrom, dateTo);
+      replacements.push(loggingDateFrom, loggingDateTo);
     }
 
     if (factory) {
@@ -927,7 +931,7 @@ export class Cat1andcat4Service {
       (row) => !previewKeys.has(this.getVerificationComparisonKey(row)),
     ).length;
 
-    const rowsWithStatus = previewRows.map((row) => {
+    const previewRowsWithStatus = previewRows.map((row) => {
       const isMatched = loggingKeys.has(this.getVerificationComparisonKey(row));
       return {
         ...row,
@@ -935,11 +939,25 @@ export class Cat1andcat4Service {
       };
     });
 
+    const extraRowsWithStatus = loggingRows
+      .filter((row) => !previewKeys.has(this.getVerificationComparisonKey(row)))
+      .map((row) => ({
+        ...row,
+        VerificationStatus: 'EXTRA',
+      }));
+
+    const rowsWithStatus = [
+      ...previewRowsWithStatus,
+      ...extraRowsWithStatus,
+    ];
+
     const filteredRows =
       normalizedStatus === 'MATCHED'
         ? rowsWithStatus.filter((row) => row.VerificationStatus === 'MATCHED')
         : normalizedStatus === 'MISSING'
           ? rowsWithStatus.filter((row) => row.VerificationStatus === 'MISSING')
+          : normalizedStatus === 'EXTRA'
+            ? rowsWithStatus.filter((row) => row.VerificationStatus === 'EXTRA')
           : rowsWithStatus;
 
     const total = filteredRows.length;
