@@ -202,19 +202,19 @@ export class LogcatService {
       //   let fac: string = '';
 
       //   switch (item.Factory.trim().toLowerCase()) {
-      //     case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
+      //     case '樂億 - LYV'.trim().toLowerCase():
       //       fac = 'LYV';
       //       break;
-      //     case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
+      //     case '樂億II - LHG'.trim().toLowerCase():
       //       fac = 'LHG';
       //       break;
-      //     case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
+      //     case '億春B - LVL'.trim().toLowerCase():
       //       fac = 'LVL';
       //       break;
-      //     case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
+      //     case '昌億 - LYM'.trim().toLowerCase():
       //       fac = 'LYM';
       //       break;
-      //     case 'å„„ç¦ - LYF'.trim().toLowerCase():
+      //     case '億福 - LYF'.trim().toLowerCase():
       //       fac = 'LYF';
       //       break;
       //     case 'Jiazhi-1'.trim().toLowerCase():
@@ -856,19 +856,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
+          case '樂億 - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
+          case '樂億II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
+          case '億春B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
+          case '昌億 - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case 'å„„ç¦ - LYF'.trim().toLowerCase():
+          case '億福 - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1152,19 +1152,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
+          case '樂億 - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
+          case '樂億II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
+          case '億春B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
+          case '昌億 - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case 'å„„ç¦ - LYF'.trim().toLowerCase():
+          case '億福 - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1415,19 +1415,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
+          case '樂億 - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
+          case '樂億II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
+          case '億春B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
+          case '昌億 - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case 'å„„ç¦ - LYF'.trim().toLowerCase():
+          case '億福 - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1673,19 +1673,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
+          case '樂億 - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
+          case '樂億II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
+          case '億春B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
+          case '昌億 - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case 'å„„ç¦ - LYF'.trim().toLowerCase():
+          case '億福 - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
@@ -1975,19 +1975,19 @@ export class LogcatService {
         let fac: string = '';
 
         switch (item.Factory.trim().toLowerCase()) {
-          case 'æ¨‚å„„ - LYV'.trim().toLowerCase():
+          case '樂億 - LYV'.trim().toLowerCase():
             fac = 'LYV';
             break;
-          case 'æ¨‚å„„II - LHG'.trim().toLowerCase():
+          case '樂億II - LHG'.trim().toLowerCase():
             fac = 'LHG';
             break;
-          case 'å„„æ˜¥B - LVL'.trim().toLowerCase():
+          case '億春B - LVL'.trim().toLowerCase():
             fac = 'LVL';
             break;
-          case 'æ˜Œå„„ - LYM'.trim().toLowerCase():
+          case '昌億 - LYM'.trim().toLowerCase():
             fac = 'LYM';
             break;
-          case 'å„„ç¦ - LYF'.trim().toLowerCase():
+          case '億福 - LYF'.trim().toLowerCase():
             fac = 'LYF';
             break;
           case 'Jiazhi-1'.trim().toLowerCase():
