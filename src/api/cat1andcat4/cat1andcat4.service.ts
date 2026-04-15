@@ -15,6 +15,7 @@ import {
   ACTIVITY_TYPES,
   ActivityType,
   IDataPortCodeCat1AndCat4,
+  IDataStyleAutoFill,
 } from 'src/types/cat1andcat4';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
@@ -36,7 +37,11 @@ export class Cat1andcat4Service {
 
   private getVerificationComparisonKey(row: any) {
     return [row.DocNo, row.Product]
-      .map((value) => String(value ?? '').trim().toLowerCase())
+      .map((value) =>
+        String(value ?? '')
+          .trim()
+          .toLowerCase(),
+      )
       .join('|');
   }
 
@@ -173,6 +178,20 @@ export class Cat1andcat4Service {
     const records: IDataPortCodeCat1AndCat4[] = await this.EIP.query(
       `SELECT *
         FROM CMW_PortCode_Cat1_4
+        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+        `,
+      { type: QueryTypes.SELECT },
+    );
+    return records;
+  }
+
+  async getStyleAutoFill(
+    sortField: string = 'No',
+    sortOrder: string = 'asc',
+  ): Promise<IDataStyleAutoFill[]> {
+    const records: IDataStyleAutoFill[] = await this.EIP.query(
+      `SELECT *,ROW_NUMBER() OVER(ORDER BY PrefixOfMatCode) AS [No]
+        FROM CMW_StyleAutoFill
         ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
         `,
       { type: QueryTypes.SELECT },
@@ -508,6 +527,146 @@ export class Cat1andcat4Service {
       const records: any = await this.EIP.query(
         `SELECT *
           FROM CMW_PortCode_Cat1_4`,
+        { type: QueryTypes.SELECT },
+      );
+      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      return { message, records };
+    } catch (error: any) {
+      throw new InternalServerErrorException(`${error.message}`);
+    }
+  }
+
+  async importExcelStyleAutoFill(
+    file: Express.Multer.File,
+    userid: string,
+    factory: string,
+  ) {
+    try {
+      let insertCount = 0;
+      let updateCount = 0;
+      if (!file.path || !fs.existsSync(file.path)) {
+        throw new Error('File path not found!');
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(file.path);
+      const worksheet = workbook.getWorksheet(1);
+      if (!worksheet) {
+        throw new Error('No worksheet found in the Excel file');
+      }
+
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell((cell) => {
+        if (cell.value) {
+          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
+        }
+      });
+
+      const requiredHeaders = ['No', 'Prefix_of_Mat_Code', 'Style'];
+      const missingHeaders = requiredHeaders.filter(
+        (h) => !headers.includes(h),
+      );
+
+      if (missingHeaders.length > 0) {
+        throw new Error(
+          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
+        );
+      }
+
+      const data: {
+        No: string;
+        Prefix_of_Mat_Code: string;
+        Style: string;
+      }[] = [];
+
+      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        if (rowNumber === 1 && row.cellCount > 0) return;
+
+        const rowData: any = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const headerCell = headerRow.getCell(colNumber);
+          const headerValue = headerCell.value;
+          if (headerValue !== null && headerValue !== undefined) {
+            const key = headerValue.toString().trim().replace(/\s+/g, '_');
+            rowData[key] = cell.value;
+          }
+        });
+        if (rowData?.No && rowData?.Prefix_of_Mat_Code && rowData?.Style) {
+          data.push(rowData);
+        }
+      });
+
+      for (let item of data) {
+        const id = uuidv4();
+        const records: { total: number }[] = await this.EIP.query(
+          `SELECT COUNT(*) total
+            FROM CMW_StyleAutoFill
+            WHERE PrefixOfMatCode = ?
+          `,
+          {
+            replacements: [item.Prefix_of_Mat_Code],
+            type: QueryTypes.SELECT,
+          },
+        );
+
+        if (records[0].total > 0) {
+          await this.EIP.query(
+            `UPDATE CMW_StyleAutoFill
+              SET
+                Style = ?,
+                UpdatedBy = ?,
+                UpdatedFactory = ?,
+                UpdatedAt = GETDATE()
+              WHERE PrefixOfMatCode = ''`,
+            {
+              replacements: [
+                item.Style,
+                userid,
+                factory,
+                item.Prefix_of_Mat_Code,
+              ],
+              type: QueryTypes.SELECT,
+            },
+          );
+          updateCount++;
+        } else {
+          await this.EIP.query(
+            `INSERT INTO CMW_StyleAutoFill
+              (
+                Id,
+                PrefixOfMatCode,
+                Style,
+                CreatedBy,
+                CreatedFactory,
+                CreatedAt
+              )
+              VALUES
+              (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                GETDATE()
+              )`,
+            {
+              replacements: [
+                id,
+                item.Prefix_of_Mat_Code,
+                item.Style,
+                userid,
+                factory,
+              ],
+              type: QueryTypes.INSERT,
+            },
+          );
+          insertCount++;
+        }
+      }
+      const records: any = await this.EIP.query(
+        `SELECT *
+          FROM CMW_StyleAutoFill`,
         { type: QueryTypes.SELECT },
       );
       const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
@@ -873,10 +1032,13 @@ export class Cat1andcat4Service {
       limit = 50,
     } = payload;
 
-    const normalizedCategory = category?.trim().toUpperCase() === 'CAT4' ? 'CAT4' : 'CAT1';
+    const normalizedCategory =
+      category?.trim().toUpperCase() === 'CAT4' ? 'CAT4' : 'CAT1';
     const dockeyCMS = normalizedCategory === 'CAT4' ? '3.1' : '4.1';
     const activityType = dockeyCMS;
-    const normalizedStatus = String(status ?? 'ALL').trim().toUpperCase();
+    const normalizedStatus = String(status ?? 'ALL')
+      .trim()
+      .toUpperCase();
     const safePage = page > 0 ? page : 1;
     const safeLimit = limit > 0 ? limit : 50;
 
@@ -946,10 +1108,7 @@ export class Cat1andcat4Service {
         VerificationStatus: 'EXTRA',
       }));
 
-    const rowsWithStatus = [
-      ...previewRowsWithStatus,
-      ...extraRowsWithStatus,
-    ];
+    const rowsWithStatus = [...previewRowsWithStatus, ...extraRowsWithStatus];
 
     const filteredRows =
       normalizedStatus === 'MATCHED'
@@ -958,7 +1117,7 @@ export class Cat1andcat4Service {
           ? rowsWithStatus.filter((row) => row.VerificationStatus === 'MISSING')
           : normalizedStatus === 'EXTRA'
             ? rowsWithStatus.filter((row) => row.VerificationStatus === 'EXTRA')
-          : rowsWithStatus;
+            : rowsWithStatus;
 
     const total = filteredRows.length;
     const offset = (safePage - 1) * safeLimit;

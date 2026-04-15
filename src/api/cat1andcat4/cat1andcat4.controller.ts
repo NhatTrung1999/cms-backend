@@ -70,6 +70,14 @@ export class Cat1andcat4Controller {
     return this.cat1andcat4Service.getTaxFreeZoneAddress(sortField, sortOrder);
   }
 
+  @Get('get-style-auto-fill')
+  async getStyleAutoFill(
+    @Query('sortField') sortField: string,
+    @Query('sortOrder') sortOrder: string,
+  ) {
+    return this.cat1andcat4Service.getStyleAutoFill(sortField, sortOrder);
+  }
+
   @Patch('tax-free-zone-address/:id')
   async update(
     @Param('id') id: string,
@@ -97,6 +105,26 @@ export class Cat1andcat4Controller {
     if (!file) throw new BadRequestException('No file uploaded!');
 
     const data = await this.cat1andcat4Service.importExcelPortCode(
+      file,
+      userid,
+      factory,
+    );
+    return data;
+  }
+
+  @Post('import-excel-style-auto-fill')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }),
+  )
+  async importExcelStyleAutoFill(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    const factory = getFactortyID(req);
+    const userid = getUserId(req);
+    if (!file) throw new BadRequestException('No file uploaded!');
+
+    const data = await this.cat1andcat4Service.importExcelStyleAutoFill(
       file,
       userid,
       factory,

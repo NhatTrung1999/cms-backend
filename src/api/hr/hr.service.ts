@@ -318,6 +318,7 @@ export class HrService {
         SET
           Address_Live = :address,
           Vehicle = :vehicle,
+          rfToken = ISNULL(rfToken, 'ESG'),
           UpdatedBy = :updatedBy,
           UpdatedAt = GETDATE()
         OUTPUT 
