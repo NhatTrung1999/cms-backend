@@ -113,6 +113,90 @@ export class Cat1andcat4Service {
     });
   }
 
+  private async getStyleAutoFillByPrefix(prefix: string) {
+    if (!prefix) {
+      return null;
+    }
+
+    const [record]: Array<{ Style: string }> = await this.EIP.query(
+      `SELECT TOP 1 Style
+       FROM CMW_StyleAutoFill
+       WHERE PrefixOfMatCode = ?`,
+      {
+        replacements: [prefix],
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    return record?.Style ?? null;
+  }
+
+  private async upsertStyleAutoFill(
+    item: { Prefix_of_Mat_Code: string; Style: string },
+    userid: string,
+    factory: string,
+  ): Promise<'insert' | 'update' | 'skip'> {
+    const prefix = String(item.Prefix_of_Mat_Code ?? '').trim();
+    if (!prefix) {
+      return 'skip';
+    }
+
+    const [record]: Array<{ total: number }> = await this.EIP.query(
+      `SELECT COUNT(*) AS total
+       FROM CMW_StyleAutoFill
+       WHERE PrefixOfMatCode = ?`,
+      {
+        replacements: [prefix],
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    if ((record?.total ?? 0) > 0) {
+      await this.EIP.query(
+        `UPDATE CMW_StyleAutoFill
+         SET
+           Style = ?,
+           UpdatedBy = ?,
+           UpdatedFactory = ?,
+           UpdatedAt = GETDATE()
+         WHERE PrefixOfMatCode = ?`,
+        {
+          replacements: [item.Style, userid, factory, prefix],
+          type: QueryTypes.UPDATE,
+        },
+      );
+
+      return 'update';
+    }
+
+    await this.EIP.query(
+      `INSERT INTO CMW_StyleAutoFill
+       (
+         Id,
+         PrefixOfMatCode,
+         Style,
+         CreatedBy,
+         CreatedFactory,
+         CreatedAt
+       )
+       VALUES
+       (
+         ?,
+         ?,
+         ?,
+         ?,
+         ?,
+         GETDATE()
+       )`,
+      {
+        replacements: [uuidv4(), prefix, item.Style, userid, factory],
+        type: QueryTypes.INSERT,
+      },
+    );
+
+    return 'insert';
+  }
+
   async getDataCat1AndCat4(
     dateFrom: string,
     dateTo: string,
@@ -197,6 +281,36 @@ export class Cat1andcat4Service {
       { type: QueryTypes.SELECT },
     );
     return records;
+  }
+
+  async deleteStyleAutoFill(id: string) {
+    try {
+      const [record]: Array<{ total: number }> = await this.EIP.query(
+        `SELECT COUNT(*) AS total
+         FROM CMW_StyleAutoFill
+         WHERE Id = ?`,
+        {
+          replacements: [id],
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      if ((record?.total ?? 0) === 0) {
+        throw new NotFoundException('Delete failed!');
+      }
+
+      await this.EIP.query(`DELETE FROM CMW_StyleAutoFill WHERE Id = ?`, {
+        replacements: [id],
+        type: QueryTypes.DELETE,
+      });
+
+      return { message: 'Deleted successfully!', Id: id };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(error.message);
+    }
   }
 
   async getTaxFreeZoneAddress(
@@ -597,75 +711,16 @@ export class Cat1andcat4Service {
         }
       });
 
-      for (let item of data) {
-        const id = uuidv4();
-        const records: { total: number }[] = await this.EIP.query(
-          `SELECT COUNT(*) total
-            FROM CMW_StyleAutoFill
-            WHERE PrefixOfMatCode = ?
-          `,
-          {
-            replacements: [item.Prefix_of_Mat_Code],
-            type: QueryTypes.SELECT,
-          },
-        );
-
-        if (records[0].total > 0) {
-          await this.EIP.query(
-            `UPDATE CMW_StyleAutoFill
-              SET
-                Style = ?,
-                UpdatedBy = ?,
-                UpdatedFactory = ?,
-                UpdatedAt = GETDATE()
-              WHERE PrefixOfMatCode = ''`,
-            {
-              replacements: [
-                item.Style,
-                userid,
-                factory,
-                item.Prefix_of_Mat_Code,
-              ],
-              type: QueryTypes.SELECT,
-            },
-          );
+      for (const item of data) {
+        const action = await this.upsertStyleAutoFill(item, userid, factory);
+        if (action === 'update') {
           updateCount++;
-        } else {
-          await this.EIP.query(
-            `INSERT INTO CMW_StyleAutoFill
-              (
-                Id,
-                PrefixOfMatCode,
-                Style,
-                CreatedBy,
-                CreatedFactory,
-                CreatedAt
-              )
-              VALUES
-              (
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                GETDATE()
-              )`,
-            {
-              replacements: [
-                id,
-                item.Prefix_of_Mat_Code,
-                item.Style,
-                userid,
-                factory,
-              ],
-              type: QueryTypes.INSERT,
-            },
-          );
+        } else if (action === 'insert') {
           insertCount++;
         }
       }
       const records: any = await this.EIP.query(
-        `SELECT *
+        `SELECT *, ROW_NUMBER() OVER(ORDER BY PrefixOfMatCode) AS [No]
           FROM CMW_StyleAutoFill`,
         { type: QueryTypes.SELECT },
       );
@@ -851,10 +906,8 @@ export class Cat1andcat4Service {
     sortOrder: string = 'asc',
   ) {
     try {
-      const startedAt = Date.now();
       const offset = (page - 1) * limit;
 
-      const buildQueryStartedAt = Date.now();
       const query = await buildQueryTest(
         sortField,
         sortOrder,
@@ -865,7 +918,6 @@ export class Cat1andcat4Service {
         departure,
         this.EIP,
       );
-      const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
 
       const replacements = {
         startDate: dateFrom,
@@ -877,23 +929,31 @@ export class Cat1andcat4Service {
         limit,
       };
 
-      const queryStartedAt = Date.now();
       let data: any[] = await db.query(query, {
         replacements,
         type: QueryTypes.SELECT,
       });
-      const queryDurationMs = Date.now() - queryStartedAt;
 
-      const overrideStartedAt = Date.now();
       data = await this.applyTaxFreeZoneOverrides(data, factory);
-      const overrideDurationMs = Date.now() - overrideStartedAt;
+
+      data = await Promise.all(
+        data.map(async (item: any) => {
+          const prefix = String(item?.MatID ?? '')
+            .trim()
+            .charAt(0);
+          const styleAutoFill = await this.getStyleAutoFillByPrefix(prefix);
+          return {
+            ...item,
+            Style:
+              (item.Style === '' ? styleAutoFill : item?.Style) ||
+              (item?.Style ?? styleAutoFill ?? 'N/A'),
+          };
+        }),
+      );
 
       const total = data.length > 0 ? data[0].TotalRowsCount : 0;
       const hasMore = offset + data.length < total;
-      const totalDurationMs = Date.now() - startedAt;
-      console.log(
-        `[Cat1AndCat4][getAFactoryDataTest] factory=${factory} page=${page} limit=${limit} rows=${data.length} total=${total} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
-      );
+
       return { data, page, limit, total, hasMore };
     } catch (error: any) {
       throw error;

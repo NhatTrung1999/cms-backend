@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -76,6 +77,11 @@ export class Cat1andcat4Controller {
     @Query('sortOrder') sortOrder: string,
   ) {
     return this.cat1andcat4Service.getStyleAutoFill(sortField, sortOrder);
+  }
+
+  @Delete('style-auto-fill/:id')
+  async deleteStyleAutoFill(@Param('id') id: string) {
+    return this.cat1andcat4Service.deleteStyleAutoFill(id);
   }
 
   @Patch('tax-free-zone-address/:id')

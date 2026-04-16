@@ -479,7 +479,7 @@ export const buildQueryTest = async (
                   ${notIn}
                   AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
-                  AND c.CLBH NOT LIKE 'W%'
+                  AND LEFT(c.CLBH,1) NOT IN ('W', 'T')
                   AND (
                         NOT EXISTS (
                               SELECT 1
@@ -838,7 +838,7 @@ export const buildQueryTest = async (
 //           ${notIn}
 //           AND ISNULL(cgzl.CGLX, '') NOT IN ('6', '4')
 //           AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
-//           AND c.CLBH NOT LIKE 'W%'
+//           AND LEFT(c.CLBH,1) NOT IN ('W', 'T')
 //           AND ISNULL(c.Qty, 0) <> 0
 //           AND (
 //                 secmi_all.TypeMaterial IS NULL     -- Không bị exclude toàn cục → OK
@@ -1342,7 +1342,7 @@ export const buildQueryAutoSentCMS = async (
   //                   ${notIn}
   //                   AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
   //                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
-  //                   AND c.CLBH NOT LIKE 'W%'
+  //                   AND LEFT(c.CLBH,1) NOT IN ('W', 'T')
   //                   AND (
   //                         NOT EXISTS (
   //                               SELECT 1
@@ -1596,7 +1596,7 @@ export const buildQueryAutoSentCMS = async (
                   ${notIn}
                   AND ISNULL(cgzl.CGLX ,'') NOT IN ('6' ,'4')
                   AND (c.CLBH NOT LIKE '[XYZV]%' OR c.CLBH LIKE 'V501%')
-                  AND c.CLBH NOT LIKE 'W%'
+                  AND LEFT(c.CLBH,1) NOT IN ('W', 'T')
                   AND (
                         NOT EXISTS (
                               SELECT 1
