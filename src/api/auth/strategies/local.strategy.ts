@@ -19,7 +19,12 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
 
     let user;
 
-    if (userid === 'admin' || userid === 'ESG') {
+    if (
+      userid.trim().toLowerCase() === 'admin'.trim().toLowerCase() ||
+      userid.trim().toLowerCase() === 'esg'.trim().toLowerCase() ||
+      userid.trim().toLowerCase() === 'susan'.trim().toLowerCase() ||
+      userid.trim().toLowerCase() === 'ruby'.trim().toLowerCase()
+    ) {
       user = await this.authService.validateUser(userid, password, factory);
     } else {
       let checkLock = await this.authService.checkLockErp(userid);
@@ -28,9 +33,9 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
           'Account ERP is clocked! Please enter your other account!',
         );
       }
-      const checkExist = await this.authService.checkExistUser(userid)
+      const checkExist = await this.authService.checkExistUser(userid);
 
-      if(!checkExist) {
+      if (!checkExist) {
         throw new UnauthorizedException(
           'This account has not been set up on the system!',
         );

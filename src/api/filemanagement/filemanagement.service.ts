@@ -26,6 +26,7 @@ import {
   buildQueryCat6,
   normalizeRoute,
   splitRecordByAirport,
+  sumHotelNights,
 } from 'src/helper/cat6.helper';
 import { ICat6Query, ICat6Record } from 'src/types/cat6';
 import dayjs from 'dayjs';
@@ -1132,10 +1133,7 @@ export class FilemanagementService {
       );
 
       const getAddr = (r: any) => r?.AddressDetail || r?.AddressName || '';
-      const totalNights =
-        item.Accommodation?.filter(
-          (item) => item.isSameAsAbove === false,
-        ).reduce((sum, acc) => sum + (acc.nights || 0), 0) || 0;
+      const totalNights = sumHotelNights(item.Accommodation);
 
       let businessTripType: string = '';
       switch (item.Factory.trim().toLowerCase()) {

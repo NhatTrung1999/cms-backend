@@ -61,6 +61,20 @@ export const normalizeRoute = (route: any): Route => {
   };
 };
 
+export const sumHotelNights = (
+  accommodations: ICat6Record['Accommodation'] = [],
+) => {
+  return (
+    accommodations
+      ?.filter(
+        (item) =>
+          item.isSameAsAbove === false &&
+          item.type?.trim().toLowerCase() === 'hotel',
+      )
+      .reduce((sum, acc) => sum + (acc.nights || 0), 0) || 0
+  );
+};
+
 export const buildQueryCat6 = async (
   dateFrom: string,
   dateTo: string,
