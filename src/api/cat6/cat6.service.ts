@@ -2,43 +2,304 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import dayjs from 'dayjs';
-import { getFactory } from 'src/helper/factory.helper';
-import { AutoCMSCat6Data } from 'src/fakedata';
 dayjs().format();
 
-type Cat6UiRow = {
-  Document_Date: string;
-  Document_Number: string;
-  Staff_ID: string;
-  Round_trip_One_way: string;
-  Start_Time: string;
-  End_Time: string;
-  Business_Trip_Type: string;
-  Place_of_Departure: string;
-  Land_Trasportation_Type_A: string;
-  Land_Transport_Distance_km_A: string;
-  Departure_Airport: string;
-  Destination_Airport: string;
-  Air_Transport_Distance_km: string;
-  Third_country_transfer_Destination: string;
-  Land_Transportation_Type_B: string;
-  Land_Transport_Distance_km_B: string;
-  Destination_2: string;
-  Destination_3: string;
-  Destination_4: string;
-  Destination_5: string;
-  Destination_6: string;
-  Land_Transportation_Type: string;
-  Land_Transport_Distance_km: string;
-  Number_of_nights_stayed: number;
-  TotalRow: number;
-  Routes: ReturnType<Cat6Service['normalizeRoute']>[];
-  Accommodation: ReturnType<Cat6Service['normalizeAccommodation']>[];
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Cat6RouteItem = {
+  AddressName: string;
+  Transport: string;
+  AddressDetail: string;
+  isAirport: boolean;
+  From: string;
+  To: string;
 };
+
+type AccommodationItem = {
+  id: string;
+  isSameAsAbove: boolean;
+  type: string;
+  nights: number;
+  addressID: string;
+};
+
+// Format map sang đúng cột Excel
+type Cat6ExcelRow = {
+  // A–H: Thông tin chung
+  documentDate: string | null;
+  documentNumber: string | null;
+  staffID: string | null;
+  roundTripOrOneWay: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  businessTripType: string | null;
+  placeOfDeparture: string | null;
+  // I–K: Điểm khởi hành
+  departureAirport: string | null;
+  landTransportDistanceA: number | null;
+  landTransportTypeA: string | null;
+  // L–O: Điểm đến
+  destinationAirport: string | null;
+  thirdCountryTransferDestination: string | null;
+  landTransportDistanceB: number | null;
+  landTransportTypeB: string | null;
+  // P–T: Transit destinations
+  transitDestination2: string | null;
+  transitDestination3: string | null;
+  transitDestination4: string | null;
+  transitDestination5: string | null;
+  transitDestination6: string | null;
+  // U–X: Tổng hợp
+  landTransportDistanceTotal: number | null;
+  landTransportTypeTotal: string | null;
+  airTransportDistance: number | null;
+  numberOfNightsStayed: number;
+};
+
+// ─── Service ──────────────────────────────────────────────────────────────────
 
 @Injectable()
 export class Cat6Service {
   constructor(@Inject('UOF') private readonly UOF: Sequelize) {}
+
+  // ── Parse JSON field từ DB ────────────────────────────────────────────────
+
+  private parseJsonArray<T = unknown>(value: unknown): T[] {
+    if (Array.isArray(value)) return value as T[];
+    if (typeof value !== 'string' || !value.trim()) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as T[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private normalizeRoute(item: unknown): Cat6RouteItem {
+    const r = (item ?? {}) as Record<string, any>;
+    // ✅ Handle cả 2 case: isAirport (lowercase) và IsAirport (uppercase)
+    const isAirport = Boolean(r.isAirport ?? r.IsAirport);
+    const transport = typeof r.Transport === 'string' ? r.Transport : '';
+    return {
+      AddressName: r.AddressName ?? '',
+      Transport: transport,
+      AddressDetail: r.AddressDetail ?? '',
+      isAirport: isAirport || transport.trim().toLowerCase() === 'flight',
+      From: r.From ?? '',
+      To: r.To ?? '',
+    };
+  }
+
+  // ── Tách routes thành child rows theo số lượng flight ────────────────────
+  // Mỗi flight → 1 child row
+  // Land stop ngay trước flight tiếp theo được lặp lại ở 2 child liền kề
+  private splitRoutesByFlight(routes: Cat6RouteItem[]): Cat6RouteItem[][] {
+    const flightIndices = routes
+      .map((r, i) =>
+        r.isAirport || r.Transport.trim().toLowerCase() === 'flight' ? i : -1,
+      )
+      .filter((i) => i >= 0);
+
+    if (flightIndices.length <= 1) return [routes];
+
+    const splitPoints = flightIndices.slice(1).map((idx) => idx - 1);
+    const boundaries = [0, ...splitPoints, routes.length - 1];
+
+    const groups: Cat6RouteItem[][] = [];
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      groups.push(routes.slice(boundaries[i], boundaries[i + 1] + 1));
+    }
+
+    return groups;
+  }
+
+  // ── Transform 1 DB row → Excel row ───────────────────────────────────────
+
+  private transformRow(row: Record<string, any>): Cat6ExcelRow {
+    const routes = this.parseJsonArray(row.Routes)
+      .flat()
+      .map((item) => this.normalizeRoute(item));
+
+    const accommodation = this.parseJsonArray<AccommodationItem>(
+      row.Accommodation,
+    );
+
+    // Tách flights và land transports
+    const flights = routes.filter(
+      (r) =>
+        r.isAirport === true || r.Transport.trim().toLowerCase() === 'flight',
+    );
+    const landLegs = routes.filter(
+      (r) =>
+        r.isAirport === false && r.Transport.trim().toLowerCase() !== 'flight',
+    );
+
+    // Index của tất cả các flight trong routes
+    const flightIndices = routes
+      .map((r, i) =>
+        r.isAirport || r.Transport.trim().toLowerCase() === 'flight' ? i : -1,
+      )
+      .filter((i) => i >= 0);
+
+    const firstFlight = flights[0] ?? null;
+    const lastFlight = flights[flights.length - 1] ?? null;
+
+    // Transit = các flight ở giữa (bỏ first và last)
+    // Với 2 flights: RGN→SGN, SGN→HKG thì transit là SGN (From của flight thứ 2)
+    const transitAirports =
+      flights.length > 1
+        ? flights
+            .slice(1)
+            .map((f) => f.From)
+            .filter(Boolean)
+        : [];
+
+    // Land transport trước flight đầu (A)
+    const firstFlightIdx = routes.findIndex(
+      (r) => r.isAirport || r.Transport.trim().toLowerCase() === 'flight',
+    );
+    const landBeforeFlight = routes
+      .slice(0, firstFlightIdx < 0 ? 0 : firstFlightIdx)
+      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight');
+
+    // Land transport sau flight cuối (B)
+    const lastFlightIdx = routes
+      .map((r) => r.isAirport || r.Transport.trim().toLowerCase() === 'flight')
+      .lastIndexOf(true);
+    const landAfterFlight = routes
+      .slice(lastFlightIdx + 1)
+      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight');
+
+    // DuringDay: tính lại từ DateStart/DateEnd vì DB trả về 0
+    const duringDay =
+      row.DateStart && row.DateEnd
+        ? Math.abs(
+            Math.round(
+              (new Date(row.DateEnd).getTime() -
+                new Date(row.DateStart).getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          )
+        : Number(row.DuringDay) || 0;
+
+    // Số đêm lưu trú
+    const totalNights =
+      Number(row.StayNight) ||
+      accommodation.reduce((sum, a) => sum + (a.nights || 0), 0) ||
+      0;
+
+    // Pad transit destinations đủ 5 cột (Destination 2–6)
+    const padded = [...transitAirports];
+    while (padded.length < 5) padded.push(null as any);
+
+    return {
+      // A–H
+      documentDate: row.CreatedAt
+        ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
+        : null,
+      documentNumber: row.DOC_NBR ?? null,
+      staffID: row.UserCreate ?? null,
+      roundTripOrOneWay: this.formatTripType(row.TypeTravel),
+      startTime: row.DateStart
+        ? dayjs(row.DateStart).format('YYYY-MM-DD')
+        : null,
+      endTime: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : null,
+      businessTripType: row.Factory ?? null,
+      // ✅ Lấy AddressDetail của điểm xuất phát đầu tiên
+      placeOfDeparture: routes[0]?.AddressDetail ?? null,
+
+      // I–K
+      departureAirport: firstFlight?.From ?? null,
+      landTransportDistanceA: row.Distance ?? null,
+      // ✅ Lấy Transport của điểm xuất phát đầu tiên
+      landTransportTypeA: routes[0]?.Transport ?? null,
+
+      // L–O
+      destinationAirport: lastFlight?.To ?? null,
+      // Có flight: routes[lastFlightIdx + 1].AddressDetail
+      // Không có flight: routes[1].AddressDetail
+      thirdCountryTransferDestination:
+        lastFlightIdx >= 0
+          ? (routes[lastFlightIdx + 1]?.AddressDetail ?? null)
+          : (routes[1]?.AddressDetail ?? null),
+      landTransportDistanceB: row.Distance ?? null,
+      // Có flight: routes[lastFlightIdx + 1].Transport
+      // Không có flight: routes[1].Transport
+      landTransportTypeB:
+        lastFlightIdx >= 0
+          ? (routes[lastFlightIdx + 1]?.Transport ?? null)
+          : (routes[1]?.Transport ?? null),
+
+      // P–T: AddressDetail các điểm kế tiếp sau thirdCountryTransferDestination
+      // Có flight: bắt đầu từ routes[lastFlightIdx + 2]
+      // Không có flight: bắt đầu từ routes[2]
+      ...(() => {
+        const startIdx = lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2;
+        const destinations: (string | null)[] = routes
+          .slice(startIdx)
+          .map((r) => r.AddressDetail ?? null);
+        while (destinations.length < 5) destinations.push(null);
+        return {
+          transitDestination2: destinations[0],
+          transitDestination3: destinations[1],
+          transitDestination4: destinations[2],
+          transitDestination5: destinations[3],
+          transitDestination6: destinations[4],
+        };
+      })(),
+
+      // U–X
+      landTransportDistanceTotal: row.Distance ?? null,
+      // ✅ Transport của điểm gần cuối (routes[length - 2])
+      landTransportTypeTotal: routes[routes.length - 2]?.Transport ?? null,
+      airTransportDistance: row.Distance ?? null,
+      numberOfNightsStayed: totalNights,
+    };
+  }
+
+  private formatTripType(type: unknown): string | null {
+    if (!type || typeof type !== 'string') return null;
+    const map: Record<string, string> = {
+      oneway: 'One-way',
+      roundtrip: 'Round trip',
+      'round trip': 'Round trip',
+    };
+    return map[type.toLowerCase()] ?? type;
+  }
+
+  // ─── Main method ──────────────────────────────────────────────────────────
+
+  // ── Map accommodation theo thứ tự các điểm dừng ──────────────────────────
+  // Bỏ routes[0] (điểm xuất phát) và các airport
+  // accommodation[0] → stop[1], accommodation[1] → stop[2], ...
+  private buildAccommodationMap(
+    fullRoutes: Cat6RouteItem[],
+    accommodation: AccommodationItem[],
+  ): Map<string, AccommodationItem> {
+    const stopsWithAccommodation = fullRoutes
+      .slice(1)
+      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight');
+
+    const map = new Map<string, AccommodationItem>();
+    stopsWithAccommodation.forEach((stop, i) => {
+      if (accommodation[i] && stop.AddressDetail) {
+        map.set(stop.AddressDetail.trim(), accommodation[i]);
+      }
+    });
+    return map;
+  }
+
+  // Lấy accommodations cho 1 child row (bỏ stop đầu tiên của child = điểm xuất phát)
+  private getAccommodationForGroup(
+    groupRoutes: Cat6RouteItem[],
+    accMap: Map<string, AccommodationItem>,
+  ): AccommodationItem[] {
+    return groupRoutes
+      .slice(1)
+      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight')
+      .map((r) => accMap.get(r.AddressDetail?.trim() ?? ''))
+      .filter((a): a is AccommodationItem => !!a);
+  }
 
   async getDataCat6(
     dateFrom: string,
@@ -46,16 +307,20 @@ export class Cat6Service {
     factory: string,
     page: number = 1,
     limit: number = 20,
-    sortField: string = 'Document_Date',
+    sortField: string = 'CreatedAt',
     sortOrder: string = 'asc',
   ) {
-    const offset = (page - 1) * limit;
-    let where = `WHERE 1=1 AND BPMStatus = 'F'
-                  AND ISNULL(Accommodation ,'')<>''
-                  AND ISNULL(Factory_User ,'')<>''`;
     const replacements: any[] = [];
 
-    if (dateTo && dateFrom) {
+    let where = `WHERE 1=1
+                  AND BPMStatus = 'F'
+                  --AND ISNULL(Accommodation, '') <> ''
+                  --AND ISNULL(Factory_User, '') <> ''
+                  AND DOC_NBR = 'LYV_HR_BT260100010'`;
+
+    // ✅ Đã bỏ hardcode DOC_NBR
+
+    if (dateFrom && dateTo) {
       where += ` AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo);
     }
@@ -65,541 +330,61 @@ export class Cat6Service {
       replacements.push(`%${factory}%`);
     }
 
-    const query = `SELECT *, COUNT(TripID) OVER() AS TotalRow
-                   FROM CDS_HRBUSS_BusTripData
-                   ${where}`;
+    // ✅ Tính DuringDay ngay trong query
+    const query = `
+      SELECT *,
+        DATEDIFF(day, DateStart, DateEnd) AS DuringDay,
+        COUNT(TripID) OVER() AS TotalRow
+      FROM CDS_HRBUSS_BusTripData
+      ${where}
+    `;
 
-    const dataResults = await this.fetchRawCat6Rows(replacements, query);
-
-    let data = dataResults.flatMap((item) => {
-      const routes = this.parseJsonArray(item.Routes).map((route) =>
-        this.normalizeRoute(route),
-      );
-      const accommodations = this.parseJsonArray(item.Accommodation).map(
-        (accommodation) => this.normalizeAccommodation(accommodation),
-      );
-
-      return this.splitByFlight({
-        ...item,
-        Routes: routes,
-        Accommodation: accommodations,
-      }).map((segment) => this.formatUiRow(segment));
-    });
-
-    data.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-
-    const total = data.length;
-    data = data.slice(offset, offset + limit);
-
-    const hasMore = offset + data.length < total;
-
-    return { data, page, limit, total, hasMore };
-  }
-
-  private parseJsonArray<T>(value: string | null | undefined): T[] {
-    if (!value) {
-      return [];
-    }
-
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private normalizeRoute(route: any) {
-    return {
-      AddressName: route?.AddressName ?? null,
-      AddressDetail: route?.AddressDetail ?? null,
-      Transport: route?.Transport ?? '',
-      isAirport: Boolean(route?.isAirport),
-      From: route?.From ?? null,
-      To: route?.To ?? null,
-    };
-  }
-
-  private normalizeAccommodation(item: any) {
-    return {
-      id: item?.id ?? '',
-      isSameAsAbove: Boolean(item?.isSameAsAbove),
-      type: item?.type ?? '',
-      address: item?.address ?? '',
-      nights: Number(item?.nights ?? 0),
-    };
-  }
-
-  private formatUiRow(record: {
-    Routes: ReturnType<Cat6Service['normalizeRoute']>[];
-    Accommodation: ReturnType<Cat6Service['normalizeAccommodation']>[];
-    [key: string]: any;
-  }): Cat6UiRow {
-    const routes = record.Routes || [];
-    const flightSegment = routes.find((route) => route.isAirport);
-    const startSegment = routes[0];
-    const otherDestinations = routes.filter(
-      (route) => route !== startSegment && !route.isAirport,
-    );
-
-    return {
-      Document_Date: this.formatDate(record.CreatedAt),
-      Document_Number: record.DOC_NBR || '',
-      Staff_ID: record.UserCreate || '',
-      Round_trip_One_way: this.formatRoundTrip(record.TypeTravel || ''),
-      Start_Time: this.formatDate(record.DateStart),
-      End_Time: this.formatDate(record.DateEnd),
-      Business_Trip_Type: this.formatBusinessTripType(record.Factory || ''),
-      Place_of_Departure: this.getAddress(startSegment),
-      Land_Trasportation_Type_A: startSegment?.Transport?.trim() || '',
-      Land_Transport_Distance_km_A: 'API Calculation',
-      Departure_Airport: flightSegment?.From || '',
-      Destination_Airport: flightSegment?.To || '',
-      Air_Transport_Distance_km: flightSegment ? 'API Calculation' : '',
-      Third_country_transfer_Destination: this.getAddress(otherDestinations[0]),
-      Land_Transportation_Type_B: otherDestinations[0]?.Transport?.trim() || '',
-      Land_Transport_Distance_km_B: otherDestinations[0]
-        ? 'API Calculation'
-        : '',
-      Destination_2: this.getAddress(otherDestinations[1]),
-      Destination_3: this.getAddress(otherDestinations[2]),
-      Destination_4: this.getAddress(otherDestinations[3]),
-      Destination_5: this.getAddress(otherDestinations[4]),
-      Destination_6: this.getAddress(otherDestinations[5]),
-      Land_Transportation_Type: otherDestinations[0]?.Transport?.trim() || '',
-      Land_Transport_Distance_km: 'API Calculation',
-      Number_of_nights_stayed: this.sumHotelNights(record.Accommodation),
-      TotalRow: record.TotalRow || 0,
-      Routes: routes,
-      Accommodation: record.Accommodation,
-    };
-  }
-
-  private formatDate(value: string | Date | null | undefined) {
-    if (!value) {
-      return '';
-    }
-
-    const formatted = dayjs(value);
-    return formatted.isValid() ? formatted.format('YYYY/MM/DD') : '';
-  }
-
-  private formatBusinessTripType(factory: string) {
-    switch (factory?.trim().toLowerCase()) {
-      case 'factory_domestic':
-        return 'Domestic business trip within the group';
-      case 'outside_domestic':
-        return 'Domestic business trip to third-party entities';
-      case 'factory_oversea':
-        return 'Overseas business trip within the group';
-      case 'outside_oversea':
-        return 'Overseas business trip to third-party entities';
-      default:
-        return '';
-    }
-  }
-
-  private formatBusinessTripTypeNoDash(factory: string) {
-    return this.formatBusinessTripType(factory).replace(
-      /third-party/g,
-      'third party',
-    );
-  }
-
-  private normalizeBusinessTripTypeForDocKey(value: string) {
-    return (value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/-/g, ' ')
-      .replace(/\s+/g, ' ');
-  }
-
-  private getDocKeyFromBusinessTripType(value: string) {
-    switch (this.normalizeBusinessTripTypeForDocKey(value)) {
-      case 'factory domestic':
-      case 'domestic business trip within the group':
-        return '3.5.1';
-      case 'outside domestic':
-      case 'domestic business trip to third party entities':
-        return '3.5.2';
-      case 'factory oversea':
-      case 'overseas business trip within the group':
-        return '3.5.3';
-      case 'outside oversea':
-      case 'overseas business trip to third party entities':
-        return '3.5.4';
-      default:
-        return '';
-    }
-  }
-
-  private formatRoundTrip(typeTravel: string) {
-    return typeTravel?.trim().toLowerCase() === 'round'
-      ? 'Round trip'
-      : 'One-way';
-  }
-
-  private getAddress(route?: ReturnType<Cat6Service['normalizeRoute']>) {
-    return route?.AddressDetail || route?.AddressName || '';
-  }
-
-  private sumHotelNights(
-    accommodations: ReturnType<Cat6Service['normalizeAccommodation']>[] = [],
-  ) {
-    return (
-      accommodations
-        .filter(
-          (item) =>
-            item.isSameAsAbove === false &&
-            item.type?.trim().toLowerCase() === 'hotel',
-        )
-        .reduce((sum, acc) => sum + (acc.nights || 0), 0) || 0
-    );
-  }
-
-  private splitByFlight(record: {
-    Routes: ReturnType<Cat6Service['normalizeRoute']>[];
-    Accommodation: ReturnType<Cat6Service['normalizeAccommodation']>[];
-    [key: string]: any;
-  }) {
-    const routes = record.Routes || [];
-    let remainingAccommodations = [...(record.Accommodation || [])];
-    const result: (typeof record)[] = [];
-
-    if (routes.length === 0) {
-      return [
-        {
-          ...record,
-          Routes: [],
-        },
-      ];
-    }
-
-    let startIndex = 0;
-    let airportCount = 0;
-
-    for (let i = 0; i < routes.length; i++) {
-      if (routes[i].isAirport) {
-        airportCount++;
-
-        if (airportCount > 1) {
-          const cutIndex = i - 1;
-          const segmentRoutes = routes.slice(startIndex, cutIndex + 1);
-          const destinationsCount = segmentRoutes
-            .slice(1)
-            .filter((route) => !route.isAirport).length;
-          const segmentAccommodations = remainingAccommodations.slice(
-            0,
-            destinationsCount,
-          );
-
-          remainingAccommodations =
-            remainingAccommodations.slice(destinationsCount);
-
-          result.push({
-            ...record,
-            Routes: segmentRoutes,
-            Accommodation: segmentAccommodations,
-          });
-          startIndex = cutIndex;
-        }
-      }
-    }
-
-    result.push({
-      ...record,
-      Routes: routes.slice(startIndex),
-      Accommodation: remainingAccommodations,
-    });
-
-    return result;
-  }
-
-  async transformData(
-    data: AutoCMSCat6Data[],
-    factory: string,
-    dateFrom: string,
-    dateTo: string,
-  ) {
-    return data.flatMap((item) => {
-      const routes: { transType: string; dep: string; dest: string }[] = [];
-
-      if (item.PlaceOfDeparture && item.DepartureAirport) {
-        routes.push({
-          transType: item.LandTrasportationTypeA,
-          dep: item.PlaceOfDeparture,
-          dest: item.DepartureAirport,
-        });
-      }
-
-      if (item.DepartureAirport && item.DestinationAirport) {
-        routes.push({
-          transType: 'Flight',
-          dep: item.DepartureAirport,
-          dest: item.DestinationAirport,
-        });
-      }
-
-      if (item.DestinationAirport && item.ThirdCountryTransferDestination) {
-        routes.push({
-          transType: item.LandTrasportationTypeB,
-          dep: item.DestinationAirport,
-          dest: item.ThirdCountryTransferDestination,
-        });
-      }
-
-      return routes.map((route, index) => {
-        let transType = '';
-        switch (route.transType.trim().toLowerCase()) {
-          case 'Car'.trim().toLowerCase():
-            transType = '計程車/出租車';
-            break;
-          case 'Company Shuttle Car'.trim().toLowerCase():
-            transType = '公司車';
-            break;
-          case 'Flight'.trim().toLowerCase():
-            transType = '飛機';
-            break;
-          default:
-            transType = route.transType.trim();
-            break;
-        }
-
-        const businessTripType = this.formatBusinessTripTypeNoDash(
-          item.BusinessTripType,
-        );
-        return {
-          System: 'BPM',
-          Corporation: 'LAI YIH',
-          Factory: getFactory(factory),
-          Department: item.Dept,
-          DocKey: this.getDocKeyFromBusinessTripType(businessTripType),
-          ActivitySource: '',
-          SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-          EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-          ActivityType: '3.5',
-          DataType: '2',
-          DocType: '洽公單',
-          DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
-          DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
-          DocNo: item.DocumentNumber,
-          UndDocNo: `${item.DocumentNumber}-${index + 1}`,
-          TransType: transType,
-          Departure: route.dep,
-          Destination: route.dest,
-          Memo: businessTripType,
-          CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-          Creator: '',
-        };
-      });
-    });
-  }
-
-  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
-    const data = await this.buildAutoCmsDataFromDb(dateFrom, dateTo, factory);
-    return await this.transformData(data, factory, dateFrom, dateTo);
-  }
-
-  async autoSentCMSV2(dateFrom: string, dateTo: string, factory: string) {
-    const data = await this.buildAutoCmsV2DataFromDb(dateFrom, dateTo, factory);
-
-    const mapped = data.map((item) => {
-      return {
-        System: 'BPM',
-        Corporation: 'LAI YIH',
-        Factory: getFactory(factory),
-        Department: item.Dept,
-        DocKey: this.getDocKeyFromBusinessTripType(item.BusinessTripType),
-        ActivitySource: '住宿',
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: '3.5',
-        DataType: '3',
-        DocType: '出差住宿單',
-        DocDate: dayjs(item.DocumentDate).format('YYYY/MM/DD'),
-        DocDate2: dayjs(item.StartTime).format('YYYY/MM/DD'),
-        DocNo: item.DocumentNumber,
-        UndDocNo: item.DocumentNumber,
-        TransType: 'double',
-        ActivityData: item.NumberOfNightsStayed,
-        Memo: '',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-      };
-    });
-
-    const grouped = new Map<string, (typeof mapped)[number]>();
-
-    for (const item of mapped) {
-      const key = (item.DocNo || '').trim();
-      const existing = grouped.get(key);
-
-      if (!existing) {
-        grouped.set(key, item);
-        continue;
-      }
-
-      existing.ActivityData =
-        Number(existing.ActivityData || 0) + Number(item.ActivityData || 0);
-    }
-
-    return Array.from(grouped.values());
-  }
-
-  private async buildAutoCmsDataFromDb(
-    dateFrom: string,
-    dateTo: string,
-    factory: string,
-  ): Promise<AutoCMSCat6Data[]> {
-    const { query, replacements } = this.buildCat6Query(
-      dateFrom,
-      dateTo,
-      factory,
-    );
-    const dataResults = await this.fetchRawCat6Rows(replacements, query);
-
-    return dataResults.flatMap((item) => {
-      const routes = this.parseJsonArray(item.Routes).map((route) =>
-        this.normalizeRoute(route),
-      );
-      const accommodations = this.parseJsonArray(item.Accommodation).map(
-        (accommodation) => this.normalizeAccommodation(accommodation),
-      );
-
-      return this.splitByFlight({
-        ...item,
-        Routes: routes,
-        Accommodation: accommodations,
-      }).map((segment) => this.mapRawRowToAutoCmsData(segment));
-    });
-  }
-
-  private async buildAutoCmsV2DataFromDb(
-    dateFrom: string,
-    dateTo: string,
-    factory: string,
-  ): Promise<AutoCMSCat6Data[]> {
-    const { query, replacements } = this.buildCat6Query(
-      dateFrom,
-      dateTo,
-      factory,
-    );
-    const dataResults = await this.fetchRawCat6Rows(replacements, query);
-
-    const mergedRows = new Map<string, AutoCMSCat6Data>();
-    let fallbackIndex = 0;
-
-    for (const item of dataResults) {
-      const documentNumber = (item.DOC_NBR || '').trim();
-      const key = documentNumber || `__missing_doc_no__${fallbackIndex++}`;
-      const nights = this.sumHotelNights(
-        this.parseJsonArray(item.Accommodation).map((accommodation) =>
-          this.normalizeAccommodation(accommodation),
-        ),
-      );
-
-      const existing = mergedRows.get(key);
-      if (existing) {
-        existing.NumberOfNightsStayed += nights;
-        continue;
-      }
-
-      mergedRows.set(
-        key,
-        this.mapRawRowToAutoCmsData({
-          ...item,
-          Routes: [],
-          Accommodation: [],
-        }),
-      );
-      const inserted = mergedRows.get(key);
-      if (inserted) {
-        inserted.NumberOfNightsStayed = nights;
-      }
-    }
-
-    return Array.from(mergedRows.values());
-  }
-
-  private async fetchRawCat6Rows(
-    replacements: any[],
-    query: string,
-  ): Promise<any[]> {
-    return (await this.UOF.query(query, {
+    const rawRows = (await this.UOF.query(query, {
       type: QueryTypes.SELECT,
       replacements,
-    })) as any[];
-  }
+    })) as Record<string, any>[];
 
-  private buildCat6Query(dateFrom: string, dateTo: string, factory: string) {
-    let where = `WHERE 1=1 AND BPMStatus = 'F'
-                  AND ISNULL(Accommodation ,'')<>'' 
-                  AND ISNULL(Factory_User ,'')<>''`;
-    const replacements: any[] = [];
+    // Expand mỗi DB row thành nhiều child rows theo số lượng flight
+    // rồi transform từng child sang Excel format
+    const transformed = rawRows.flatMap((row) => {
+      const routes = this.parseJsonArray(row.Routes)
+        .flat()
+        .map((item) => this.normalizeRoute(item));
 
-    if (dateTo && dateFrom) {
-      where += ` AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo);
-    }
+      const accommodation = this.parseJsonArray<AccommodationItem>(
+        row.Accommodation,
+      );
 
-    if (factory) {
-      where += ` AND Factory_User LIKE ?`;
-      replacements.push(`%${factory}%`);
-    }
+      // Build map: AddressDetail → AccommodationItem theo thứ tự stops
+      const accMap = this.buildAccommodationMap(routes, accommodation);
 
-    const query = `SELECT *, COUNT(TripID) OVER() AS TotalRow
-                   FROM CDS_HRBUSS_BusTripData
-                   ${where}`;
+      const routeGroups = this.splitRoutesByFlight(routes);
 
-    return { query, replacements };
-  }
+      return routeGroups.map((groupRoutes) => {
+        // Lấy đúng accommodation cho child này
+        const groupAccommodation = this.getAccommodationForGroup(
+          groupRoutes,
+          accMap,
+        );
+        return this.transformRow({
+          ...row,
+          Routes: groupRoutes,
+          Accommodation: groupAccommodation,
+        });
+      });
+    });
 
-  private mapRawRowToAutoCmsData(record: {
-    Routes: ReturnType<Cat6Service['normalizeRoute']>[];
-    Accommodation: ReturnType<Cat6Service['normalizeAccommodation']>[];
-    [key: string]: any;
-  }): AutoCMSCat6Data {
-    const routes = record.Routes || [];
-    const flightSegment = routes.find((route) => route.isAirport);
-    const startSegment = routes[0];
-    const otherDestinations = routes.filter(
-      (route) => route !== startSegment && !route.isAirport,
-    );
+    // Phân trang
+    const total = rawRows[0]?.TotalRow ?? transformed.length;
+    const offset = (page - 1) * limit;
+    const data = transformed.slice(offset, offset + limit);
 
     return {
-      DocumentDate: this.formatDate(record.CreatedAt),
-      DocumentNumber: record.DOC_NBR || '',
-      StaffID: record.UserCreate || '',
-      Dept: record.Dept ?? '',
-      TripType: this.formatRoundTrip(record.TypeTravel || ''),
-      StartTime: this.formatDate(record.DateStart),
-      EndTime: this.formatDate(record.DateEnd),
-      BusinessTripType: this.formatBusinessTripType(record.Factory || ''),
-      PlaceOfDeparture: this.getAddress(startSegment),
-      DepartureAirport: flightSegment?.From || '',
-      LandTransportDistanceA: 'API Auto calculate',
-      LandTrasportationTypeA: startSegment?.Transport?.trim() || '',
-      DestinationAirport: flightSegment?.To || '',
-      ThirdCountryTransferDestination: this.getAddress(otherDestinations[0]),
-      LandTransportDistanceB: otherDestinations[0] ? 'API Auto calculate' : '',
-      LandTrasportationTypeB: otherDestinations[0]?.Transport?.trim() || '',
-      Destination2: this.getAddress(otherDestinations[1]),
-      Destination3: this.getAddress(otherDestinations[2]),
-      Destination4: this.getAddress(otherDestinations[3]),
-      Destination5: this.getAddress(otherDestinations[4]),
-      Destination6: this.getAddress(otherDestinations[5]),
-      LandTransportDistance: 'API Auto calculate',
-      LandTrasportationType: otherDestinations[0]?.Transport?.trim() || '',
-      AirTransportDistance: flightSegment ? 'API Auto calculate' : '',
-      NumberOfNightsStayed: this.sumHotelNights(record.Accommodation),
+      data,
+      page,
+      limit,
+      total: Number(total),
+      hasMore: offset + data.length < Number(total),
     };
   }
 }
