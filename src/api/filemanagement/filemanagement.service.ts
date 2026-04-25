@@ -24,6 +24,23 @@ import {
 import { buildQueryTest as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
 import dayjs from 'dayjs';
 
+type Cat6RouteItem = {
+  AddressName: string;
+  Transport: string;
+  AddressDetail: string;
+  isAirport: boolean;
+  From: string;
+  To: string;
+};
+
+type Cat6AccommodationItem = {
+  id?: string;
+  isSameAsAbove?: boolean;
+  type?: string;
+  nights?: number;
+  addressID?: string;
+};
+
 @Injectable()
 export class FilemanagementService {
   private rootFolder: string;
@@ -63,6 +80,165 @@ export class FilemanagementService {
     if (!fs.existsSync(this.rootFolder)) {
       fs.mkdirSync(this.rootFolder, { recursive: true });
     }
+  }
+
+  private parseJsonArray<T = unknown>(value: unknown): T[] {
+    if (Array.isArray(value)) return value as T[];
+    if (typeof value !== 'string' || !value.trim()) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as T[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private normalizeCat6Route(item: unknown): Cat6RouteItem {
+    const r = (item ?? {}) as Record<string, any>;
+    const transport = typeof r.Transport === 'string' ? r.Transport : '';
+    const isAirport = Boolean(r.isAirport ?? r.IsAirport);
+
+    return {
+      AddressName: r.AddressName ?? '',
+      Transport: transport,
+      AddressDetail: r.AddressDetail ?? '',
+      isAirport: isAirport || transport.trim().toLowerCase() === 'flight',
+      From: r.From ?? '',
+      To: r.To ?? '',
+    };
+  }
+
+  private splitCat6RoutesByFlight(routes: Cat6RouteItem[]): Cat6RouteItem[][] {
+    const flightIndices = routes
+      .map((r, i) =>
+        r.isAirport || r.Transport.trim().toLowerCase() === 'flight' ? i : -1,
+      )
+      .filter((i) => i >= 0);
+
+    if (flightIndices.length <= 1) return [routes];
+
+    const splitPoints = flightIndices.slice(1).map((idx) => idx - 1);
+    const boundaries = [0, ...splitPoints, routes.length - 1];
+
+    const groups: Cat6RouteItem[][] = [];
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      groups.push(routes.slice(boundaries[i], boundaries[i + 1] + 1));
+    }
+
+    return groups;
+  }
+
+  private formatCat6TripType(type: unknown): string | null {
+    if (!type || typeof type !== 'string') return null;
+    const t = type.toLowerCase().trim();
+    if (t === 'round' || t === 'roundtrip' || t === 'round trip')
+      return 'Round trip';
+    return 'One-way';
+  }
+
+  private formatCat6BusinessTripType(type: unknown): string | null {
+    if (!type || typeof type !== 'string') return null;
+    const map: Record<string, string> = {
+      factory_domestic: 'Domestic business trip within the group',
+      outside_domestic: 'Domestic business trip to third-party entities',
+      factory_oversea: 'Overseas business trip within the group',
+      outside_oversea: 'Overseas business trip to third-party entities',
+    };
+    return map[type.toLowerCase()] ?? type;
+  }
+
+  private buildCat6AccommodationMap(
+    fullRoutes: Cat6RouteItem[],
+    accommodation: Cat6AccommodationItem[],
+  ): Map<string, Cat6AccommodationItem> {
+    const stopsWithAccommodation = fullRoutes
+      .slice(1)
+      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight');
+
+    const map = new Map<string, Cat6AccommodationItem>();
+    stopsWithAccommodation.forEach((stop, i) => {
+      if (accommodation[i] && stop.AddressDetail) {
+        map.set(stop.AddressDetail.trim(), accommodation[i]);
+      }
+    });
+    return map;
+  }
+
+  private getCat6AccommodationForGroup(
+    groupRoutes: Cat6RouteItem[],
+    accMap: Map<string, Cat6AccommodationItem>,
+  ): Cat6AccommodationItem[] {
+    return groupRoutes
+      .slice(1)
+      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight')
+      .map((r) => accMap.get(r.AddressDetail?.trim() ?? ''))
+      .filter((a): a is Cat6AccommodationItem => Boolean(a));
+  }
+
+  private transformCat6Row(row: Record<string, any>) {
+    const routes = this.parseJsonArray(row.Routes)
+      .flat()
+      .map((item) => this.normalizeCat6Route(item));
+
+    const accommodation = this.parseJsonArray<Cat6AccommodationItem>(
+      row.Accommodation,
+    );
+    const flights = routes.filter(
+      (r) => r.isAirport === true || r.Transport.trim().toLowerCase() === 'flight',
+    );
+
+    const firstFlight = flights[0] ?? null;
+    const lastFlight = flights[flights.length - 1] ?? null;
+    const lastFlightIdx = routes
+      .map((r) => r.isAirport || r.Transport.trim().toLowerCase() === 'flight')
+      .lastIndexOf(true);
+    const totalNights =
+      Number(row.StayNight) ||
+      accommodation.reduce((sum, a) => sum + (a?.nights || 0), 0) ||
+      0;
+
+    return {
+      Document_Date: row.CreatedAt
+        ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
+        : null,
+      Document_Number: row.DOC_NBR ?? null,
+      Staff_ID: row.UserCreate ?? null,
+      Round_trip_One_way: this.formatCat6TripType(row.TypeTravel),
+      Start_Time: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : null,
+      End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : null,
+      Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory),
+      Place_of_Departure: routes[0]?.AddressDetail ?? null,
+      Departure_Airport: firstFlight?.From ?? null,
+      Land_Transport_Distance_km_A: 'API Calculation',
+      Land_Trasportation_Type_A: routes[0]?.Transport ?? null,
+      Destination_Airport: lastFlight?.To ?? null,
+      Third_country_transfer_Destination:
+        lastFlightIdx >= 0
+          ? routes[lastFlightIdx + 1]?.AddressDetail ?? null
+          : routes[1]?.AddressDetail ?? null,
+      Land_Transport_Distance_km_B: 'API Calculation',
+      Land_Transportation_Type_B:
+        lastFlightIdx >= 0
+          ? routes[lastFlightIdx + 1]?.Transport ?? null
+          : routes[1]?.Transport ?? null,
+      Destination_2: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[0]
+        ?.AddressDetail ?? null,
+      Destination_3: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[1]
+        ?.AddressDetail ?? null,
+      Destination_4: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[2]
+        ?.AddressDetail ?? null,
+      Destination_5: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[3]
+        ?.AddressDetail ?? null,
+      Destination_6: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[4]
+        ?.AddressDetail ?? null,
+      Land_Transport_Distance_km: 'API Calculation',
+      Land_Transportation_Type:
+        lastFlightIdx >= 0
+          ? routes[lastFlightIdx + 1]?.Transport ?? null
+          : routes[1]?.Transport ?? null,
+      Air_Transport_Distance_km: 'API Calculation',
+      Number_of_nights_stayed: totalNights,
+    };
   }
 
   async getData(
@@ -269,7 +445,8 @@ export class FilemanagementService {
         await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
         break;
       case 'cat6':
-        return 'coming soon';
+        await this.fileExcelCat6(sheet, dateFrom, dateTo, factory);
+        break;
       case 'cat7':
         await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
         break;
@@ -302,7 +479,120 @@ export class FilemanagementService {
           'file-excel-error',
           'Error export file excel!',
         );
+    });
+  }
+
+  async fileExcelCat6(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    let where = `WHERE 1=1
+                  AND BPMStatus = 'F'
+                  AND ISNULL(Accommodation, '') <> ''
+                  AND ISNULL(Factory_User, '') <> ''`;
+    const replacements: any[] = [];
+
+    if (dateFrom && dateTo) {
+      where += ` AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?`;
+      replacements.push(dateFrom, dateTo);
+    }
+
+    if (factory) {
+      where += ` AND Factory_User LIKE ?`;
+      replacements.push(`%${factory}%`);
+    }
+
+    const query = `
+      SELECT *
+      FROM CDS_HRBUSS_BusTripData
+      ${where}
+      ORDER BY CreatedAt ASC
+    `;
+
+    const rawRows = (await this.UOF.query(query, {
+      type: QueryTypes.SELECT,
+      replacements,
+    })) as Record<string, any>[];
+
+    const transformed = rawRows.flatMap((row) => {
+      const routes = this.parseJsonArray(row.Routes)
+        .flat()
+        .map((item) => this.normalizeCat6Route(item));
+      const accommodation = this.parseJsonArray<Cat6AccommodationItem>(
+        row.Accommodation,
+      );
+      const accMap = this.buildCat6AccommodationMap(routes, accommodation);
+      const routeGroups = this.splitCat6RoutesByFlight(routes);
+
+      return routeGroups.map((groupRoutes) => {
+        const groupAccommodation = this.getCat6AccommodationForGroup(
+          groupRoutes,
+          accMap,
+        );
+        return this.transformCat6Row({
+          ...row,
+          Routes: groupRoutes,
+          Accommodation: groupAccommodation,
+        });
       });
+    });
+
+    sheet.columns = [
+      { header: 'Document Date', key: 'Document_Date' },
+      { header: 'Document Number', key: 'Document_Number' },
+      { header: 'Staff ID', key: 'Staff_ID' },
+      { header: 'Round trip / One-way', key: 'Round_trip_One_way' },
+      { header: 'Start Time', key: 'Start_Time' },
+      { header: 'End Time', key: 'End_Time' },
+      { header: 'Business Trip Type', key: 'Business_Trip_Type' },
+      { header: 'Place of Departure', key: 'Place_of_Departure' },
+      { header: 'Departure Airport', key: 'Departure_Airport' },
+      { header: 'Land Transport Distance km A', key: 'Land_Transport_Distance_km_A' },
+      { header: 'Land Trasportation Type A', key: 'Land_Trasportation_Type_A' },
+      { header: 'Destination Airport', key: 'Destination_Airport' },
+      {
+        header: 'Third country transfer Destination',
+        key: 'Third_country_transfer_Destination',
+      },
+      { header: 'Land Transport Distance km B', key: 'Land_Transport_Distance_km_B' },
+      {
+        header: 'Land Transportation Type B',
+        key: 'Land_Transportation_Type_B',
+      },
+      { header: 'Destination 2', key: 'Destination_2' },
+      { header: 'Destination 3', key: 'Destination_3' },
+      { header: 'Destination 4', key: 'Destination_4' },
+      { header: 'Destination 5', key: 'Destination_5' },
+      { header: 'Destination 6', key: 'Destination_6' },
+      { header: 'Land Transport Distance km', key: 'Land_Transport_Distance_km' },
+      { header: 'Land Transportation Type', key: 'Land_Transportation_Type' },
+      { header: 'Air Transport Distance km', key: 'Air_Transport_Distance_km' },
+      { header: 'Number of nights stayed', key: 'Number_of_nights_stayed' },
+    ];
+
+    transformed.forEach((item) => sheet.addRow(item));
+    sheet.columns.forEach((column) => {
+      let maxLength = 0;
+      if (typeof column.eachCell === 'function') {
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? String(cell.value) : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+      }
+      column.width = maxLength * 1.2;
+    });
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
   }
 
   async fileExcelCat9AndCat12(

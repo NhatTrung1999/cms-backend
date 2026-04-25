@@ -5,6 +5,7 @@ import { getFactory } from './factory.helper';
 import dayjs from 'dayjs';
 
 const factoryAddressCache = new Map<string, string>();
+const styleAutoFillCache = new Map<string, string | null>();
 
 const getFactoryAddress = async (factory: string, db?: Sequelize) => {
   const normalizedFactory = String(factory ?? '')
@@ -33,6 +34,35 @@ const getFactoryAddress = async (factory: string, db?: Sequelize) => {
   const address = rows.length > 0 ? String(rows[0]['Address'] ?? 'N/A') : 'N/A';
   factoryAddressCache.set(normalizedFactory, address);
   return address;
+};
+
+const getStyleAutoFillByPrefix = async (prefix: string, db?: Sequelize) => {
+  const normalizedPrefix = String(prefix ?? '')
+    .trim()
+    .toUpperCase();
+  if (!normalizedPrefix) {
+    return null;
+  }
+
+  const cachedStyle = styleAutoFillCache.get(normalizedPrefix);
+  if (styleAutoFillCache.has(normalizedPrefix)) {
+    return cachedStyle ?? null;
+  }
+
+  const rows =
+    (await db?.query(
+      `SELECT TOP 1 Style
+       FROM CMW_StyleAutoFill
+       WHERE PrefixOfMatCode = :prefix`,
+      {
+        replacements: { prefix: normalizedPrefix },
+        type: QueryTypes.SELECT,
+      },
+    )) || [];
+
+  const style = rows.length > 0 ? String(rows[0]['Style'] ?? '') : null;
+  styleAutoFillCache.set(normalizedPrefix, style);
+  return style;
 };
 
 export const buildQuery = async (
@@ -374,7 +404,7 @@ export const buildQueryTest = async (
                         )
                   END                          AS UnitWeight
                   ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
-                  ,ISNULL(P.Style ,ZSZL.Style)  AS Style
+                  --,ISNULL(P.Style ,ZSZL.Style)  AS Style
                   ,CASE 
                         WHEN ISNULL(poisi.Transportationmethod ,'')<>'' THEN poisi.Transportationmethod
                         WHEN ISNULL(isi.Transportationmethod ,'')<>'' AND ISNULL(poisi.Transportationmethod ,'')='' THEN 
@@ -610,7 +640,7 @@ export const buildQueryTest = async (
                   ,pnc.MatName
                   ,pnc.UnitWeight
                   ,pnc.SupplierCode
-                  ,pnc.Style
+                  --,pnc.Style
                   ,pnc.TransportationMethod
                   ,pnc.Departure
                   ,pnc.ThirdCountryLandTransport
@@ -1095,6 +1125,10 @@ export const getADataExcelFactoryCat1AndCat4 = async (
             type: QueryTypes.SELECT,
           },
         )) ?? [];
+      const prefix = String(item?.MatID ?? '')
+        .trim()
+        .charAt(0);
+      const styleAutoFill = await getStyleAutoFillByPrefix(prefix, dbEIP);
       return {
         ...item,
         TransportationMethod:
@@ -1103,6 +1137,9 @@ export const getADataExcelFactoryCat1AndCat4 = async (
           taxFreeZone.length > 0
             ? taxFreeZone[0].TaxFreeZoneAddress
             : item.Departure,
+        Style:
+          (item.Style === '' ? styleAutoFill : item?.Style) ||
+          (item?.Style ?? styleAutoFill ?? 'N/A'),
       };
     }),
   );
@@ -1491,7 +1528,7 @@ export const buildQueryAutoSentCMS = async (
                         )
                   END                          AS UnitWeight
                   ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
-                  ,ISNULL(P.Style ,ZSZL.Style)  AS Style
+                  --,ISNULL(P.Style ,ZSZL.Style)  AS Style
                   ,CASE 
                         WHEN ISNULL(poisi.Transportationmethod ,'')<>'' THEN poisi.Transportationmethod
                         WHEN ISNULL(isi.Transportationmethod ,'')<>'' AND ISNULL(poisi.Transportationmethod ,'')='' THEN 
@@ -1727,7 +1764,7 @@ export const buildQueryAutoSentCMS = async (
                   ,pnc.MatName
                   ,pnc.UnitWeight
                   ,pnc.SupplierCode
-                  ,pnc.Style
+                  --,pnc.Style
                   ,pnc.TransportationMethod
                   ,pnc.Departure
                   ,pnc.ThirdCountryLandTransport
