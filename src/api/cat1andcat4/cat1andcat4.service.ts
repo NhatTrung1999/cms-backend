@@ -1224,10 +1224,10 @@ export class Cat1andcat4Service {
     const db = this.getDbByFactory(factory);
     if (!db) return [];
 
-    const startedAt = Date.now();
-    const buildQueryStartedAt = Date.now();
+    // const startedAt = Date.now();
+    // const buildQueryStartedAt = Date.now();
     const query = await buildQueryAutoSentCMS(factory, this.EIP);
-    const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
+    // const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
 
     const replacements =
       dateFrom && dateTo
@@ -1240,24 +1240,24 @@ export class Cat1andcat4Service {
           }
         : {};
 
-    const queryStartedAt = Date.now();
+    // const queryStartedAt = Date.now();
     let data = await db.query<any>(query, {
       type: QueryTypes.SELECT,
       replacements,
     });
-    const queryDurationMs = Date.now() - queryStartedAt;
+    // const queryDurationMs = Date.now() - queryStartedAt;
 
-    const overrideStartedAt = Date.now();
+    // const overrideStartedAt = Date.now();
     data = await this.applyTaxFreeZoneOverrides(data, factory);
-    const overrideDurationMs = Date.now() - overrideStartedAt;
+    // const overrideDurationMs = Date.now() - overrideStartedAt;
 
     const mapped = data.flatMap((item) =>
       this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
     );
-    const totalDurationMs = Date.now() - startedAt;
-    console.log(
-      `[Cat1AndCat4][getCMSByFactory] factory=${factory} dockeyCMS=${dockeyCMS} sourceRows=${data.length} mappedRows=${mapped.length} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
-    );
+    // const totalDurationMs = Date.now() - startedAt;
+    // console.log(
+    //   `[Cat1AndCat4][getCMSByFactory] factory=${factory} dockeyCMS=${dockeyCMS} sourceRows=${data.length} mappedRows=${mapped.length} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
+    // );
 
     return mapped;
   }

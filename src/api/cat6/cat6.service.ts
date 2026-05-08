@@ -16,11 +16,12 @@ type RouteItem = {
 
 type AccommodationItem = {
   nights?: number | string;
+  type?: string;
 };
 
 @Injectable()
 export class Cat6Service {
-  constructor(@Inject('UOF') private readonly UOF: Sequelize) {}
+  constructor(@Inject('UOF') private readonly UOF: Sequelize) { }
 
   private parseJsonArray<T = unknown>(value: unknown): T[] {
     if (Array.isArray(value)) return value as T[];
@@ -141,6 +142,43 @@ export class Cat6Service {
     }, 0);
   }
 
+  private hasDormAccommodation(accommodationValue: unknown) {
+    const accommodations =
+      this.parseJsonArray<AccommodationItem>(accommodationValue);
+    return accommodations.some(
+      (item) => item.type?.trim().toLowerCase() === 'dorm',
+    );
+  }
+
+  private hasCompanyShuttleCar(routesValue: unknown) {
+    const routes = this.parseJsonArray<RouteItem>(routesValue);
+    return routes.some(
+      (route) =>
+        route.Transport?.trim().toLowerCase() === 'company shuttle car',
+    );
+  }
+
+  private splitAssistedRows(rows: Record<string, any>[]) {
+    return rows.flatMap((row) => {
+      if (typeof row.AssisstedIDs !== 'string' || !row.AssisstedIDs.trim()) {
+        return [row];
+      }
+
+      const assistedIds = row.AssisstedIDs.split('$')
+        .map((id) => id.trim())
+        .filter(Boolean);
+
+      if (assistedIds.length === 0) {
+        return [row];
+      }
+
+      return assistedIds.map((id) => ({
+        ...row,
+        AssisstedIDs: id,
+      }));
+    });
+  }
+
   private compareValues(left: unknown, right: unknown, sortOrder: string) {
     const direction = sortOrder?.toLowerCase() === 'desc' ? -1 : 1;
     const leftValue = left ?? '';
@@ -213,13 +251,15 @@ export class Cat6Service {
       replacements,
     })) as Record<string, any>[];
 
-    console.log(rawRows);
-    const transformed = rawRows.map((row) => ({
+    const expandedRows = this.splitAssistedRows(rawRows);
+    const total = expandedRows.length;
+
+    const transformed = expandedRows.map((row) => ({
       Document_Date: row.CreatedAt
         ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
         : '',
       Document_Number: row.DOC_NBR ?? '',
-      Staff_ID: row.UserCreate ?? '',
+      Staff_ID: row.AssisstedIDs ?? row.UserCreate ?? '',
       Dept: row.Dept ?? row.Department ?? '',
       Round_trip_One_way: this.formatTripType(row.TypeTravel) ?? '',
       Start_Time: row.DateStart
@@ -228,15 +268,18 @@ export class Cat6Service {
       End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
       Business_Trip_Type: this.formatBusinessTripType(row.Factory) ?? '',
       ...this.formatPlacesAndTransports(row.Routes),
+      IsDormShuttleCase: Number(
+        this.hasCompanyShuttleCar(row.Routes) &&
+          this.hasDormAccommodation(row.Accommodation),
+      ),
       Number_of_nights_stayed: this.getAccommodationNights(row.Accommodation),
-      TotalRow: Number(row.TotalRow ?? 0),
+      TotalRow: total,
     }));
 
     transformed.sort((left, right) =>
       this.compareValues(left[sortField], right[sortField], sortOrder),
     );
 
-    const total = rawRows[0]?.TotalRow ?? transformed.length;
     const offset = (page - 1) * limit;
     const data = transformed.slice(offset, offset + limit);
 
