@@ -1182,6 +1182,7 @@ export class Cat9andcat12Service {
         };
       }),
     );
+    
     return data.flatMap((item) =>
       this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
     );
