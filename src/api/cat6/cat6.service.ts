@@ -158,25 +158,17 @@ export class Cat6Service {
     );
   }
 
-  private splitAssistedRows(rows: Record<string, any>[]) {
-    return rows.flatMap((row) => {
-      if (typeof row.AssisstedIDs !== 'string' || !row.AssisstedIDs.trim()) {
-        return [row];
-      }
+  private getNumberOfPeople(assistedIdsValue: unknown) {
+    if (typeof assistedIdsValue !== 'string' || !assistedIdsValue.trim()) {
+      return 1;
+    }
 
-      const assistedIds = row.AssisstedIDs.split('$')
-        .map((id) => id.trim())
-        .filter(Boolean);
+    const assistedIds = assistedIdsValue
+      .split('$')
+      .map((id) => id.trim())
+      .filter(Boolean);
 
-      if (assistedIds.length === 0) {
-        return [row];
-      }
-
-      return assistedIds.map((id) => ({
-        ...row,
-        AssisstedIDs: id,
-      }));
-    });
+    return assistedIds.length || 1;
   }
 
   private compareValues(left: unknown, right: unknown, sortOrder: string) {
@@ -206,6 +198,7 @@ export class Cat6Service {
     limit: number = 20,
     sortField: string = 'CreatedAt',
     sortOrder: string = 'asc',
+    checkedDormShuttle: boolean = false,
   ) {
     const replacements: any[] = [];
 
@@ -251,15 +244,21 @@ export class Cat6Service {
       replacements,
     })) as Record<string, any>[];
 
-    const expandedRows = this.splitAssistedRows(rawRows);
-    const total = expandedRows.length;
+    const filteredRows = checkedDormShuttle
+      ? rawRows.filter(
+        (row) =>
+          this.hasCompanyShuttleCar(row.Routes) &&
+          this.hasDormAccommodation(row.Accommodation),
+      )
+      : rawRows;
+    const total = filteredRows.length;
 
-    const transformed = expandedRows.map((row) => ({
+    const transformed = filteredRows.map((row) => ({
       Document_Date: row.CreatedAt
         ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
         : '',
       Document_Number: row.DOC_NBR ?? '',
-      Staff_ID: row.AssisstedIDs ?? row.UserCreate ?? '',
+      Staff_ID: row.UserCreate ?? '',
       Dept: row.Dept ?? row.Department ?? '',
       Round_trip_One_way: this.formatTripType(row.TypeTravel) ?? '',
       Start_Time: row.DateStart
@@ -268,11 +267,8 @@ export class Cat6Service {
       End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
       Business_Trip_Type: this.formatBusinessTripType(row.Factory) ?? '',
       ...this.formatPlacesAndTransports(row.Routes),
-      IsDormShuttleCase: Number(
-        this.hasCompanyShuttleCar(row.Routes) &&
-          this.hasDormAccommodation(row.Accommodation),
-      ),
       Number_of_nights_stayed: this.getAccommodationNights(row.Accommodation),
+      Number_of_People: this.getNumberOfPeople(row.AssisstedIDs),
       TotalRow: total,
     }));
 

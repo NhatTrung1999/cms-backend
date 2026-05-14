@@ -14,6 +14,7 @@ export class Cat6Controller {
     @Query('limit') limit: number,
     @Query('sortField') sortField: string,
     @Query('sortOrder') sortOrder: string,
+    @Query('checkedDormShuttle') checkedDormShuttle: string,
   ) {
     return this.cat6Service.getDataCat6(
       dateFrom,
@@ -23,6 +24,7 @@ export class Cat6Controller {
       +limit,
       sortField,
       sortOrder,
+      checkedDormShuttle?.trim().toLowerCase() === 'true',
     );
   }
 
