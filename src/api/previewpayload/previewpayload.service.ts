@@ -11,7 +11,12 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ConfigService } from '@nestjs/config';
 import * as ExcelJS from 'exceljs';
-import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
+import {
+  FACTORY_LIST,
+  FactoryCode,
+  getFactory,
+} from 'src/helper/factory.helper';
+import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
 import dayjs from 'dayjs';
 import { ACTIVITY_TYPES, ActivityType } from 'src/types/cat1andcat4';
 import {
@@ -40,34 +45,6 @@ import {
 } from 'src/helper/cat7.helper';
 import { BuildQueryFn } from 'src/types/cat7';
 
-type Cat6PreviewRow = {
-  DocumentDate: string;
-  DocumentNumber: string;
-  StaffID: string;
-  Dept: string;
-  TripType: string;
-  StartTime: string;
-  EndTime: string;
-  BusinessTripType: string;
-  PlaceOfDeparture: string;
-  DepartureAirport: string;
-  LandTransportDistanceA: string;
-  LandTrasportationTypeA: string;
-  DestinationAirport: string;
-  ThirdCountryTransferDestination: string;
-  LandTransportDistanceB: string;
-  LandTrasportationTypeB: string;
-  Destination2: string;
-  Destination3: string;
-  Destination4: string;
-  Destination5: string;
-  Destination6: string;
-  LandTransportDistance: string;
-  LandTrasportationType: string;
-  AirTransportDistance: string;
-  NumberOfNightsStayed: number;
-};
-
 type Cat6RouteItem = {
   AddressName: string;
   Transport: string;
@@ -78,11 +55,50 @@ type Cat6RouteItem = {
 };
 
 type Cat6AccommodationItem = {
-  nights?: number;
+  nights?: number | string;
   addressID?: string;
   id?: string;
   isSameAsAbove?: boolean;
   type?: string;
+};
+
+type Cat6ActivePreviewRow = {
+  Document_Date: string;
+  Document_Number: string;
+  Staff_ID: string;
+  Dept: string;
+  Round_trip_One_way: string;
+  Start_Time: string;
+  End_Time: string;
+  Business_Trip_Type: string;
+  Number_of_nights_stayed: number;
+  Number_of_People: number;
+  Factory_Code: string;
+  [key: string]: string | number | undefined;
+};
+
+type Cat6PreviewPayload = {
+  System: string;
+  Corporation: string;
+  Factory: string;
+  Department: string;
+  DocKey: string;
+  ActivitySource: string;
+  SPeriodData: string;
+  EPeriodData: string;
+  ActivityType: string;
+  DataType: string;
+  DocType: string;
+  DocDate: string;
+  DocDate2: string;
+  DocNo: string;
+  UndDocNo: string;
+  TransType: string;
+  Departure: string;
+  Destination: string;
+  Memo: string;
+  CreateDateTime: string;
+  Creator: string;
 };
 
 @Injectable()
@@ -872,40 +888,6 @@ export class PreviewpayloadService {
     }
   }
 
-  private normalizeCat6Route(item: unknown): Cat6RouteItem {
-    const r = (item ?? {}) as Record<string, any>;
-    const transport = typeof r.Transport === 'string' ? r.Transport : '';
-    const isAirport = Boolean(r.isAirport ?? r.IsAirport);
-    return {
-      AddressName: r.AddressName ?? '',
-      Transport: transport,
-      AddressDetail: r.AddressDetail ?? '',
-      isAirport: isAirport || transport.trim().toLowerCase() === 'flight',
-      From: r.From ?? '',
-      To: r.To ?? '',
-    };
-  }
-
-  private splitCat6RoutesByFlight(routes: Cat6RouteItem[]): Cat6RouteItem[][] {
-    const flightIndices = routes
-      .map((r, i) =>
-        r.isAirport || r.Transport.trim().toLowerCase() === 'flight' ? i : -1,
-      )
-      .filter((i) => i >= 0);
-
-    if (flightIndices.length <= 1) return [routes];
-
-    const splitPoints = flightIndices.slice(1).map((idx) => idx - 1);
-    const boundaries = [0, ...splitPoints, routes.length - 1];
-    const groups: Cat6RouteItem[][] = [];
-
-    for (let i = 0; i < boundaries.length - 1; i++) {
-      groups.push(routes.slice(boundaries[i], boundaries[i + 1] + 1));
-    }
-
-    return groups;
-  }
-
   private formatCat6TripType(type: unknown): string | null {
     if (!type || typeof type !== 'string') return null;
     const t = type.toLowerCase().trim();
@@ -919,105 +901,246 @@ export class PreviewpayloadService {
     if (!type || typeof type !== 'string') return null;
     const map: Record<string, string> = {
       factory_domestic: 'Domestic business trip within the group',
-      outside_domestic: 'Domestic business trip to third-party entities',
+      outside_domestic: 'Domestic business trip to third party entities',
       factory_oversea: 'Overseas business trip within the group',
-      outside_oversea: 'Overseas business trip to third-party entities',
+      outside_oversea: 'Overseas business trip to third party entities',
     };
     return map[type.toLowerCase()] ?? type;
   }
 
-  private buildCat6AccommodationMap(
-    fullRoutes: Cat6RouteItem[],
-    accommodation: Cat6AccommodationItem[],
-  ): Map<string, Cat6AccommodationItem> {
-    const stopsWithAccommodation = fullRoutes
-      .slice(1)
-      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight');
+  private formatCat6PlacesAndTransports(routesValue: unknown) {
+    const routes = this.parseJsonArray<Cat6RouteItem>(routesValue);
+    const places: string[] = [];
+    const transports: string[] = [];
 
-    const map = new Map<string, Cat6AccommodationItem>();
-    stopsWithAccommodation.forEach((stop, i) => {
-      if (accommodation[i] && stop.AddressDetail) {
-        map.set(stop.AddressDetail.trim(), accommodation[i]);
+    const pushPlace = (value?: string) => {
+      const place = getCat6AirportName(value);
+      if (!place) return;
+      if (places[places.length - 1] === place) return;
+      places.push(place);
+    };
+
+    const isFlightRoute = (route: Cat6RouteItem) => {
+      const transport = route.Transport?.trim().toLowerCase() ?? '';
+      return route.isAirport === true || transport === 'flight';
+    };
+
+    let index = 0;
+    while (index < routes.length) {
+      const route = routes[index];
+      const transport = route.Transport?.trim() ?? '';
+      const nextRoute = routes[index + 1];
+
+      if (isFlightRoute(route)) {
+        const flightStart = route.From?.trim() ?? '';
+        let flightEnd = route.To?.trim() ?? '';
+        let cursor = index;
+
+        while (cursor + 1 < routes.length && isFlightRoute(routes[cursor + 1])) {
+          cursor += 1;
+          flightEnd = routes[cursor].To?.trim() ?? flightEnd;
+        }
+
+        pushPlace(flightStart);
+        pushPlace(flightEnd);
+        transports.push('Flight');
+        index = cursor + 1;
+        continue;
       }
-    });
-    return map;
-  }
 
-  private getCat6AccommodationForGroup(
-    groupRoutes: Cat6RouteItem[],
-    accMap: Map<string, Cat6AccommodationItem>,
-  ): Cat6AccommodationItem[] {
-    return groupRoutes
-      .slice(1)
-      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight')
-      .map((r) => accMap.get(r.AddressDetail?.trim() ?? ''))
-      .filter((a): a is Cat6AccommodationItem => Boolean(a));
-  }
+      if (!transport && places.length === 0 && nextRoute && isFlightRoute(nextRoute)) {
+        pushPlace(nextRoute.From);
+        index += 1;
+        continue;
+      }
 
-  private transformCat6Row(row: Record<string, any>): Cat6PreviewRow {
-    const routes = this.parseJsonArray(row.Routes)
-      .flat()
-      .map((item) => this.normalizeCat6Route(item));
+      pushPlace(route.AddressDetail ?? route.AddressName);
+      if (transport) {
+        transports.push(transport);
+      }
+      index += 1;
+    }
 
-    const accommodation = this.parseJsonArray<Cat6AccommodationItem>(
-      row.Accommodation,
-    );
-    const flights = routes.filter(
-      (r) =>
-        r.isAirport === true || r.Transport.trim().toLowerCase() === 'flight',
-    );
-
-    const firstFlight = flights[0] ?? null;
-    const lastFlight = flights[flights.length - 1] ?? null;
-    const lastFlightIdx = routes
-      .map((r) => r.isAirport || r.Transport.trim().toLowerCase() === 'flight')
-      .lastIndexOf(true);
-    const totalNights =
-      Number(row.StayNight) ||
-      accommodation.reduce((sum, a) => sum + (a?.nights || 0), 0) ||
-      0;
-
-    const destinationIndex = lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2;
-    const destinationList = routes.slice(destinationIndex).map((r) => r.AddressDetail ?? null);
+    const transportLimit = Math.max(places.length - 1, 0);
+    const normalizedTransports = transports.slice(0, transportLimit);
+    while (normalizedTransports.length < transportLimit) {
+      normalizedTransports.push('');
+    }
 
     return {
-      DocumentDate: row.CreatedAt
+      ...places.reduce<Record<string, string>>((acc, place, index) => {
+        acc[`Place${index + 1}`] = place;
+        return acc;
+      }, {}),
+      ...normalizedTransports.reduce<Record<string, string>>(
+        (acc, transport, index) => {
+          acc[`Transport_${index + 1}`] = transport;
+          return acc;
+        },
+        {},
+      ),
+    };
+  }
+
+  private getCat6AccommodationNights(accommodationValue: unknown) {
+    const accommodations =
+      this.parseJsonArray<Cat6AccommodationItem>(accommodationValue);
+    return accommodations.reduce((sum, item) => {
+      const nights = Number(item?.nights ?? 0);
+      return sum + (Number.isFinite(nights) ? nights : 0);
+    }, 0);
+  }
+
+  private getCat6NumberOfPeople(assistedIdsValue: unknown) {
+    if (typeof assistedIdsValue !== 'string' || !assistedIdsValue.trim()) {
+      return 0;
+    }
+
+    return assistedIdsValue
+      .split('$')
+      .map((id) => id.trim())
+      .filter(Boolean).length;
+  }
+
+  private transformCat6ActiveRow(row: Record<string, any>): Cat6ActivePreviewRow {
+    return {
+      Document_Date: row.CreatedAt
         ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
         : '',
-      DocumentNumber: row.DOC_NBR ?? '',
-      StaffID: row.UserCreate ?? '',
-      Dept: row.Department ?? '',
-      TripType: this.formatCat6TripType(row.TypeTravel) ?? '',
-      StartTime: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : '',
-      EndTime: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
-      BusinessTripType: this.formatCat6BusinessTripType(row.Factory) ?? '',
-      PlaceOfDeparture: routes[0]?.AddressDetail ?? '',
-      DepartureAirport: firstFlight?.From ?? '',
-      LandTransportDistanceA: 'API Calculation',
-      LandTrasportationTypeA: routes[0]?.Transport ?? '',
-      DestinationAirport: lastFlight?.To ?? '',
-      ThirdCountryTransferDestination:
-        lastFlightIdx >= 0
-          ? routes[lastFlightIdx + 1]?.AddressDetail ?? ''
-          : routes[1]?.AddressDetail ?? '',
-      LandTransportDistanceB: 'API Calculation',
-      LandTrasportationTypeB:
-        lastFlightIdx >= 0
-          ? routes[lastFlightIdx + 1]?.Transport ?? ''
-          : routes[1]?.Transport ?? '',
-      Destination2: destinationList[0] ?? '',
-      Destination3: destinationList[1] ?? '',
-      Destination4: destinationList[2] ?? '',
-      Destination5: destinationList[3] ?? '',
-      Destination6: destinationList[4] ?? '',
-      LandTransportDistance: 'API Calculation',
-      LandTrasportationType:
-        lastFlightIdx >= 0
-          ? routes[lastFlightIdx + 1]?.Transport ?? ''
-          : routes[1]?.Transport ?? '',
-      AirTransportDistance: 'API Calculation',
-      NumberOfNightsStayed: totalNights,
+      Document_Number: row.DOC_NBR ?? '',
+      Staff_ID: row.UserCreate ?? '',
+      Dept: row.Dept ?? row.Department ?? '',
+      Round_trip_One_way: this.formatCat6TripType(row.TypeTravel) ?? '',
+      Start_Time: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : '',
+      End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
+      Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory) ?? '',
+      ...this.formatCat6PlacesAndTransports(row.Routes),
+      Number_of_nights_stayed: this.getCat6AccommodationNights(row.Accommodation),
+      Number_of_People: this.getCat6NumberOfPeople(row.AssisstedIDs),
+      Factory_Code: String(row.Factory_User ?? '').trim().toUpperCase(),
     };
+  }
+
+  private extractCat6Places(row: Cat6ActivePreviewRow): string[] {
+    return Object.keys(row)
+      .filter((key) => /^Place\d+$/.test(key))
+      .sort((left, right) => {
+        const leftIndex = Number(left.replace('Place', ''));
+        const rightIndex = Number(right.replace('Place', ''));
+        return leftIndex - rightIndex;
+      })
+      .map((key) => String(row[key] ?? '').trim())
+      .filter(Boolean);
+  }
+
+  private extractCat6Transports(row: Cat6ActivePreviewRow): string[] {
+    return Object.keys(row)
+      .filter((key) => /^Transport_\d+$/.test(key))
+      .sort((left, right) => {
+        const leftIndex = Number(left.replace('Transport_', ''));
+        const rightIndex = Number(right.replace('Transport_', ''));
+        return leftIndex - rightIndex;
+      })
+      .map((key) => String(row[key] ?? '').trim());
+  }
+
+  private buildCat6CMSLegs(row: Cat6ActivePreviewRow) {
+    const places = this.extractCat6Places(row);
+    const transports = this.extractCat6Transports(row);
+    const legs: { transType: string; dep: string; dest: string }[] = [];
+    const maxLegs = Math.max(places.length - 1, 0);
+
+    for (let index = 0; index < maxLegs; index += 1) {
+      const dep = places[index]?.trim() ?? '';
+      const dest = places[index + 1]?.trim() ?? '';
+      const transType = transports[index]?.trim() ?? '';
+
+      if (!dep || !dest || !transType) {
+        continue;
+      }
+
+      legs.push({
+        transType,
+        dep,
+        dest,
+      });
+    }
+
+    return legs;
+  }
+
+  private getCat6CMSDocKey(businessTripType: string): string {
+    switch (businessTripType.trim().toLowerCase()) {
+      case 'domestic business trip within the group':
+        return '3.5.1';
+      case 'domestic business trip to third party entities':
+        return '3.5.2';
+      case 'overseas business trip within the group':
+        return '3.5.3';
+      case 'overseas business trip to third party entities':
+        return '3.5.4';
+      default:
+        return '';
+    }
+  }
+
+  private mapCat6CMSTransType(transport: string): string {
+    const normalized = transport.trim().toLowerCase();
+
+    switch (normalized) {
+      case 'car':
+        return '計程車/出租車';
+      case 'company shuttle car':
+        return '公司車';
+      case 'flight':
+        return '飛機';
+      case 'personal motocycle':
+        return '個人機車';
+      default:
+        return transport.trim();
+    }
+  }
+
+  private mapCat6RowToPreviewPayload(
+    row: Cat6ActivePreviewRow,
+    factory: string,
+    dateFrom: string,
+    dateTo: string,
+  ): Cat6PreviewPayload[] {
+    const legs = this.buildCat6CMSLegs(row);
+    const docKey = this.getCat6CMSDocKey(row.Business_Trip_Type ?? '');
+    const resolvedFactoryCode =
+      factory.trim().toUpperCase() === 'ALL'
+        ? row.Factory_Code
+        : factory.trim().toUpperCase();
+
+    return legs.map((leg, index) => ({
+      System: 'BPM',
+      Corporation: 'LAI YIH',
+      Factory: getFactory(resolvedFactoryCode as FactoryCode),
+      Department: row.Dept ?? '',
+      DocKey: docKey,
+      ActivitySource: '',
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: '3.5',
+      DataType: '2',
+      DocType: '洽公單',
+      DocDate: row.Document_Date
+        ? dayjs(row.Document_Date).format('YYYY/MM/DD')
+        : '',
+      DocDate2: row.Start_Time
+        ? dayjs(row.Start_Time).format('YYYY/MM/DD')
+        : '',
+      DocNo: row.Document_Number ?? '',
+      UndDocNo: `${row.Document_Number ?? ''}-${index + 1}`,
+      TransType: this.mapCat6CMSTransType(leg.transType),
+      Departure: leg.dep,
+      Destination: leg.dest,
+      Memo: row.Business_Trip_Type ?? '',
+      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      Creator: '',
+    }));
   }
 
   async exportExcelCat6(
@@ -1027,25 +1150,98 @@ export class PreviewpayloadService {
     factory: string,
     dockeyCMS: string,
   ) {
-    let where = `WHERE 1=1
-                  AND BPMStatus = 'F'
-                  AND ISNULL(Accommodation, '') <> ''
-                  AND ISNULL(Factory_User, '') <> ''`;
+    let where = `WHERE  chb.BPMStatus = 'F'
+                        AND ISNULL(chb.Factory_User ,'')<>''`;
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?`;
+      where += ` AND CONVERT(VARCHAR ,chb.CreatedAt ,23) BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo);
     }
 
     if (factory && factory.trim().toUpperCase() !== 'ALL') {
-      where += ` AND Factory_User LIKE ?`;
+      where += ` AND chb.Factory_User LIKE ?`;
       replacements.push(`%${factory}%`);
     }
 
     const query = `
-      SELECT *
-      FROM CDS_HRBUSS_BusTripData
+      SELECT chb.*
+                          --,twt.Current_doc
+                          ,COALESCE(
+                              vwd.GROUP_NAME
+                              ,(
+                                  SELECT TOP 1 vwd2.GROUP_NAME
+                                  FROM   TB_EB_USER teu2
+                                          OUTER APPLY (
+                                      SELECT teed2.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed2
+                                      WHERE  teed2.USER_GUID = teu2.USER_GUID
+                                              AND teed2.ORDERS = 0
+                                  ) teed2
+                                  LEFT JOIN vwDepartment_Factory vwd2
+                                              ON  vwd2.GROUP_ID = teed2.GROUP_ID
+                                  WHERE  teu2.ACCOUNT = chb.Factory_User+chb.UserCreate
+                                          AND vwd2.GROUP_NAME IS NOT NULL
+                              )
+                              ,(
+                                  SELECT TOP 1 vwd3.GROUP_NAME
+                                  FROM   TB_EB_USER teu3
+                                          OUTER APPLY (
+                                      SELECT teed3.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed3
+                                      WHERE  teed3.USER_GUID = teu3.USER_GUID
+                                              AND teed3.ORDERS = 0
+                                  ) teed3
+                                  LEFT JOIN vwDepartment_Factory vwd3
+                                              ON  vwd3.GROUP_ID = teed3.GROUP_ID
+                                  WHERE  teu3.ACCOUNT = chb.Departure+chb.UserCreate
+                                          AND vwd3.GROUP_NAME IS NOT NULL
+                              )
+                              ,(
+                                  SELECT TOP 1 vwd4.GROUP_NAME
+                                  FROM   CDS_FMEval_Employee cfe
+                                          JOIN TB_EB_USER teu4
+                                              ON  teu4.ACCOUNT = cfe.BPMAccount
+                                          OUTER APPLY (
+                                      SELECT teed4.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed4
+                                      WHERE  teed4.USER_GUID = teu4.USER_GUID
+                                              AND teed4.ORDERS = 0
+                                  ) teed4
+                                  LEFT JOIN vwDepartment_Factory vwd4
+                                              ON  vwd4.GROUP_ID = teed4.GROUP_ID
+                                  WHERE  cfe.EmpID = chb.UserCreate
+                                          AND vwd4.GROUP_NAME IS NOT NULL
+                              )
+                          )                         AS Dept
+                          ,COUNT(chb.TripID) OVER()  AS TotalRow
+                    FROM   CDS_HRBUSS_BusTripData    AS chb
+                          LEFT JOIN TB_EB_USER      AS teu
+                                ON  (
+                                        teu.ACCOUNT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
+                                        AND teu.ACCOUNT LIKE '%'+chb.UserCreate+'%'
+                                    )
+                                    OR (
+                                        teu.ACCOUNT NOT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
+                                        AND teu.ACCOUNT=chb.UserCreate
+                                    )
+                          OUTER APPLY (
+                        SELECT teed2.GROUP_ID
+                        FROM   TB_EB_EMPL_DEP AS teed2
+                        WHERE  teed2.USER_GUID = teu.USER_GUID
+                              AND teed2.ORDERS = 0
+                    )                                AS teed
+                    LEFT JOIN vwDepartment_Factory   AS vwd
+                                ON  vwd.GROUP_ID = teed.GROUP_ID
+                          LEFT JOIN tb_wkf_task     AS twt
+                                ON  twt.DOC_NBR = chb.DOC_NBR
+                                    AND (
+                                            twt.DOC_NBR LIKE 'LYV-HR-BT%'
+                                            OR twt.DOC_NBR LIKE 'LHG-SUGG%'
+                                            OR twt.DOC_NBR LIKE 'LVL-HR-BTF%'
+                                            OR twt.DOC_NBR LIKE 'LVL-ODBT%'
+                                            OR twt.DOC_NBR LIKE 'LYM-HR-BT%'
+                                        )
       ${where}
       ORDER BY CreatedAt ASC
     `;
@@ -1055,68 +1251,38 @@ export class PreviewpayloadService {
       replacements,
     })) as Record<string, any>[];
 
-    const transformed = rawRows.flatMap((row) => {
-      const routes = this.parseJsonArray(row.Routes)
-        .flat()
-        .map((item) => this.normalizeCat6Route(item));
-      const accommodation = this.parseJsonArray<Cat6AccommodationItem>(
-        row.Accommodation,
-      );
-      const accMap = this.buildCat6AccommodationMap(routes, accommodation);
-      const routeGroups = this.splitCat6RoutesByFlight(routes);
-
-      return routeGroups.map((groupRoutes) => {
-        const groupAccommodation = this.getCat6AccommodationForGroup(
-          groupRoutes,
-          accMap,
-        );
-        return this.transformCat6Row({
-          ...row,
-          Routes: groupRoutes,
-          Accommodation: groupAccommodation,
-        });
-      });
-    });
+    const transformedRows = rawRows.map((row) => this.transformCat6ActiveRow(row));
+    const payloadRows = transformedRows.flatMap((row) =>
+      this.mapCat6RowToPreviewPayload(row, factory, dateFrom, dateTo),
+    );
 
     sheet.columns = [
-      { header: 'Document Date', key: 'DocumentDate', width: 15 },
-      { header: 'Document Number', key: 'DocumentNumber', width: 18 },
-      { header: 'Staff ID', key: 'StaffID', width: 14 },
-      { header: 'Dept', key: 'Dept', width: 15 },
-      { header: 'Trip Type', key: 'TripType', width: 15 },
-      { header: 'Start Time', key: 'StartTime', width: 15 },
-      { header: 'End Time', key: 'EndTime', width: 15 },
-      { header: 'Business Trip Type', key: 'BusinessTripType', width: 28 },
-      { header: 'Place of Departure', key: 'PlaceOfDeparture', width: 25 },
-      { header: 'Departure Airport', key: 'DepartureAirport', width: 20 },
-      { header: 'Land Transport Distance A', key: 'LandTransportDistanceA', width: 22 },
-      { header: 'Land Transportation Type A', key: 'LandTrasportationTypeA', width: 22 },
-      { header: 'Destination Airport', key: 'DestinationAirport', width: 20 },
-      {
-        header: 'Third Country Transfer Destination',
-        key: 'ThirdCountryTransferDestination',
-        width: 30,
-      },
-      { header: 'Land Transport Distance B', key: 'LandTransportDistanceB', width: 22 },
-      {
-        header: 'Land Transportation Type B',
-        key: 'LandTrasportationTypeB',
-        width: 22,
-      },
-      { header: 'Destination 2', key: 'Destination2', width: 20 },
-      { header: 'Destination 3', key: 'Destination3', width: 20 },
-      { header: 'Destination 4', key: 'Destination4', width: 20 },
-      { header: 'Destination 5', key: 'Destination5', width: 20 },
-      { header: 'Destination 6', key: 'Destination6', width: 20 },
-      { header: 'Land Transport Distance', key: 'LandTransportDistance', width: 22 },
-      { header: 'Land Transportation Type', key: 'LandTrasportationType', width: 22 },
-      { header: 'Air Transport Distance', key: 'AirTransportDistance', width: 22 },
-      { header: 'Number of Nights Stayed', key: 'NumberOfNightsStayed', width: 18 },
+      { header: 'System', key: 'System', width: 15 },
+      { header: 'Corporation', key: 'Corporation', width: 15 },
+      { header: 'Factory', key: 'Factory', width: 18 },
+      { header: 'Department', key: 'Department', width: 20 },
+      { header: 'DocKey', key: 'DocKey', width: 12 },
+      { header: 'ActivitySource', key: 'ActivitySource', width: 15 },
+      { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
+      { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
+      { header: 'ActivityType', key: 'ActivityType', width: 12 },
+      { header: 'DataType', key: 'DataType', width: 10 },
+      { header: 'DocType', key: 'DocType', width: 18 },
+      { header: 'DocDate', key: 'DocDate', width: 15 },
+      { header: 'DocDate2', key: 'DocDate2', width: 15 },
+      { header: 'DocNo', key: 'DocNo', width: 20 },
+      { header: 'UndDocNo', key: 'UndDocNo', width: 22 },
+      { header: 'TransType', key: 'TransType', width: 20 },
+      { header: 'Departure', key: 'Departure', width: 35 },
+      { header: 'Destination', key: 'Destination', width: 35 },
+      { header: 'Memo', key: 'Memo', width: 35 },
+      { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
+      { header: 'Creator', key: 'Creator', width: 15 },
     ];
 
     sheet.getRow(1).font = { bold: true };
 
-    transformed.forEach((item) => sheet.addRow(item));
+    payloadRows.forEach((item) => sheet.addRow(item));
   }
   // Preview Excel
   async previewExcel(

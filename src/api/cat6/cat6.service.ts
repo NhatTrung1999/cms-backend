@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { QueryTypes, Sequelize } from 'sequelize';
 import dayjs from 'dayjs';
+import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
+import { getFactory } from 'src/helper/factory.helper';
 
 dayjs().format();
 
@@ -19,9 +21,54 @@ type AccommodationItem = {
   type?: string;
 };
 
+type Cat6ActiveRow = {
+  Document_Date: string;
+  Document_Number: string;
+  Staff_ID: string;
+  Dept: string;
+  Round_trip_One_way: string;
+  Start_Time: string;
+  End_Time: string;
+  Business_Trip_Type: string;
+  Number_of_nights_stayed: number;
+  Number_of_People: number;
+  TotalRow?: number;
+  [key: string]: string | number | undefined;
+};
+
+type CMSLeg = {
+  transType: string;
+  dep: string;
+  dest: string;
+};
+
+type CMSPayload = {
+  System: string;
+  Corporation: string;
+  Factory: string;
+  Department: string;
+  DocKey: string;
+  ActivitySource: string;
+  SPeriodData: string;
+  EPeriodData: string;
+  ActivityType: string;
+  DataType: string;
+  DocType: string;
+  DocDate: string;
+  DocDate2: string;
+  DocNo: string;
+  UndDocNo: string;
+  TransType: string;
+  Departure: string;
+  Destination: string;
+  Memo: string;
+  CreateDateTime: string;
+  Creator: string;
+};
+
 @Injectable()
 export class Cat6Service {
-  constructor(@Inject('UOF') private readonly UOF: Sequelize) { }
+  constructor(@Inject('UOF') private readonly UOF: Sequelize) {}
 
   private parseJsonArray<T = unknown>(value: unknown): T[] {
     if (Array.isArray(value)) return value as T[];
@@ -46,9 +93,9 @@ export class Cat6Service {
     if (!type || typeof type !== 'string') return null;
     const map: Record<string, string> = {
       factory_domestic: 'Domestic business trip within the group',
-      outside_domestic: 'Domestic business trip to third-party entities',
+      outside_domestic: 'Domestic business trip to third party entities',
       factory_oversea: 'Overseas business trip within the group',
-      outside_oversea: 'Overseas business trip to third-party entities',
+      outside_oversea: 'Overseas business trip to third party entities',
     };
     return map[type.toLowerCase()] ?? type;
   }
@@ -59,7 +106,7 @@ export class Cat6Service {
     const transports: string[] = [];
 
     const pushPlace = (value?: string) => {
-      const place = value?.trim() ?? '';
+      const place = getCat6AirportName(value);
       if (!place) return;
       const lastPlace = places[places.length - 1];
       if (lastPlace === place) return;
@@ -68,7 +115,11 @@ export class Cat6Service {
 
     const isFlightRoute = (route: RouteItem) => {
       const transport = route.Transport?.trim().toLowerCase() ?? '';
-      return route.isAirport === true || route.IsAirport === true || transport === 'flight';
+      return (
+        route.isAirport === true ||
+        route.IsAirport === true ||
+        transport === 'flight'
+      );
     };
 
     let index = 0;
@@ -82,7 +133,10 @@ export class Cat6Service {
         let flightEnd = route.To?.trim() ?? '';
         let cursor = index;
 
-        while (cursor + 1 < routes.length && isFlightRoute(routes[cursor + 1])) {
+        while (
+          cursor + 1 < routes.length &&
+          isFlightRoute(routes[cursor + 1])
+        ) {
           cursor += 1;
           flightEnd = routes[cursor].To?.trim() ?? flightEnd;
         }
@@ -160,7 +214,7 @@ export class Cat6Service {
 
   private getNumberOfPeople(assistedIdsValue: unknown) {
     if (typeof assistedIdsValue !== 'string' || !assistedIdsValue.trim()) {
-      return 1;
+      return 0;
     }
 
     const assistedIds = assistedIdsValue
@@ -168,7 +222,7 @@ export class Cat6Service {
       .map((id) => id.trim())
       .filter(Boolean);
 
-    return assistedIds.length || 1;
+    return assistedIds.length;
   }
 
   private compareValues(left: unknown, right: unknown, sortOrder: string) {
@@ -190,6 +244,151 @@ export class Cat6Service {
     );
   }
 
+  private extractPlaces(row: Cat6ActiveRow): string[] {
+    return Object.keys(row)
+      .filter((key) => /^Place\d+$/.test(key))
+      .sort((left, right) => {
+        const leftIndex = Number(left.replace('Place', ''));
+        const rightIndex = Number(right.replace('Place', ''));
+        return leftIndex - rightIndex;
+      })
+      .map((key) => String(row[key] ?? '').trim())
+      .filter(Boolean);
+  }
+
+  private extractTransports(row: Cat6ActiveRow): string[] {
+    return Object.keys(row)
+      .filter((key) => /^Transport_\d+$/.test(key))
+      .sort((left, right) => {
+        const leftIndex = Number(left.replace('Transport_', ''));
+        const rightIndex = Number(right.replace('Transport_', ''));
+        return leftIndex - rightIndex;
+      })
+      .map((key) => String(row[key] ?? '').trim());
+  }
+
+  private buildCMSLegs(row: Cat6ActiveRow): CMSLeg[] {
+    const places = this.extractPlaces(row);
+    const transports = this.extractTransports(row);
+    const legs: CMSLeg[] = [];
+    const maxLegs = Math.max(places.length - 1, 0);
+
+    for (let index = 0; index < maxLegs; index += 1) {
+      const dep = places[index]?.trim() ?? '';
+      const dest = places[index + 1]?.trim() ?? '';
+      const transType = transports[index]?.trim() ?? '';
+
+      if (!dep || !dest || !transType) {
+        continue;
+      }
+
+      legs.push({
+        transType,
+        dep,
+        dest,
+      });
+    }
+
+    return legs;
+  }
+
+  private getCMSDocKey(businessTripType: string): string {
+    switch (businessTripType.trim().toLowerCase()) {
+      case 'domestic business trip within the group':
+        return '3.5.1';
+      case 'domestic business trip to third party entities':
+        return '3.5.2';
+      case 'overseas business trip within the group':
+        return '3.5.3';
+      case 'overseas business trip to third party entities':
+        return '3.5.4';
+      default:
+        return '';
+    }
+  }
+
+  private mapCMSTransType(transport: string): string {
+    const normalized = transport.trim().toLowerCase();
+
+    switch (normalized) {
+      case 'car':
+        return '計程車/出租車';
+      case 'company shuttle car':
+        return '公司車';
+      case 'flight':
+        return '飛機';
+      case 'personal motocycle':
+        return '個人機車';
+      default:
+        return transport.trim();
+    }
+  }
+
+  private mapRowToCMSPayload(
+    row: Cat6ActiveRow,
+    factory: string,
+    dateFrom: string,
+    dateTo: string,
+  ): CMSPayload[] {
+    const legs = this.buildCMSLegs(row);
+    const docKey = this.getCMSDocKey(row.Business_Trip_Type ?? '');
+
+    return legs.map((leg, index) => ({
+      System: 'BPM',
+      Corporation: 'LAI YIH',
+      Factory: getFactory(factory ?? ''),
+      Department: row.Dept ?? '',
+      DocKey: docKey,
+      ActivitySource: '',
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: '3.5',
+      DataType: '2',
+      DocType: '洽公單',
+      DocDate: row.Document_Date
+        ? dayjs(row.Document_Date).format('YYYY/MM/DD')
+        : '',
+      DocDate2: row.Start_Time
+        ? dayjs(row.Start_Time).format('YYYY/MM/DD')
+        : '',
+      DocNo: row.Document_Number ?? '',
+      UndDocNo: `${row.Document_Number ?? ''}-${index + 1}`,
+      TransType: this.mapCMSTransType(leg.transType),
+      Departure: leg.dep,
+      Destination: leg.dest,
+      Memo: row.Business_Trip_Type ?? '',
+      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      Creator: '',
+    }));
+  }
+
+  async transformCMSData(
+    rows: Cat6ActiveRow[],
+    factory: string,
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<CMSPayload[]> {
+    return rows.flatMap((row) =>
+      this.mapRowToCMSPayload(row, factory, dateFrom, dateTo),
+    );
+  }
+
+  async autoSentCMS(dateFrom: string, dateTo: string, factory: string) {
+    const result = await this.getDataCat6(
+      dateFrom,
+      dateTo,
+      factory,
+      1,
+      999999,
+      'CreatedAt',
+      'asc',
+      false,
+    );
+
+    const rows = result.data as Cat6ActiveRow[];
+    return this.transformCMSData(rows, factory, dateFrom, dateTo);
+  }
+
   async getDataCat6(
     dateFrom: string,
     dateTo: string,
@@ -202,17 +401,16 @@ export class Cat6Service {
   ) {
     const replacements: any[] = [];
 
-    let where = `WHERE 1=1
-                  AND BPMStatus = 'F'
-                  AND ISNULL(Factory_User, '') <> ''`;
+    let where = `WHERE  chb.BPMStatus = 'F'
+                        AND ISNULL(chb.Factory_User ,'')<>''`;
 
     if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?`;
+      where += ` AND CONVERT(VARCHAR ,chb.CreatedAt ,23) BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo);
     }
 
     if (factory) {
-      where += ` AND Factory_User LIKE ?`;
+      where += ` AND chb.Factory_User LIKE ?`;
       replacements.push(`%${factory}%`);
     }
 
@@ -232,9 +430,83 @@ export class Cat6Service {
     const safeSortField = allowedSortFields[sortField] ?? 'CreatedAt';
     const safeSortOrder = sortOrder?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
     const query = `
-      SELECT *,
-        COUNT(TripID) OVER() AS TotalRow
-      FROM CDS_HRBUSS_BusTripData
+                    SELECT chb.*
+                          --,twt.Current_doc
+                          ,COALESCE(
+                              vwd.GROUP_NAME
+                              ,(
+                                  SELECT TOP 1 vwd2.GROUP_NAME
+                                  FROM   TB_EB_USER teu2
+                                          OUTER APPLY (
+                                      SELECT teed2.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed2
+                                      WHERE  teed2.USER_GUID = teu2.USER_GUID
+                                              AND teed2.ORDERS = 0
+                                  ) teed2
+                                  LEFT JOIN vwDepartment_Factory vwd2
+                                              ON  vwd2.GROUP_ID = teed2.GROUP_ID
+                                  WHERE  teu2.ACCOUNT = chb.Factory_User+chb.UserCreate
+                                          AND vwd2.GROUP_NAME IS NOT NULL
+                              )
+                              ,(
+                                  SELECT TOP 1 vwd3.GROUP_NAME
+                                  FROM   TB_EB_USER teu3
+                                          OUTER APPLY (
+                                      SELECT teed3.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed3
+                                      WHERE  teed3.USER_GUID = teu3.USER_GUID
+                                              AND teed3.ORDERS = 0
+                                  ) teed3
+                                  LEFT JOIN vwDepartment_Factory vwd3
+                                              ON  vwd3.GROUP_ID = teed3.GROUP_ID
+                                  WHERE  teu3.ACCOUNT = chb.Departure+chb.UserCreate
+                                          AND vwd3.GROUP_NAME IS NOT NULL
+                              )
+                              ,(
+                                  SELECT TOP 1 vwd4.GROUP_NAME
+                                  FROM   CDS_FMEval_Employee cfe
+                                          JOIN TB_EB_USER teu4
+                                              ON  teu4.ACCOUNT = cfe.BPMAccount
+                                          OUTER APPLY (
+                                      SELECT teed4.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed4
+                                      WHERE  teed4.USER_GUID = teu4.USER_GUID
+                                              AND teed4.ORDERS = 0
+                                  ) teed4
+                                  LEFT JOIN vwDepartment_Factory vwd4
+                                              ON  vwd4.GROUP_ID = teed4.GROUP_ID
+                                  WHERE  cfe.EmpID = chb.UserCreate
+                                          AND vwd4.GROUP_NAME IS NOT NULL
+                              )
+                          )                         AS Dept
+                          ,COUNT(chb.TripID) OVER()  AS TotalRow
+                    FROM   CDS_HRBUSS_BusTripData    AS chb
+                          LEFT JOIN TB_EB_USER      AS teu
+                                ON  (
+                                        teu.ACCOUNT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
+                                        AND teu.ACCOUNT LIKE '%'+chb.UserCreate+'%'
+                                    )
+                                    OR (
+                                        teu.ACCOUNT NOT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
+                                        AND teu.ACCOUNT=chb.UserCreate
+                                    )
+                          OUTER APPLY (
+                        SELECT teed2.GROUP_ID
+                        FROM   TB_EB_EMPL_DEP AS teed2
+                        WHERE  teed2.USER_GUID = teu.USER_GUID
+                              AND teed2.ORDERS = 0
+                    )                                AS teed
+                    LEFT JOIN vwDepartment_Factory   AS vwd
+                                ON  vwd.GROUP_ID = teed.GROUP_ID
+                          LEFT JOIN tb_wkf_task     AS twt
+                                ON  twt.DOC_NBR = chb.DOC_NBR
+                                    AND (
+                                            twt.DOC_NBR LIKE 'LYV-HR-BT%'
+                                            OR twt.DOC_NBR LIKE 'LHG-SUGG%'
+                                            OR twt.DOC_NBR LIKE 'LVL-HR-BTF%'
+                                            OR twt.DOC_NBR LIKE 'LVL-ODBT%'
+                                            OR twt.DOC_NBR LIKE 'LYM-HR-BT%'
+                                        )
       ${where}
       ORDER BY ${safeSortField} ${safeSortOrder}
     `;
@@ -246,10 +518,10 @@ export class Cat6Service {
 
     const filteredRows = checkedDormShuttle
       ? rawRows.filter(
-        (row) =>
-          this.hasCompanyShuttleCar(row.Routes) &&
-          this.hasDormAccommodation(row.Accommodation),
-      )
+          (row) =>
+            this.hasCompanyShuttleCar(row.Routes) &&
+            this.hasDormAccommodation(row.Accommodation),
+        )
       : rawRows;
     const total = filteredRows.length;
 

@@ -20,6 +20,7 @@ import {
   getADataCustomExport,
   getADataExcelFactoryCat7,
 } from 'src/helper/cat7.helper';
+import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
 
 import { buildQueryTest as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
 import dayjs from 'dayjs';
@@ -37,7 +38,7 @@ type Cat6AccommodationItem = {
   id?: string;
   isSameAsAbove?: boolean;
   type?: string;
-  nights?: number;
+  nights?: number | string;
   addressID?: string;
 };
 
@@ -93,41 +94,6 @@ export class FilemanagementService {
     }
   }
 
-  private normalizeCat6Route(item: unknown): Cat6RouteItem {
-    const r = (item ?? {}) as Record<string, any>;
-    const transport = typeof r.Transport === 'string' ? r.Transport : '';
-    const isAirport = Boolean(r.isAirport ?? r.IsAirport);
-
-    return {
-      AddressName: r.AddressName ?? '',
-      Transport: transport,
-      AddressDetail: r.AddressDetail ?? '',
-      isAirport: isAirport || transport.trim().toLowerCase() === 'flight',
-      From: r.From ?? '',
-      To: r.To ?? '',
-    };
-  }
-
-  private splitCat6RoutesByFlight(routes: Cat6RouteItem[]): Cat6RouteItem[][] {
-    const flightIndices = routes
-      .map((r, i) =>
-        r.isAirport || r.Transport.trim().toLowerCase() === 'flight' ? i : -1,
-      )
-      .filter((i) => i >= 0);
-
-    if (flightIndices.length <= 1) return [routes];
-
-    const splitPoints = flightIndices.slice(1).map((idx) => idx - 1);
-    const boundaries = [0, ...splitPoints, routes.length - 1];
-
-    const groups: Cat6RouteItem[][] = [];
-    for (let i = 0; i < boundaries.length - 1; i++) {
-      groups.push(routes.slice(boundaries[i], boundaries[i + 1] + 1));
-    }
-
-    return groups;
-  }
-
   private formatCat6TripType(type: unknown): string | null {
     if (!type || typeof type !== 'string') return null;
     const t = type.toLowerCase().trim();
@@ -140,105 +106,105 @@ export class FilemanagementService {
     if (!type || typeof type !== 'string') return null;
     const map: Record<string, string> = {
       factory_domestic: 'Domestic business trip within the group',
-      outside_domestic: 'Domestic business trip to third-party entities',
+      outside_domestic: 'Domestic business trip to third party entities',
       factory_oversea: 'Overseas business trip within the group',
-      outside_oversea: 'Overseas business trip to third-party entities',
+      outside_oversea: 'Overseas business trip to third party entities',
     };
     return map[type.toLowerCase()] ?? type;
   }
 
-  private buildCat6AccommodationMap(
-    fullRoutes: Cat6RouteItem[],
-    accommodation: Cat6AccommodationItem[],
-  ): Map<string, Cat6AccommodationItem> {
-    const stopsWithAccommodation = fullRoutes
-      .slice(1)
-      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight');
+  private formatCat6PlacesAndTransports(routesValue: unknown) {
+    const routes = this.parseJsonArray<Cat6RouteItem>(routesValue);
+    const places: string[] = [];
+    const transports: string[] = [];
 
-    const map = new Map<string, Cat6AccommodationItem>();
-    stopsWithAccommodation.forEach((stop, i) => {
-      if (accommodation[i] && stop.AddressDetail) {
-        map.set(stop.AddressDetail.trim(), accommodation[i]);
+    const pushPlace = (value?: string) => {
+      const place = getCat6AirportName(value);
+      if (!place) return;
+      if (places[places.length - 1] === place) return;
+      places.push(place);
+    };
+
+    const isFlightRoute = (route: Cat6RouteItem) => {
+      const transport = route.Transport?.trim().toLowerCase() ?? '';
+      return route.isAirport === true || transport === 'flight';
+    };
+
+    let index = 0;
+    while (index < routes.length) {
+      const route = routes[index];
+      const transport = route.Transport?.trim() ?? '';
+      const nextRoute = routes[index + 1];
+
+      if (isFlightRoute(route)) {
+        const flightStart = route.From?.trim() ?? '';
+        let flightEnd = route.To?.trim() ?? '';
+        let cursor = index;
+
+        while (cursor + 1 < routes.length && isFlightRoute(routes[cursor + 1])) {
+          cursor += 1;
+          flightEnd = routes[cursor].To?.trim() ?? flightEnd;
+        }
+
+        pushPlace(flightStart);
+        pushPlace(flightEnd);
+        transports.push('Flight');
+        index = cursor + 1;
+        continue;
       }
-    });
-    return map;
-  }
 
-  private getCat6AccommodationForGroup(
-    groupRoutes: Cat6RouteItem[],
-    accMap: Map<string, Cat6AccommodationItem>,
-  ): Cat6AccommodationItem[] {
-    return groupRoutes
-      .slice(1)
-      .filter((r) => !r.isAirport && r.Transport.toLowerCase() !== 'flight')
-      .map((r) => accMap.get(r.AddressDetail?.trim() ?? ''))
-      .filter((a): a is Cat6AccommodationItem => Boolean(a));
-  }
+      if (!transport && places.length === 0 && nextRoute && isFlightRoute(nextRoute)) {
+        pushPlace(nextRoute.From);
+        index += 1;
+        continue;
+      }
 
-  private transformCat6Row(row: Record<string, any>) {
-    const routes = this.parseJsonArray(row.Routes)
-      .flat()
-      .map((item) => this.normalizeCat6Route(item));
+      pushPlace(route.AddressDetail ?? route.AddressName);
+      if (transport) {
+        transports.push(transport);
+      }
+      index += 1;
+    }
 
-    const accommodation = this.parseJsonArray<Cat6AccommodationItem>(
-      row.Accommodation,
-    );
-    const flights = routes.filter(
-      (r) => r.isAirport === true || r.Transport.trim().toLowerCase() === 'flight',
-    );
-
-    const firstFlight = flights[0] ?? null;
-    const lastFlight = flights[flights.length - 1] ?? null;
-    const lastFlightIdx = routes
-      .map((r) => r.isAirport || r.Transport.trim().toLowerCase() === 'flight')
-      .lastIndexOf(true);
-    const totalNights =
-      Number(row.StayNight) ||
-      accommodation.reduce((sum, a) => sum + (a?.nights || 0), 0) ||
-      0;
+    const transportLimit = Math.max(places.length - 1, 0);
+    const normalizedTransports = transports.slice(0, transportLimit);
+    while (normalizedTransports.length < transportLimit) {
+      normalizedTransports.push('');
+    }
 
     return {
-      Document_Date: row.CreatedAt
-        ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
-        : null,
-      Document_Number: row.DOC_NBR ?? null,
-      Staff_ID: row.UserCreate ?? null,
-      Round_trip_One_way: this.formatCat6TripType(row.TypeTravel),
-      Start_Time: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : null,
-      End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : null,
-      Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory),
-      Place_of_Departure: routes[0]?.AddressDetail ?? null,
-      Departure_Airport: firstFlight?.From ?? null,
-      Land_Transport_Distance_km_A: 'API Calculation',
-      Land_Trasportation_Type_A: routes[0]?.Transport ?? null,
-      Destination_Airport: lastFlight?.To ?? null,
-      Third_country_transfer_Destination:
-        lastFlightIdx >= 0
-          ? routes[lastFlightIdx + 1]?.AddressDetail ?? null
-          : routes[1]?.AddressDetail ?? null,
-      Land_Transport_Distance_km_B: 'API Calculation',
-      Land_Transportation_Type_B:
-        lastFlightIdx >= 0
-          ? routes[lastFlightIdx + 1]?.Transport ?? null
-          : routes[1]?.Transport ?? null,
-      Destination_2: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[0]
-        ?.AddressDetail ?? null,
-      Destination_3: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[1]
-        ?.AddressDetail ?? null,
-      Destination_4: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[2]
-        ?.AddressDetail ?? null,
-      Destination_5: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[3]
-        ?.AddressDetail ?? null,
-      Destination_6: routes.slice(lastFlightIdx >= 0 ? lastFlightIdx + 2 : 2)[4]
-        ?.AddressDetail ?? null,
-      Land_Transport_Distance_km: 'API Calculation',
-      Land_Transportation_Type:
-        lastFlightIdx >= 0
-          ? routes[lastFlightIdx + 1]?.Transport ?? null
-          : routes[1]?.Transport ?? null,
-      Air_Transport_Distance_km: 'API Calculation',
-      Number_of_nights_stayed: totalNights,
+      ...places.reduce<Record<string, string>>((acc, place, index) => {
+        acc[`Place${index + 1}`] = place;
+        return acc;
+      }, {}),
+      ...normalizedTransports.reduce<Record<string, string>>(
+        (acc, transport, index) => {
+          acc[`Transport_${index + 1}`] = transport;
+          return acc;
+        },
+        {},
+      ),
     };
+  }
+
+  private getCat6AccommodationNights(accommodationValue: unknown) {
+    const accommodations =
+      this.parseJsonArray<Cat6AccommodationItem>(accommodationValue);
+    return accommodations.reduce((sum, item) => {
+      const nights = Number(item?.nights ?? 0);
+      return sum + (Number.isFinite(nights) ? nights : 0);
+    }, 0);
+  }
+
+  private getCat6NumberOfPeople(assistedIdsValue: unknown) {
+    if (typeof assistedIdsValue !== 'string' || !assistedIdsValue.trim()) {
+      return 0;
+    }
+
+    return assistedIdsValue
+      .split('$')
+      .map((id) => id.trim())
+      .filter(Boolean).length;
   }
 
   async getData(
@@ -488,25 +454,98 @@ export class FilemanagementService {
     dateTo: string,
     factory: string,
   ) {
-    let where = `WHERE 1=1
-                  AND BPMStatus = 'F'
-                  AND ISNULL(Accommodation, '') <> ''
-                  AND ISNULL(Factory_User, '') <> ''`;
+    let where = `WHERE  chb.BPMStatus = 'F'
+                        AND ISNULL(chb.Factory_User ,'')<>''`;
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR, CreatedAt, 23) BETWEEN ? AND ?`;
+      where += ` AND CONVERT(VARCHAR ,chb.CreatedAt ,23) BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo);
     }
 
     if (factory) {
-      where += ` AND Factory_User LIKE ?`;
+      where += ` AND chb.Factory_User LIKE ?`;
       replacements.push(`%${factory}%`);
     }
 
     const query = `
-      SELECT *
-      FROM CDS_HRBUSS_BusTripData
+      SELECT chb.*
+                          --,twt.Current_doc
+                          ,COALESCE(
+                              vwd.GROUP_NAME
+                              ,(
+                                  SELECT TOP 1 vwd2.GROUP_NAME
+                                  FROM   TB_EB_USER teu2
+                                          OUTER APPLY (
+                                      SELECT teed2.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed2
+                                      WHERE  teed2.USER_GUID = teu2.USER_GUID
+                                              AND teed2.ORDERS = 0
+                                  ) teed2
+                                  LEFT JOIN vwDepartment_Factory vwd2
+                                              ON  vwd2.GROUP_ID = teed2.GROUP_ID
+                                  WHERE  teu2.ACCOUNT = chb.Factory_User+chb.UserCreate
+                                          AND vwd2.GROUP_NAME IS NOT NULL
+                              )
+                              ,(
+                                  SELECT TOP 1 vwd3.GROUP_NAME
+                                  FROM   TB_EB_USER teu3
+                                          OUTER APPLY (
+                                      SELECT teed3.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed3
+                                      WHERE  teed3.USER_GUID = teu3.USER_GUID
+                                              AND teed3.ORDERS = 0
+                                  ) teed3
+                                  LEFT JOIN vwDepartment_Factory vwd3
+                                              ON  vwd3.GROUP_ID = teed3.GROUP_ID
+                                  WHERE  teu3.ACCOUNT = chb.Departure+chb.UserCreate
+                                          AND vwd3.GROUP_NAME IS NOT NULL
+                              )
+                              ,(
+                                  SELECT TOP 1 vwd4.GROUP_NAME
+                                  FROM   CDS_FMEval_Employee cfe
+                                          JOIN TB_EB_USER teu4
+                                              ON  teu4.ACCOUNT = cfe.BPMAccount
+                                          OUTER APPLY (
+                                      SELECT teed4.GROUP_ID
+                                      FROM   TB_EB_EMPL_DEP AS teed4
+                                      WHERE  teed4.USER_GUID = teu4.USER_GUID
+                                              AND teed4.ORDERS = 0
+                                  ) teed4
+                                  LEFT JOIN vwDepartment_Factory vwd4
+                                              ON  vwd4.GROUP_ID = teed4.GROUP_ID
+                                  WHERE  cfe.EmpID = chb.UserCreate
+                                          AND vwd4.GROUP_NAME IS NOT NULL
+                              )
+                          )                         AS Dept
+                          ,COUNT(chb.TripID) OVER()  AS TotalRow
+                    FROM   CDS_HRBUSS_BusTripData    AS chb
+                          LEFT JOIN TB_EB_USER      AS teu
+                                ON  (
+                                        teu.ACCOUNT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
+                                        AND teu.ACCOUNT LIKE '%'+chb.UserCreate+'%'
+                                    )
+                                    OR (
+                                        teu.ACCOUNT NOT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
+                                        AND teu.ACCOUNT=chb.UserCreate
+                                    )
+                          OUTER APPLY (
+                        SELECT teed2.GROUP_ID
+                        FROM   TB_EB_EMPL_DEP AS teed2
+                        WHERE  teed2.USER_GUID = teu.USER_GUID
+                              AND teed2.ORDERS = 0
+                    )                                AS teed
+                    LEFT JOIN vwDepartment_Factory   AS vwd
+                                ON  vwd.GROUP_ID = teed.GROUP_ID
+                          LEFT JOIN tb_wkf_task     AS twt
+                                ON  twt.DOC_NBR = chb.DOC_NBR
+                                    AND (
+                                            twt.DOC_NBR LIKE 'LYV-HR-BT%'
+                                            OR twt.DOC_NBR LIKE 'LHG-SUGG%'
+                                            OR twt.DOC_NBR LIKE 'LVL-HR-BTF%'
+                                            OR twt.DOC_NBR LIKE 'LVL-ODBT%'
+                                            OR twt.DOC_NBR LIKE 'LYM-HR-BT%'
+                                        )
       ${where}
       ORDER BY CreatedAt ASC
     `;
@@ -516,60 +555,56 @@ export class FilemanagementService {
       replacements,
     })) as Record<string, any>[];
 
-    const transformed = rawRows.flatMap((row) => {
-      const routes = this.parseJsonArray(row.Routes)
-        .flat()
-        .map((item) => this.normalizeCat6Route(item));
-      const accommodation = this.parseJsonArray<Cat6AccommodationItem>(
-        row.Accommodation,
-      );
-      const accMap = this.buildCat6AccommodationMap(routes, accommodation);
-      const routeGroups = this.splitCat6RoutesByFlight(routes);
+    const transformed = rawRows.map((row) => ({
+      Document_Date: row.CreatedAt
+        ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
+        : '',
+      Document_Number: row.DOC_NBR ?? '',
+      Staff_ID: row.UserCreate ?? '',
+      Dept: row.Dept ?? row.Department ?? '',
+      Round_trip_One_way: this.formatCat6TripType(row.TypeTravel) ?? '',
+      Start_Time: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : '',
+      End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
+      Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory) ?? '',
+      ...this.formatCat6PlacesAndTransports(row.Routes),
+      Number_of_nights_stayed: this.getCat6AccommodationNights(row.Accommodation),
+      Number_of_People: this.getCat6NumberOfPeople(row.AssisstedIDs),
+    }));
 
-      return routeGroups.map((groupRoutes) => {
-        const groupAccommodation = this.getCat6AccommodationForGroup(
-          groupRoutes,
-          accMap,
-        );
-        return this.transformCat6Row({
-          ...row,
-          Routes: groupRoutes,
-          Accommodation: groupAccommodation,
-        });
-      });
-    });
+    const placeCount = Math.max(
+      1,
+      ...transformed.map(
+        (row) => Object.keys(row).filter((key) => /^Place\d+$/.test(key)).length,
+      ),
+    );
+    const transportCount = Math.max(
+      0,
+      placeCount - 1,
+      ...transformed.map(
+        (row) =>
+          Object.keys(row).filter((key) => /^Transport_\d+$/.test(key)).length,
+      ),
+    );
 
     sheet.columns = [
       { header: 'Document Date', key: 'Document_Date' },
       { header: 'Document Number', key: 'Document_Number' },
       { header: 'Staff ID', key: 'Staff_ID' },
-      { header: 'Round trip / One-way', key: 'Round_trip_One_way' },
+      { header: 'Dept', key: 'Dept' },
+      { header: 'Round trip / One way', key: 'Round_trip_One_way' },
       { header: 'Start Time', key: 'Start_Time' },
       { header: 'End Time', key: 'End_Time' },
       { header: 'Business Trip Type', key: 'Business_Trip_Type' },
-      { header: 'Place of Departure', key: 'Place_of_Departure' },
-      { header: 'Departure Airport', key: 'Departure_Airport' },
-      { header: 'Land Transport Distance km A', key: 'Land_Transport_Distance_km_A' },
-      { header: 'Land Trasportation Type A', key: 'Land_Trasportation_Type_A' },
-      { header: 'Destination Airport', key: 'Destination_Airport' },
-      {
-        header: 'Third country transfer Destination',
-        key: 'Third_country_transfer_Destination',
-      },
-      { header: 'Land Transport Distance km B', key: 'Land_Transport_Distance_km_B' },
-      {
-        header: 'Land Transportation Type B',
-        key: 'Land_Transportation_Type_B',
-      },
-      { header: 'Destination 2', key: 'Destination_2' },
-      { header: 'Destination 3', key: 'Destination_3' },
-      { header: 'Destination 4', key: 'Destination_4' },
-      { header: 'Destination 5', key: 'Destination_5' },
-      { header: 'Destination 6', key: 'Destination_6' },
-      { header: 'Land Transport Distance km', key: 'Land_Transport_Distance_km' },
-      { header: 'Land Transportation Type', key: 'Land_Transportation_Type' },
-      { header: 'Air Transport Distance km', key: 'Air_Transport_Distance_km' },
+      ...Array.from({ length: placeCount }, (_, index) => ({
+        header: `Place ${index + 1}`,
+        key: `Place${index + 1}`,
+      })),
+      ...Array.from({ length: transportCount }, (_, index) => ({
+        header: `Transport ${index + 1}`,
+        key: `Transport_${index + 1}`,
+      })),
       { header: 'Number of nights stayed', key: 'Number_of_nights_stayed' },
+      { header: 'Number of people', key: 'Number_of_People' },
     ];
 
     transformed.forEach((item) => sheet.addRow(item));
