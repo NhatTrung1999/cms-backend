@@ -403,7 +403,8 @@ export const buildQueryTest = async (
                               ,imw.Total_Weight
                         )
                   END                          AS UnitWeight
-                  ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
+                  --,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
+                  ,CGZL.ZSBH SupplierCode
                   --,ISNULL(P.Style ,ZSZL.Style)  AS Style
                   ,CASE 
                         WHEN ISNULL(poisi.Transportationmethod ,'')<>'' THEN poisi.Transportationmethod
@@ -1527,7 +1528,8 @@ export const buildQueryAutoSentCMS = async (
                               ,imw.Total_Weight
                         )
                   END                          AS UnitWeight
-                  ,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
+                  --,ISNULL(z.ZSDH ,CGZL.ZSBH)    AS SupplierCode
+                  ,CGZL.ZSBH SupplierCode
                   --,ISNULL(P.Style ,ZSZL.Style)  AS Style
                   ,CASE 
                         WHEN ISNULL(poisi.Transportationmethod ,'')<>'' THEN poisi.Transportationmethod

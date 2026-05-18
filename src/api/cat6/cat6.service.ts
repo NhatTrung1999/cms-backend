@@ -409,7 +409,7 @@ export class Cat6Service {
       replacements.push(dateFrom, dateTo);
     }
 
-    if (factory) {
+    if (factory.trim().toLowerCase() !== 'ALL'.trim().toLowerCase()) {
       where += ` AND chb.Factory_User LIKE ?`;
       replacements.push(`%${factory}%`);
     }
