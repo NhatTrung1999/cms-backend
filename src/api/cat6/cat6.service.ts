@@ -2,6 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { QueryTypes, Sequelize } from 'sequelize';
 import dayjs from 'dayjs';
 import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
+import {
+  appendCat6DocumentSuffix,
+  getCat6AssistedIds,
+} from 'src/helper/cat6-assisted.helper';
 import { getFactory } from 'src/helper/factory.helper';
 
 dayjs().format();
@@ -213,16 +217,40 @@ export class Cat6Service {
   }
 
   private getNumberOfPeople(assistedIdsValue: unknown) {
-    if (typeof assistedIdsValue !== 'string' || !assistedIdsValue.trim()) {
-      return 0;
+    return getCat6AssistedIds(assistedIdsValue).length;
+  }
+
+  private expandRowsByAssistedIds(row: Record<string, any>): Record<string, any>[] {
+    const assistedIds = getCat6AssistedIds(row.AssisstedIDs);
+
+    if (assistedIds.length === 0) {
+      return [
+        {
+          ...row,
+          DOC_NBR: row.DOC_NBR ?? '',
+          EffectiveStaffID: row.UserCreate ?? '',
+          Number_of_People: 0,
+        },
+      ];
     }
 
-    const assistedIds = assistedIdsValue
-      .split('$')
-      .map((id) => id.trim())
-      .filter(Boolean);
+    if (assistedIds.length === 1) {
+      return [
+        {
+          ...row,
+          DOC_NBR: row.DOC_NBR ?? '',
+          EffectiveStaffID: assistedIds[0],
+          Number_of_People: 1,
+        },
+      ];
+    }
 
-    return assistedIds.length;
+    return assistedIds.map((assistedId, index) => ({
+      ...row,
+      DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
+      EffectiveStaffID: assistedId,
+      Number_of_People: 1,
+    }));
   }
 
   private compareValues(left: unknown, right: unknown, sortOrder: string) {
@@ -525,24 +553,35 @@ export class Cat6Service {
       : rawRows;
     const total = filteredRows.length;
 
-    const transformed = filteredRows.map((row) => ({
-      Document_Date: row.CreatedAt
-        ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
-        : '',
-      Document_Number: row.DOC_NBR ?? '',
-      Staff_ID: row.UserCreate ?? '',
-      Dept: row.Dept ?? row.Department ?? '',
-      Round_trip_One_way: this.formatTripType(row.TypeTravel) ?? '',
-      Start_Time: row.DateStart
-        ? dayjs(row.DateStart).format('YYYY-MM-DD')
-        : '',
-      End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
-      Business_Trip_Type: this.formatBusinessTripType(row.Factory) ?? '',
-      ...this.formatPlacesAndTransports(row.Routes),
-      Number_of_nights_stayed: this.getAccommodationNights(row.Accommodation),
-      Number_of_People: this.getNumberOfPeople(row.AssisstedIDs),
-      TotalRow: total,
-    }));
+    const transformed = filteredRows.flatMap((row) =>
+      this.expandRowsByAssistedIds(row).map((expandedRow) => ({
+        Document_Date: expandedRow.CreatedAt
+          ? dayjs(expandedRow.CreatedAt).format('YYYY-MM-DD')
+          : '',
+        Document_Number: expandedRow.DOC_NBR ?? '',
+        Staff_ID: expandedRow.EffectiveStaffID ?? '',
+        Dept: expandedRow.Dept ?? expandedRow.Department ?? '',
+        Round_trip_One_way: this.formatTripType(expandedRow.TypeTravel) ?? '',
+        Start_Time: expandedRow.DateStart
+          ? dayjs(expandedRow.DateStart).format('YYYY-MM-DD')
+          : '',
+        End_Time: expandedRow.DateEnd
+          ? dayjs(expandedRow.DateEnd).format('YYYY-MM-DD')
+          : '',
+        Business_Trip_Type: this.formatBusinessTripType(expandedRow.Factory) ?? '',
+        ...this.formatPlacesAndTransports(expandedRow.Routes),
+        Number_of_nights_stayed: this.getAccommodationNights(
+          expandedRow.Accommodation,
+        ),
+        Number_of_People: expandedRow.Number_of_People,
+        TotalRow: 0,
+      })),
+    );
+
+    const transformedTotal = transformed.length;
+    transformed.forEach((row) => {
+      row.TotalRow = transformedTotal;
+    });
 
     transformed.sort((left, right) =>
       this.compareValues(left[sortField], right[sortField], sortOrder),
@@ -555,8 +594,8 @@ export class Cat6Service {
       data,
       page,
       limit,
-      total: Number(total),
-      hasMore: offset + data.length < Number(total),
+      total: Number(transformedTotal),
+      hasMore: offset + data.length < Number(transformedTotal),
     };
   }
 }

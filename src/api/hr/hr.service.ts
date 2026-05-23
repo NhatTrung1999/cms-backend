@@ -683,6 +683,9 @@ export class HrService {
       { header: 'Permanent Address', key: 'PermanentAddress' },
       { header: 'Current Address', key: 'CurrentAddress' },
       { header: 'Transportation Method', key: 'TransportationMethod' },
+      { header: 'Bus Route', key: 'BusRoute' },
+      { header: 'Bus Station', key: 'BusStation' },
+      { header: 'Pick Up Point', key: 'PickUpPoint' },
       { header: 'Number of Working Days', key: 'Number_of_Working_Days' },
     ];
 

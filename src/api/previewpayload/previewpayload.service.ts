@@ -17,6 +17,10 @@ import {
   getFactory,
 } from 'src/helper/factory.helper';
 import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
+import {
+  appendCat6DocumentSuffix,
+  getCat6AssistedIds,
+} from 'src/helper/cat6-assisted.helper';
 import dayjs from 'dayjs';
 import { ACTIVITY_TYPES, ActivityType } from 'src/types/cat1andcat4';
 import {
@@ -992,23 +996,53 @@ export class PreviewpayloadService {
   }
 
   private getCat6NumberOfPeople(assistedIdsValue: unknown) {
-    if (typeof assistedIdsValue !== 'string' || !assistedIdsValue.trim()) {
-      return 0;
-    }
-
-    return assistedIdsValue
-      .split('$')
-      .map((id) => id.trim())
-      .filter(Boolean).length;
+    return getCat6AssistedIds(assistedIdsValue).length;
   }
 
-  private transformCat6ActiveRow(row: Record<string, any>): Cat6ActivePreviewRow {
+  private expandCat6PreviewRowsByAssistedIds(
+    row: Record<string, any>,
+  ): Record<string, any>[] {
+    const assistedIds = getCat6AssistedIds(row.AssisstedIDs);
+
+    if (assistedIds.length === 0) {
+      return [
+        {
+          ...row,
+          DOC_NBR: row.DOC_NBR ?? '',
+          EffectiveStaffID: row.UserCreate ?? '',
+          Number_of_People: 0,
+        },
+      ];
+    }
+
+    if (assistedIds.length === 1) {
+      return [
+        {
+          ...row,
+          DOC_NBR: row.DOC_NBR ?? '',
+          EffectiveStaffID: assistedIds[0],
+          Number_of_People: 1,
+        },
+      ];
+    }
+
+    return assistedIds.map((assistedId, index) => ({
+      ...row,
+      DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
+      EffectiveStaffID: assistedId,
+      Number_of_People: 1,
+    }));
+  }
+
+  private transformCat6ActiveRow(
+    row: Record<string, any>,
+  ): Cat6ActivePreviewRow {
     return {
       Document_Date: row.CreatedAt
         ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
         : '',
       Document_Number: row.DOC_NBR ?? '',
-      Staff_ID: row.UserCreate ?? '',
+      Staff_ID: row.EffectiveStaffID ?? '',
       Dept: row.Dept ?? row.Department ?? '',
       Round_trip_One_way: this.formatCat6TripType(row.TypeTravel) ?? '',
       Start_Time: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : '',
@@ -1016,7 +1050,7 @@ export class PreviewpayloadService {
       Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory) ?? '',
       ...this.formatCat6PlacesAndTransports(row.Routes),
       Number_of_nights_stayed: this.getCat6AccommodationNights(row.Accommodation),
-      Number_of_People: this.getCat6NumberOfPeople(row.AssisstedIDs),
+      Number_of_People: Number(row.Number_of_People ?? 0),
       Factory_Code: String(row.Factory_User ?? '').trim().toUpperCase(),
     };
   }
@@ -1251,7 +1285,11 @@ export class PreviewpayloadService {
       replacements,
     })) as Record<string, any>[];
 
-    const transformedRows = rawRows.map((row) => this.transformCat6ActiveRow(row));
+    const transformedRows = rawRows.flatMap((row) =>
+      this.expandCat6PreviewRowsByAssistedIds(row).map((expandedRow) =>
+        this.transformCat6ActiveRow(expandedRow),
+      ),
+    );
     const payloadRows = transformedRows.flatMap((row) =>
       this.mapCat6RowToPreviewPayload(row, factory, dateFrom, dateTo),
     );

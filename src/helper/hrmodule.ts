@@ -322,6 +322,9 @@ export const buildQueryHRModule = (
             ,b.Addr_now     COLLATE DATABASE_DEFAULT            AS PermanentAddress
             ,a.Address_Live COLLATE DATABASE_DEFAULT            AS CurrentAddress
             ,a.Vehicle                                          AS TransportationMethod
+            ,ISNULL(a.Bus_Route, '') AS BusRoute
+            ,ISNULL(NULLIF(CONCAT(a.lat, ', ', a.long), ', '),'') AS BusStation
+            ,ISNULL(a.PickupDropoffStation, '') AS PickUpPoint
             ,ISNULL(e.Number_of_Working_Days, 0)               AS Number_of_Working_Days
       FROM       users AS a
       ${joins}
@@ -335,6 +338,9 @@ export const buildQueryHRModule = (
             ,d.Address_Live COLLATE DATABASE_DEFAULT            AS PermanentAddress
             ,a.Address_Live COLLATE DATABASE_DEFAULT            AS CurrentAddress
             ,a.Vehicle                                          AS TransportationMethod
+            ,ISNULL(a.Bus_Route, '') AS BusRoute
+            ,ISNULL(NULLIF(CONCAT(a.lat, ', ', a.long), ', '),'') AS BusStation
+            ,ISNULL(a.PickupDropoffStation, '') AS PickUpPoint
             ,ISNULL(e.Number_of_Working_Days, 0)               AS Number_of_Working_Days
       FROM       users AS a
       ${joins}

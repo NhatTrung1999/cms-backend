@@ -21,6 +21,10 @@ import {
   getADataExcelFactoryCat7,
 } from 'src/helper/cat7.helper';
 import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
+import {
+  appendCat6DocumentSuffix,
+  getCat6AssistedIds,
+} from 'src/helper/cat6-assisted.helper';
 
 import { buildQueryTest as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
 import dayjs from 'dayjs';
@@ -197,14 +201,42 @@ export class FilemanagementService {
   }
 
   private getCat6NumberOfPeople(assistedIdsValue: unknown) {
-    if (typeof assistedIdsValue !== 'string' || !assistedIdsValue.trim()) {
-      return 0;
+    return getCat6AssistedIds(assistedIdsValue).length;
+  }
+
+  private expandCat6RowsByAssistedIds(
+    row: Record<string, any>,
+  ): Record<string, any>[] {
+    const assistedIds = getCat6AssistedIds(row.AssisstedIDs);
+
+    if (assistedIds.length === 0) {
+      return [
+        {
+          ...row,
+          DOC_NBR: row.DOC_NBR ?? '',
+          EffectiveStaffID: row.UserCreate ?? '',
+          Number_of_People: 0,
+        },
+      ];
     }
 
-    return assistedIdsValue
-      .split('$')
-      .map((id) => id.trim())
-      .filter(Boolean).length;
+    if (assistedIds.length === 1) {
+      return [
+        {
+          ...row,
+          DOC_NBR: row.DOC_NBR ?? '',
+          EffectiveStaffID: assistedIds[0],
+          Number_of_People: 1,
+        },
+      ];
+    }
+
+    return assistedIds.map((assistedId, index) => ({
+      ...row,
+      DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
+      EffectiveStaffID: assistedId,
+      Number_of_People: 1,
+    }));
   }
 
   async getData(
@@ -555,21 +587,30 @@ export class FilemanagementService {
       replacements,
     })) as Record<string, any>[];
 
-    const transformed = rawRows.map((row) => ({
-      Document_Date: row.CreatedAt
-        ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
-        : '',
-      Document_Number: row.DOC_NBR ?? '',
-      Staff_ID: row.UserCreate ?? '',
-      Dept: row.Dept ?? row.Department ?? '',
-      Round_trip_One_way: this.formatCat6TripType(row.TypeTravel) ?? '',
-      Start_Time: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : '',
-      End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
-      Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory) ?? '',
-      ...this.formatCat6PlacesAndTransports(row.Routes),
-      Number_of_nights_stayed: this.getCat6AccommodationNights(row.Accommodation),
-      Number_of_People: this.getCat6NumberOfPeople(row.AssisstedIDs),
-    }));
+    const transformed = rawRows.flatMap((row) =>
+      this.expandCat6RowsByAssistedIds(row).map((expandedRow) => ({
+        Document_Date: expandedRow.CreatedAt
+          ? dayjs(expandedRow.CreatedAt).format('YYYY-MM-DD')
+          : '',
+        Document_Number: expandedRow.DOC_NBR ?? '',
+        Staff_ID: expandedRow.EffectiveStaffID ?? '',
+        Dept: expandedRow.Dept ?? expandedRow.Department ?? '',
+        Round_trip_One_way: this.formatCat6TripType(expandedRow.TypeTravel) ?? '',
+        Start_Time: expandedRow.DateStart
+          ? dayjs(expandedRow.DateStart).format('YYYY-MM-DD')
+          : '',
+        End_Time: expandedRow.DateEnd
+          ? dayjs(expandedRow.DateEnd).format('YYYY-MM-DD')
+          : '',
+        Business_Trip_Type:
+          this.formatCat6BusinessTripType(expandedRow.Factory) ?? '',
+        ...this.formatCat6PlacesAndTransports(expandedRow.Routes),
+        Number_of_nights_stayed: this.getCat6AccommodationNights(
+          expandedRow.Accommodation,
+        ),
+        Number_of_People: expandedRow.Number_of_People,
+      })),
+    );
 
     const placeCount = Math.max(
       1,
