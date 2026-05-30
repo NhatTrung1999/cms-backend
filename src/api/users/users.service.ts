@@ -15,8 +15,7 @@ export class UsersService {
     @Inject('LYV_ERP') private readonly LYV_ERP: Sequelize,
   ) {}
 
-  async validateUser(userid: string, password?: string, factory?: string) {
-    // console.log(password);
+  async validateUser(userid: string, password?: string, _factory?: string) {
     let query = `
     SELECT *
     FROM CMW_Account
@@ -31,17 +30,6 @@ export class UsersService {
       replacements,
       type: QueryTypes.SELECT,
     });
-    // const payload: any = await this.EIP.query<any>(
-    // `
-    //   SELECT *
-    //   FROM CMW_Account
-    //   WHERE UserID = ? AND [Password] = ?
-    // `,
-    //   {
-    //     replacements: [userid, password],
-    //     type: QueryTypes.SELECT,
-    //   },
-    // );
     if (payload.length === 0) return false;
     return payload[0];
   }
@@ -95,6 +83,95 @@ export class UsersService {
     );
     if (payload.length === 0) return false;
     return payload[0];
+  }
+
+  private async ensureModulePermissionTable() {
+    await this.EIP.query(`
+      IF OBJECT_ID('dbo.CMW_UserModulePermission', 'U') IS NULL
+      BEGIN
+        CREATE TABLE dbo.CMW_UserModulePermission (
+          ID UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID() PRIMARY KEY,
+          UserID NVARCHAR(100) NOT NULL,
+          ModulePath NVARCHAR(255) NOT NULL,
+          IsAllowed BIT NOT NULL DEFAULT 0,
+          UpdatedAt NVARCHAR(100) NULL,
+          UpdatedDate DATETIME NOT NULL DEFAULT GETDATE()
+        );
+
+        CREATE UNIQUE INDEX UX_CMW_UserModulePermission_User_Module
+        ON dbo.CMW_UserModulePermission(UserID, ModulePath);
+      END
+    `);
+  }
+
+  async getUserModulePermissionState(userid: string) {
+    await this.ensureModulePermissionTable();
+
+    const rows = await this.EIP.query<any>(
+      `
+        SELECT ModulePath, IsAllowed
+        FROM CMW_UserModulePermission
+        WHERE UserID = ?
+      `,
+      {
+        replacements: [userid],
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    return {
+      permissionsConfigured: rows.length > 0,
+      modulePermissions: rows
+        .filter((item) => Boolean(item.IsAllowed))
+        .map((item) => item.ModulePath),
+    };
+  }
+
+  async getModulePermissions(userid: string) {
+    return this.getUserModulePermissionState(userid);
+  }
+
+  async updateModulePermissions(
+    userid: string,
+    modulePaths: string[] = [],
+    allModulePaths: string[] = [],
+    updatedAt?: string,
+  ) {
+    await this.ensureModulePermissionTable();
+
+    const uniqueAllModulePaths = Array.from(new Set(allModulePaths));
+    const allowed = new Set(modulePaths);
+
+    await this.EIP.transaction(async (t) => {
+      await this.EIP.query(`DELETE FROM CMW_UserModulePermission WHERE UserID = ?`, {
+        replacements: [userid],
+        type: QueryTypes.DELETE,
+        transaction: t,
+      });
+
+      for (const modulePath of uniqueAllModulePaths) {
+        await this.EIP.query(
+          `
+            INSERT INTO CMW_UserModulePermission
+              (UserID, ModulePath, IsAllowed, UpdatedAt, UpdatedDate)
+            VALUES
+              (?, ?, ?, ?, GETDATE())
+          `,
+          {
+            replacements: [
+              userid,
+              modulePath,
+              allowed.has(modulePath) ? 1 : 0,
+              updatedAt ?? null,
+            ],
+            type: QueryTypes.INSERT,
+            transaction: t,
+          },
+        );
+      }
+    });
+
+    return this.getUserModulePermissionState(userid);
   }
 
   async getSearch(

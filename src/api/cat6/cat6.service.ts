@@ -35,7 +35,6 @@ type Cat6ActiveRow = {
   End_Time: string;
   Business_Trip_Type: string;
   Number_of_nights_stayed: number;
-  Number_of_People: number;
   TotalRow?: number;
   [key: string]: string | number | undefined;
 };
@@ -216,10 +215,6 @@ export class Cat6Service {
     );
   }
 
-  private getNumberOfPeople(assistedIdsValue: unknown) {
-    return getCat6AssistedIds(assistedIdsValue).length;
-  }
-
   private expandRowsByAssistedIds(row: Record<string, any>): Record<string, any>[] {
     const assistedIds = getCat6AssistedIds(row.AssisstedIDs);
 
@@ -229,7 +224,6 @@ export class Cat6Service {
           ...row,
           DOC_NBR: row.DOC_NBR ?? '',
           EffectiveStaffID: row.UserCreate ?? '',
-          Number_of_People: 0,
         },
       ];
     }
@@ -240,7 +234,6 @@ export class Cat6Service {
           ...row,
           DOC_NBR: row.DOC_NBR ?? '',
           EffectiveStaffID: assistedIds[0],
-          Number_of_People: 1,
         },
       ];
     }
@@ -249,7 +242,6 @@ export class Cat6Service {
       ...row,
       DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
       EffectiveStaffID: assistedId,
-      Number_of_People: 1,
     }));
   }
 
@@ -573,7 +565,6 @@ export class Cat6Service {
         Number_of_nights_stayed: this.getAccommodationNights(
           expandedRow.Accommodation,
         ),
-        Number_of_People: expandedRow.Number_of_People,
         TotalRow: 0,
       })),
     );

@@ -41,6 +41,26 @@ export class UsersController {
     };
   }
 
+  @Get(':userid/module-permissions')
+  async getModulePermissions(@Param('userid') userid: string) {
+    return await this.usersService.getModulePermissions(userid);
+  }
+
+  @Patch(':userid/module-permissions')
+  async updateModulePermissions(
+    @Param('userid') userid: string,
+    @Body('modulePaths') modulePaths: string[],
+    @Body('allModulePaths') allModulePaths: string[],
+    @Body('updatedAt') updatedAt: string,
+  ) {
+    return await this.usersService.updateModulePermissions(
+      userid,
+      modulePaths,
+      allModulePaths,
+      updatedAt,
+    );
+  }
+
   @Patch('update-user')
   async updateUser(@Body() updateUserDto: UpdateUserDto) {
     const res = await this.usersService.updateUser(updateUserDto);

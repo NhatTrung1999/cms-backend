@@ -200,10 +200,6 @@ export class FilemanagementService {
     }, 0);
   }
 
-  private getCat6NumberOfPeople(assistedIdsValue: unknown) {
-    return getCat6AssistedIds(assistedIdsValue).length;
-  }
-
   private expandCat6RowsByAssistedIds(
     row: Record<string, any>,
   ): Record<string, any>[] {
@@ -215,7 +211,6 @@ export class FilemanagementService {
           ...row,
           DOC_NBR: row.DOC_NBR ?? '',
           EffectiveStaffID: row.UserCreate ?? '',
-          Number_of_People: 0,
         },
       ];
     }
@@ -226,7 +221,6 @@ export class FilemanagementService {
           ...row,
           DOC_NBR: row.DOC_NBR ?? '',
           EffectiveStaffID: assistedIds[0],
-          Number_of_People: 1,
         },
       ];
     }
@@ -235,7 +229,6 @@ export class FilemanagementService {
       ...row,
       DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
       EffectiveStaffID: assistedId,
-      Number_of_People: 1,
     }));
   }
 
@@ -309,7 +302,17 @@ export class FilemanagementService {
     }
     const filePath = path.join(folder, fileName);
 
-    await this.createFileExcel(
+    const statusWaiting = await this.fileExcelWaiting(
+      id,
+      module,
+      fileName,
+      filePath,
+      factory,
+      userID,
+    );
+    if (statusWaiting.length === 0) return false;
+
+    this.createFileExcel(
       id,
       module,
       filePath,
@@ -323,15 +326,6 @@ export class FilemanagementService {
       departure,
     );
 
-    let statusWaiting = await this.fileExcelWaiting(
-      id,
-      module,
-      fileName,
-      filePath,
-      factory,
-      userID,
-    );
-    if (statusWaiting.length === 0) return false;
     return true;
   }
 
@@ -423,61 +417,61 @@ export class FilemanagementService {
     weight?: boolean,
     departure?: boolean,
   ) {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet(module);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet(module);
 
-    switch (module.trim().toLowerCase()) {
-      case 'cat1andcat4':
-        await this.fileExcelCat1AndCat4(
-          sheet,
-          dateFrom,
-          dateTo,
-          factory,
-          usage,
-          unitWeight,
-          weight,
-          departure,
-        );
-        break;
-      case 'cat5':
-        await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
-        break;
-      case 'cat6':
-        await this.fileExcelCat6(sheet, dateFrom, dateTo, factory);
-        break;
-      case 'cat7':
-        await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
-        break;
-      case 'cat9andcat12':
-        await this.fileExcelCat9AndCat12(sheet, dateFrom, dateTo, factory);
-        break;
-      case 'customexport':
-        await this.fileCustomExport(sheet, dateFrom, dateTo, factory, fields);
-        break;
-      default:
-        console.log(`Unknown excel file module: ${module}`);
-        break;
-    }
+      switch (module.trim().toLowerCase()) {
+        case 'cat1andcat4':
+          await this.fileExcelCat1AndCat4(
+            sheet,
+            dateFrom,
+            dateTo,
+            factory,
+            usage,
+            unitWeight,
+            weight,
+            departure,
+          );
+          break;
+        case 'cat5':
+          await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
+          break;
+        case 'cat6':
+          await this.fileExcelCat6(sheet, dateFrom, dateTo, factory);
+          break;
+        case 'cat7':
+          await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
+          break;
+        case 'cat9andcat12':
+          await this.fileExcelCat9AndCat12(sheet, dateFrom, dateTo, factory);
+          break;
+        case 'customexport':
+          await this.fileCustomExport(sheet, dateFrom, dateTo, factory, fields);
+          break;
+        default:
+          throw new Error(`Unknown excel file module: ${module}`);
+      }
 
-    await workbook.xlsx
-      .writeFile(filePath)
-      .then(async () => {
-        setTimeout(async () => {
-          const statusDone = await this.fileExcelDone(id);
-          if (statusDone.length) {
-            return await this.eventsGateway.broadcastEvent(
-              'file-excel-done',
-              'Export file excel success!',
-            );
-          }
-        }, 60000);
-      })
-      .catch((error: any) => {
+      await workbook.xlsx.writeFile(filePath);
+
+      const statusDone = await this.fileExcelDone(id);
+      if (statusDone.length) {
         this.eventsGateway.broadcastEvent(
-          'file-excel-error',
-          'Error export file excel!',
+          'file-excel-done',
+          'Export file excel success!',
         );
-    });
+      }
+    } catch (error) {
+      await this.EIP.query(
+        `UPDATE CMW_File_Management SET [Status] = '2' WHERE ID = ?`,
+        { replacements: [id], type: QueryTypes.UPDATE },
+      );
+      this.eventsGateway.broadcastEvent(
+        'file-excel-error',
+        'Error export file excel!',
+      );
+    }
   }
 
   async fileExcelCat6(
@@ -608,7 +602,6 @@ export class FilemanagementService {
         Number_of_nights_stayed: this.getCat6AccommodationNights(
           expandedRow.Accommodation,
         ),
-        Number_of_People: expandedRow.Number_of_People,
       })),
     );
 
@@ -645,7 +638,6 @@ export class FilemanagementService {
         key: `Transport_${index + 1}`,
       })),
       { header: 'Number of nights stayed', key: 'Number_of_nights_stayed' },
-      { header: 'Number of people', key: 'Number_of_People' },
     ];
 
     transformed.forEach((item) => sheet.addRow(item));

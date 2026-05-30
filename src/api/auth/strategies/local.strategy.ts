@@ -17,20 +17,16 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
   async validate(req: Request): Promise<any> {
     const { userid, password, factory } = req.body;
 
-    let user;
+    let user: any;
 
-    if (
-      userid.trim().toLowerCase() === 'admin'.trim().toLowerCase() ||
-      userid.trim().toLowerCase() === 'esg'.trim().toLowerCase() ||
-      userid.trim().toLowerCase() === 'susan'.trim().toLowerCase() ||
-      userid.trim().toLowerCase() === 'ruby'.trim().toLowerCase()
-    ) {
+    const SPECIAL_ACCOUNTS = ['admin', 'esg', 'susan', 'ruby'];
+    if (SPECIAL_ACCOUNTS.includes(userid.trim().toLowerCase())) {
       user = await this.authService.validateUser(userid, password, factory);
     } else {
       let checkLock = await this.authService.checkLockErp(userid);
       if (!checkLock) {
         throw new UnauthorizedException(
-          'Account ERP is clocked! Please enter your other account!',
+          'Account ERP is locked! Please enter your other account!',
         );
       }
       const checkExist = await this.authService.checkExistUser(userid);

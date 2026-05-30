@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { EventsGateway } from '../events/events.gateway';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
@@ -76,7 +72,6 @@ type Cat6ActivePreviewRow = {
   End_Time: string;
   Business_Trip_Type: string;
   Number_of_nights_stayed: number;
-  Number_of_People: number;
   Factory_Code: string;
   [key: string]: string | number | undefined;
 };
@@ -184,7 +179,7 @@ export class PreviewpayloadService {
         { replacements: [id], type: QueryTypes.SELECT },
       );
       return result;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(error);
     }
   }
@@ -226,17 +221,12 @@ export class PreviewpayloadService {
     dockeyCMS: string,
   ) {
     const factory = item.FactoryCode ?? '';
-    // const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
     const matId = item.MatID ?? '';
     const docKey = matId.substring(0, 1);
     if (docKey.startsWith('W')) {
       return [];
     }
     const docDate = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
-    // const docDate2 = item.PurDate
-    //   ? dayjs(item.PurDate).format('YYYY/MM/DD')
-    //   : '';
-    // const docNo = item.PurNo ?? '';
     const custVenName = item.SupplierCode ?? '';
     const transportationMethod = item.TransportationMethod ?? '';
     const departure = item.Departure ?? '';
@@ -390,23 +380,23 @@ export class PreviewpayloadService {
     const createdDate = dayjs().format('YYYY-MM-DD HH:mm:ss');
 
     let dockey = '';
-    let transtType = '';
+    let transType = '';
     let portType = '';
 
     switch (transportMethod.trim().toLowerCase()) {
       case 'SEA'.trim().toLowerCase():
         dockey = '3.2.01';
-        transtType = '海運';
+        transType = '海運';
         portType = '海港';
         break;
       case 'AIR'.trim().toLowerCase():
         dockey = '3.2.02';
-        transtType = '空運';
+        transType = '空運';
         portType = '空港';
         break;
       case 'LAND'.trim().toLowerCase():
         dockey = '3.2.03';
-        transtType = '陸運';
+        transType = '陸運';
         portType = '';
         break;
       default:
@@ -416,43 +406,39 @@ export class PreviewpayloadService {
 
     return ACTIVITY_TYPES_CAT9.filter((item) => item === dockeyCMS).map(
       (activityType: ActivityTypeCat9) => ({
-        System: 'ERP', // DEFAULT
-        Corporation: 'LAI YIH', // DEFAULT
+        System: 'ERP',
+        Corporation: 'LAI YIH',
         Factory: factory,
-        Department: 'Shipping', // DEFAULT
-        // DocKey:
-        //   transportMethod.trim().toLowerCase() !== 'AIR'.trim().toLowerCase()
-        //     ? '3.2.01'
-        //     : '3.2.02', // DEFAULT
-        DocKey: activityType.trim() === '5.3'.trim() ? '5.3' : dockey, // DEFAULT
+        Department: 'Shipping',
+        DocKey: activityType.trim() === '5.3'.trim() ? '5.3' : dockey,
         SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
         EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType, // DEFAULT
-        DataType: activityType.trim() === '3.2' ? '1' : '999', // DEFAULT
-        DocType: 'Invoice', // DEFAULT 應收憑單
-        UndDoc: '銷貨單', // DEFAULT
-        DocFlow: '銷貨相關流程', // DEFAULT
+        ActivityType: activityType,
+        DataType: activityType.trim() === '3.2' ? '1' : '999',
+        DocType: 'Invoice',
+        UndDoc: '銷貨單',
+        DocFlow: '銷貨相關流程',
         DocDate: dayjs(date).format('YYYY/MM/DD'),
         DocDate2: dayjs(shipmentDate).format('YYYY/MM/DD'),
-        DocNo: bookingNo, // DEFAULT
-        UndDocNo: '', // DEFAULT
+        DocNo: bookingNo,
+        UndDocNo: '',
         CustVenName: customerID,
         InvoiceNo: invoiceNumber,
-        TransType: transtType,
+        TransType: transType,
         Departure: factoryAddress,
         Destination: portOfArrival,
         PortType: portType,
         StPort: portOfDeparture,
-        ThPort: '', // DEFAULT
+        ThPort: '',
         EndPort: portOfArrival,
-        Product: '', // DEFAULT
+        Product: '',
         Quity: quantity,
-        Amount: '', // DEFAULT
+        Amount: '',
         ActivityData: +Number(grossWeight).toFixed(2) || 0,
-        ActivityUnit: 'Kg', // DEFAULT 噸
-        Unit: '', // DEFAULT
-        UnitWeight: '', // DEFAULT
-        Memo: '', // DEFAULT
+        ActivityUnit: 'Kg',
+        Unit: '',
+        UnitWeight: '',
+        Memo: '',
         CreateDateTime: createdDate,
         Creator: '',
         ActivitySource: 'Incineration (not energy recovery)',
@@ -595,7 +581,6 @@ export class PreviewpayloadService {
           type: QueryTypes.SELECT,
           replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
         });
-        // console.log(result[0].PortCode);
         return {
           ...item,
           Transport_Method: item.Transport_Method,
@@ -635,7 +620,6 @@ export class PreviewpayloadService {
     const wasteTreatmentMethod = item.Waste_Treatment_method;
     const factoryName = item.Factory_Name;
     const wasteDisposalDate = item.Waste_disposal_date;
-    // const wasteCode = item.Waste_Code;
     let dockey = '';
 
     switch (wasteTreatmentMethod.trim().toLowerCase()) {
@@ -665,8 +649,7 @@ export class PreviewpayloadService {
         Corporation: 'LAI YIH', //default
         Factory: factoryName,
         Department: '',
-        // DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
-        DocKey: activityType.trim() === '3.6' ? '3.6' : dockey, //default
+        DocKey: activityType.trim() === '3.6' ? '3.6' : dockey,
         SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
         EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
         ActivityType: activityType, //default
@@ -758,11 +741,6 @@ export class PreviewpayloadService {
     const FactoryName = item.Factory_Name ?? '';
     const DepartmentName = item.Department_Name ?? '';
 
-    // if (DepartmentName.length > 20) {
-    //   return [];
-    // }
-
-    // console.log(DepartmentName.length);
     let dockey = '';
     let transType = '';
 
@@ -809,26 +787,6 @@ export class PreviewpayloadService {
 
     return ACTIVITY_TYPES_CAT7.filter((item) => item === dockeyCMS).map(
       (activityType: ActivityTypeCat7) => ({
-        // System: 'CMS Web', // Default
-        // Corporation: 'LAI YIH', // Default
-        // Factory: FactoryName,
-        // Department: DepartmentName,
-        // DocKey: staffId,
-        // SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        // EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        // ActivityType: activityType, // Default
-        // DataType: '2', // Default
-        // DocType: '員工通勤', // Default
-        // DocDate: dayjs().format('YYYY/MM/DD'),
-        // DocDate2: dayjs().format('YYYY/MM/DD'),
-        // UndDocNo: staffId,
-        // TransType: Main_transportation_type,
-        // Departure: Factory_address ? Factory_address : '',
-        // Destination: Residential_address ? Residential_address : '',
-        // Attendance: Number_of_working_days.toString(),
-        // Memo: '',
-        // CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        // Creator: '',
         System: 'CMS Web',
         Corporation: 'LAI YIH',
         Factory: FactoryName,
@@ -995,10 +953,6 @@ export class PreviewpayloadService {
     }, 0);
   }
 
-  private getCat6NumberOfPeople(assistedIdsValue: unknown) {
-    return getCat6AssistedIds(assistedIdsValue).length;
-  }
-
   private expandCat6PreviewRowsByAssistedIds(
     row: Record<string, any>,
   ): Record<string, any>[] {
@@ -1010,7 +964,6 @@ export class PreviewpayloadService {
           ...row,
           DOC_NBR: row.DOC_NBR ?? '',
           EffectiveStaffID: row.UserCreate ?? '',
-          Number_of_People: 0,
         },
       ];
     }
@@ -1021,7 +974,6 @@ export class PreviewpayloadService {
           ...row,
           DOC_NBR: row.DOC_NBR ?? '',
           EffectiveStaffID: assistedIds[0],
-          Number_of_People: 1,
         },
       ];
     }
@@ -1030,7 +982,6 @@ export class PreviewpayloadService {
       ...row,
       DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
       EffectiveStaffID: assistedId,
-      Number_of_People: 1,
     }));
   }
 
@@ -1050,7 +1001,6 @@ export class PreviewpayloadService {
       Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory) ?? '',
       ...this.formatCat6PlacesAndTransports(row.Routes),
       Number_of_nights_stayed: this.getCat6AccommodationNights(row.Accommodation),
-      Number_of_People: Number(row.Number_of_People ?? 0),
       Factory_Code: String(row.Factory_User ?? '').trim().toUpperCase(),
     };
   }
@@ -1347,7 +1297,7 @@ export class PreviewpayloadService {
       userID,
     );
 
-    await this.createFileExcel(
+    this.createFileExcel(
       id,
       moduleName,
       filePath,
@@ -1369,63 +1319,58 @@ export class PreviewpayloadService {
     factory: string,
     dockeyCMS: string,
   ) {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet(module);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet(module);
 
-    switch (module.trim().toLowerCase()) {
-      case 'cat1andcat4':
-        await this.exportExcelCat1And4(
-          sheet,
-          dateFrom,
-          dateTo,
-          factory,
-          dockeyCMS,
-        );
-        break;
-      case 'cat5':
-        await this.exportExcelCat5(sheet, dateFrom, dateTo, factory, dockeyCMS);
-        break;
-      case 'cat6':
-        await this.exportExcelCat6(sheet, dateFrom, dateTo, factory, dockeyCMS);
-        break;
-      case 'cat7':
-        await this.exportExcelCat7(sheet, dateFrom, dateTo, factory, dockeyCMS);
-        break;
-      case 'cat9andcat12':
-        await this.exportExcelCat9And12(
-          sheet,
-          dateFrom,
-          dateTo,
-          factory,
-          dockeyCMS,
-        );
-        break;
-      default:
-        throw new InternalServerErrorException(
-          `Module "${module}" không hợp lệ`,
-        );
-    }
+      switch (module.trim().toLowerCase()) {
+        case 'cat1andcat4':
+          await this.exportExcelCat1And4(
+            sheet,
+            dateFrom,
+            dateTo,
+            factory,
+            dockeyCMS,
+          );
+          break;
+        case 'cat5':
+          await this.exportExcelCat5(sheet, dateFrom, dateTo, factory, dockeyCMS);
+          break;
+        case 'cat6':
+          await this.exportExcelCat6(sheet, dateFrom, dateTo, factory, dockeyCMS);
+          break;
+        case 'cat7':
+          await this.exportExcelCat7(sheet, dateFrom, dateTo, factory, dockeyCMS);
+          break;
+        case 'cat9andcat12':
+          await this.exportExcelCat9And12(
+            sheet,
+            dateFrom,
+            dateTo,
+            factory,
+            dockeyCMS,
+          );
+          break;
+        default:
+          throw new Error(`Module "${module}" không hợp lệ`);
+      }
 
-    await workbook.xlsx
-      .writeFile(filePath)
-      .then(async () => {
-        setTimeout(async () => {
-          const statusDone = await this.updateFileSuccess(id);
-          if (statusDone.length) {
-            this.eventsGateway.broadcastEvent(
-              'file-excel-done',
-              'Export file excel success!',
-            );
-          }
-        }, 60000);
-      })
-      .catch(async (error: any) => {
-        await this.updateFileError(id);
+      await workbook.xlsx.writeFile(filePath);
+
+      const statusDone = await this.updateFileSuccess(id);
+      if (statusDone.length) {
         this.eventsGateway.broadcastEvent(
-          'file-excel-error',
-          'Error export file excel!',
+          'file-excel-done',
+          'Export file excel success!',
         );
-      });
+      }
+    } catch (error) {
+      await this.updateFileError(id);
+      this.eventsGateway.broadcastEvent(
+        'file-excel-error',
+        'Error export file excel!',
+      );
+    }
   }
 
   async exportExcelCat1And4(

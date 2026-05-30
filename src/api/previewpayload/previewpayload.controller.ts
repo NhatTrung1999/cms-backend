@@ -28,7 +28,7 @@ export class PreviewpayloadController {
     if (!res) return { statusCode: 401, message: 'Error export!' };
     return {
       statusCode: 200,
-      message: 'Export success. Please wait for 5 minutes!',
+      message: 'Export success!',
     };
   }
 }
