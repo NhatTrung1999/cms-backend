@@ -12,6 +12,7 @@ export class PreviewpayloadController {
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,
+    @Query('ry') ry: string,
     @Query('dockeyCMS') dockeyCMS: string,
     @Request() req,
   ) {
@@ -21,6 +22,7 @@ export class PreviewpayloadController {
       dateFrom,
       dateTo,
       factory,
+      ry,
       userId,
       dockeyCMS,
     );

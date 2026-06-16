@@ -148,7 +148,8 @@ export class HrService {
     fullName: string,
     id: string,
     department: string,
-    joinDate: string,
+    joinDateFrom: string,
+    joinDateTo: string,
     factory: string,
     page: number = 1,
     limit: number = 20,
@@ -170,7 +171,8 @@ export class HrService {
       fullName,
       id,
       department,
-      joinDate,
+      joinDateFrom,
+      joinDateTo,
       normalizedFactory,
     );
 
@@ -179,7 +181,9 @@ export class HrService {
     if (fullName) replacements.push(`%${fullName}%`);
     if (id) replacements.push(`%${id}%`);
     if (department) replacements.push(isLYM ? department : `%${department}%`);
-    if (joinDate) replacements.push(joinDate);
+    if (joinDateFrom && joinDateTo) {
+      replacements.push(joinDateFrom, joinDateTo);
+    }
 
     const safeSortField = this.sortFieldMapHRModule[sortField] ?? 'a.userId';
     const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
@@ -274,7 +278,7 @@ export class HrService {
 
       const results = await db.query(query, { type: QueryTypes.SELECT });
       return results;
-    } catch (error) {
+    } catch (error: any) {
       throw new InternalServerErrorException(error?.message);
     }
   }
@@ -341,7 +345,7 @@ export class HrService {
         throw new NotFoundException('User not found or ID is incorrect');
       }
       return results[0];
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof NotFoundException) {
         throw error;
       }
@@ -503,7 +507,7 @@ export class HrService {
         updatedData: updatedRecords,
         skippedData: skippedRecords, // ✅ trả về danh sách bị skip để kiểm tra
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new InternalServerErrorException(`${error.message}`);
     }
   }
@@ -514,7 +518,8 @@ export class HrService {
   //   fullName: string,
   //   id: string,
   //   department: string,
-  //   joinDate: string,
+  //   joinDateFrom: string,
+  //   joinDateTo: string,
   //   factory: string,
   // ) {
   //   let db: Sequelize;
@@ -546,7 +551,8 @@ export class HrService {
   //     fullName,
   //     id,
   //     department,
-  //     joinDate,
+  //     joinDateFrom,
+  //     joinDateTo,
   //     factory,
   //   );
   //   const replacements: any = [];
@@ -566,7 +572,7 @@ export class HrService {
   //     replacements.push(`%${department}%`);
   //   }
 
-  //   if (joinDate) {
+  //   if (joinDateFrom && joinDateTo) {
   //     replacements.push(joinDate);
   //   }
 
@@ -638,7 +644,8 @@ export class HrService {
     fullName: string,
     id: string,
     department: string,
-    joinDate: string,
+    joinDateFrom: string,
+    joinDateTo: string,
     factory: string,
   ) {
     const normalizedFactory = factory.trim().toUpperCase();
@@ -655,7 +662,8 @@ export class HrService {
       fullName,
       id,
       department,
-      joinDate,
+      joinDateFrom,
+      joinDateTo,
       normalizedFactory,
     );
 
@@ -664,7 +672,9 @@ export class HrService {
     if (fullName) replacements.push(`%${fullName}%`);
     if (id) replacements.push(`%${id}%`);
     if (department) replacements.push(isLYM ? department : `%${department}%`);
-    if (joinDate) replacements.push(joinDate);
+    if (joinDateFrom && joinDateTo) {
+      replacements.push(joinDateFrom, joinDateTo);
+    }
     replacements.push(0, 999999);
 
     const data = await db.query(query, {

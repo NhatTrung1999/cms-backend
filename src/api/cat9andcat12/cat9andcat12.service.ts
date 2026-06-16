@@ -37,6 +37,7 @@ export class Cat9andcat12Service {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    ry: string,
     page: number = 1,
     limit: number = 20,
     sortField: string = 'No',
@@ -70,6 +71,7 @@ export class Cat9andcat12Service {
           dateFrom,
           dateTo,
           factory,
+          ry,
           page,
           limit,
           sortField,
@@ -82,6 +84,7 @@ export class Cat9andcat12Service {
       dateFrom,
       dateTo,
       factory,
+      ry,
       page,
       limit,
       sortField,
@@ -108,6 +111,7 @@ export class Cat9andcat12Service {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    ry: string,
     page: number,
     limit: number,
     sortField: string,
@@ -126,10 +130,34 @@ export class Cat9andcat12Service {
         replacements.push(dateFrom, dateTo, dateFrom, dateTo);
       }
 
+      if (ry === 'Product') {
+        where += ` AND CHARINDEX('-', id.RYNO) > 0`;
+        where1 += ` AND CHARINDEX('-', id.RYNO) > 0`;
+      } else if (ry === 'Component') {
+        where += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
+        where1 += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
+      }
+
       const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
                           ,*
                     FROM   (
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,sb.Booking_No AS Booking_No
                                     ,im.INV_NO               AS Invoice_Number
@@ -190,6 +218,22 @@ export class Cat9andcat12Service {
                                                 )
                               UNION
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,sb.Booking_No AS Booking_No
                                     ,is1.Inv_No              AS Invoice_Number
@@ -222,6 +266,22 @@ export class Cat9andcat12Service {
                           ,*
                     FROM   (
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,im.INV_NO               AS Invoice_Number
                                     ,id.STYLE_NAME           AS Article_Name
@@ -284,6 +344,22 @@ export class Cat9andcat12Service {
                                                 )
                               UNION
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,is1.Inv_No              AS Invoice_Number
                                     ,'SAMPLE SHOE'           AS Article_Name
@@ -470,6 +546,7 @@ export class Cat9andcat12Service {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    ry: string,
     page: number,
     limit: number,
     sortField: string,
@@ -484,6 +561,22 @@ export class Cat9andcat12Service {
                           ,'${factoryName}' AS Factory_Name
                     FROM   (
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,sb.Booking_No AS Booking_No
                                     ,im.INV_NO               AS Invoice_Number
@@ -544,6 +637,22 @@ export class Cat9andcat12Service {
                                                 )
                               UNION
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,sb.Booking_No AS Booking_No
                                     ,is1.Inv_No              AS Invoice_Number
@@ -576,6 +685,22 @@ export class Cat9andcat12Service {
                           ,'${factoryName}' AS Factory_Name
                     FROM   (
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,im.INV_NO               AS Invoice_Number
                                     ,id.STYLE_NAME           AS Article_Name
@@ -638,6 +763,22 @@ export class Cat9andcat12Service {
                                                 )
                               UNION
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,is1.Inv_No              AS Invoice_Number
                                     ,'SAMPLE SHOE'           AS Article_Name
@@ -672,6 +813,14 @@ export class Cat9andcat12Service {
       where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
       where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo, dateFrom, dateTo);
+    }
+
+    if (ry === 'Product') {
+      where += ` AND CHARINDEX('-', id.RYNO) > 0`;
+      where1 += ` AND CHARINDEX('-', id.RYNO) > 0`;
+    } else if (ry === 'Component') {
+      where += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
+      where1 += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
     }
     const connects = [
       { conn: this.LYV_ERP, factoryName: 'LYV' },
@@ -1006,17 +1155,19 @@ export class Cat9andcat12Service {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    ry: string,
     dockeyCMS: string,
   ) {
     try {
       if (factory.trim().toUpperCase() === 'ALL') {
-        return this.autoSentCMSAllFactories(dateFrom, dateTo, dockeyCMS);
+        return this.autoSentCMSAllFactories(dateFrom, dateTo, ry, dockeyCMS);
       }
 
       return this.getCMSByFactory(
         factory as FactoryCode,
         dateFrom,
         dateTo,
+        ry,
         dockeyCMS,
       );
     } catch (error: any) {
@@ -1027,11 +1178,12 @@ export class Cat9andcat12Service {
   private async autoSentCMSAllFactories(
     dateFrom: string,
     dateTo: string,
+    ry: string,
     dockeyCMS: string,
   ) {
     const results = await Promise.all(
       FACTORY_LIST.map((factory) =>
-        this.getCMSByFactory(factory, dateFrom, dateTo, dockeyCMS),
+        this.getCMSByFactory(factory, dateFrom, dateTo, ry, dockeyCMS),
       ),
     );
 
@@ -1042,6 +1194,7 @@ export class Cat9andcat12Service {
     factory: FactoryCode,
     dateFrom: string,
     dateTo: string,
+    ry: string,
     dockeyCMS: string,
   ) {
     const db = this.getDbByFactory(factory);
@@ -1051,6 +1204,7 @@ export class Cat9andcat12Service {
       dateFrom,
       dateTo,
       factory,
+      ry,
       this.EIP,
     );
 
@@ -1182,7 +1336,7 @@ export class Cat9andcat12Service {
         };
       }),
     );
-    
+
     return data.flatMap((item) =>
       this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
     );

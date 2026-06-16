@@ -63,7 +63,7 @@ type Cat6AccommodationItem = {
 };
 
 type Cat6ActivePreviewRow = {
-  Document_Date: string;
+  Application_Day: string;
   Document_Number: string;
   Staff_ID: string;
   Dept: string;
@@ -450,6 +450,7 @@ export class PreviewpayloadService {
     factory: FactoryCode,
     dateFrom: string,
     dateTo: string,
+    ry: string,
     dockeyCMS: string,
   ) {
     const db = this.getDbByFactory(factory);
@@ -459,6 +460,7 @@ export class PreviewpayloadService {
       dateFrom,
       dateTo,
       factory,
+      ry,
       this.EIP,
     );
 
@@ -898,7 +900,10 @@ export class PreviewpayloadService {
         let flightEnd = route.To?.trim() ?? '';
         let cursor = index;
 
-        while (cursor + 1 < routes.length && isFlightRoute(routes[cursor + 1])) {
+        while (
+          cursor + 1 < routes.length &&
+          isFlightRoute(routes[cursor + 1])
+        ) {
           cursor += 1;
           flightEnd = routes[cursor].To?.trim() ?? flightEnd;
         }
@@ -910,7 +915,12 @@ export class PreviewpayloadService {
         continue;
       }
 
-      if (!transport && places.length === 0 && nextRoute && isFlightRoute(nextRoute)) {
+      if (
+        !transport &&
+        places.length === 0 &&
+        nextRoute &&
+        isFlightRoute(nextRoute)
+      ) {
         pushPlace(nextRoute.From);
         index += 1;
         continue;
@@ -989,19 +999,25 @@ export class PreviewpayloadService {
     row: Record<string, any>,
   ): Cat6ActivePreviewRow {
     return {
-      Document_Date: row.CreatedAt
+      Application_Day: row.CreatedAt
         ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
         : '',
       Document_Number: row.DOC_NBR ?? '',
       Staff_ID: row.EffectiveStaffID ?? '',
       Dept: row.Dept ?? row.Department ?? '',
       Round_trip_One_way: this.formatCat6TripType(row.TypeTravel) ?? '',
-      Start_Time: row.DateStart ? dayjs(row.DateStart).format('YYYY-MM-DD') : '',
+      Start_Time: row.DateStart
+        ? dayjs(row.DateStart).format('YYYY-MM-DD')
+        : '',
       End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
       Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory) ?? '',
       ...this.formatCat6PlacesAndTransports(row.Routes),
-      Number_of_nights_stayed: this.getCat6AccommodationNights(row.Accommodation),
-      Factory_Code: String(row.Factory_User ?? '').trim().toUpperCase(),
+      Number_of_nights_stayed: this.getCat6AccommodationNights(
+        row.Accommodation,
+      ),
+      Factory_Code: String(row.Factory_User ?? '')
+        .trim()
+        .toUpperCase(),
     };
   }
 
@@ -1110,8 +1126,8 @@ export class PreviewpayloadService {
       ActivityType: '3.5',
       DataType: '2',
       DocType: '洽公單',
-      DocDate: row.Document_Date
-        ? dayjs(row.Document_Date).format('YYYY/MM/DD')
+      DocDate: row.Application_Day
+        ? dayjs(row.Application_Day).format('YYYY/MM/DD')
         : '',
       DocDate2: row.Start_Time
         ? dayjs(row.Start_Time).format('YYYY/MM/DD')
@@ -1134,8 +1150,7 @@ export class PreviewpayloadService {
     factory: string,
     dockeyCMS: string,
   ) {
-    let where = `WHERE  chb.BPMStatus = 'F'
-                        AND ISNULL(chb.Factory_User ,'')<>''`;
+    let where = '';
     const replacements: any[] = [];
 
     if (dateFrom && dateTo) {
@@ -1144,95 +1159,173 @@ export class PreviewpayloadService {
     }
 
     if (factory && factory.trim().toUpperCase() !== 'ALL') {
-      where += ` AND chb.Factory_User LIKE ?`;
+      where += ` AND chb.DOC_NBR LIKE ?`;
       replacements.push(`%${factory}%`);
     }
+    const finalReplacements = [...replacements, ...replacements];
 
     const query = `
-      SELECT chb.*
-                          --,twt.Current_doc
-                          ,COALESCE(
-                              vwd.GROUP_NAME
-                              ,(
-                                  SELECT TOP 1 vwd2.GROUP_NAME
-                                  FROM   TB_EB_USER teu2
-                                          OUTER APPLY (
-                                      SELECT teed2.GROUP_ID
-                                      FROM   TB_EB_EMPL_DEP AS teed2
-                                      WHERE  teed2.USER_GUID = teu2.USER_GUID
-                                              AND teed2.ORDERS = 0
-                                  ) teed2
-                                  LEFT JOIN vwDepartment_Factory vwd2
-                                              ON  vwd2.GROUP_ID = teed2.GROUP_ID
-                                  WHERE  teu2.ACCOUNT = chb.Factory_User+chb.UserCreate
-                                          AND vwd2.GROUP_NAME IS NOT NULL
-                              )
-                              ,(
-                                  SELECT TOP 1 vwd3.GROUP_NAME
-                                  FROM   TB_EB_USER teu3
-                                          OUTER APPLY (
-                                      SELECT teed3.GROUP_ID
-                                      FROM   TB_EB_EMPL_DEP AS teed3
-                                      WHERE  teed3.USER_GUID = teu3.USER_GUID
-                                              AND teed3.ORDERS = 0
-                                  ) teed3
-                                  LEFT JOIN vwDepartment_Factory vwd3
-                                              ON  vwd3.GROUP_ID = teed3.GROUP_ID
-                                  WHERE  teu3.ACCOUNT = chb.Departure+chb.UserCreate
-                                          AND vwd3.GROUP_NAME IS NOT NULL
-                              )
-                              ,(
-                                  SELECT TOP 1 vwd4.GROUP_NAME
-                                  FROM   CDS_FMEval_Employee cfe
-                                          JOIN TB_EB_USER teu4
-                                              ON  teu4.ACCOUNT = cfe.BPMAccount
-                                          OUTER APPLY (
-                                      SELECT teed4.GROUP_ID
-                                      FROM   TB_EB_EMPL_DEP AS teed4
-                                      WHERE  teed4.USER_GUID = teu4.USER_GUID
-                                              AND teed4.ORDERS = 0
-                                  ) teed4
-                                  LEFT JOIN vwDepartment_Factory vwd4
-                                              ON  vwd4.GROUP_ID = teed4.GROUP_ID
-                                  WHERE  cfe.EmpID = chb.UserCreate
-                                          AND vwd4.GROUP_NAME IS NOT NULL
-                              )
-                          )                         AS Dept
-                          ,COUNT(chb.TripID) OVER()  AS TotalRow
-                    FROM   CDS_HRBUSS_BusTripData    AS chb
-                          LEFT JOIN TB_EB_USER      AS teu
-                                ON  (
-                                        teu.ACCOUNT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
-                                        AND teu.ACCOUNT LIKE '%'+chb.UserCreate+'%'
-                                    )
-                                    OR (
-                                        teu.ACCOUNT NOT LIKE chb.Factory_User+'[0-9][0-9][0-9][0-9][0-9]'
-                                        AND teu.ACCOUNT=chb.UserCreate
-                                    )
-                          OUTER APPLY (
-                        SELECT teed2.GROUP_ID
-                        FROM   TB_EB_EMPL_DEP AS teed2
-                        WHERE  teed2.USER_GUID = teu.USER_GUID
-                              AND teed2.ORDERS = 0
-                    )                                AS teed
-                    LEFT JOIN vwDepartment_Factory   AS vwd
-                                ON  vwd.GROUP_ID = teed.GROUP_ID
-                          LEFT JOIN tb_wkf_task     AS twt
-                                ON  twt.DOC_NBR = chb.DOC_NBR
-                                    AND (
-                                            twt.DOC_NBR LIKE 'LYV-HR-BT%'
-                                            OR twt.DOC_NBR LIKE 'LHG-SUGG%'
-                                            OR twt.DOC_NBR LIKE 'LVL-HR-BTF%'
-                                            OR twt.DOC_NBR LIKE 'LVL-ODBT%'
-                                            OR twt.DOC_NBR LIKE 'LYM-HR-BT%'
-                                        )
-      ${where}
-      ORDER BY CreatedAt ASC
+      WITH Travelers AS (
+            SELECT chb.*
+                  ,chb.UserCreate          AS TravelerID
+                  ,0                       AS TravelerOrder
+            FROM   CDS_HRBUSS_BusTripData     chb
+            WHERE  chb.BPMStatus = 'F'
+                    AND (
+                            chb.AssisstedIDs IS NULL
+                            OR LTRIM(RTRIM(chb.AssisstedIDs))=''
+                        )
+                    ${where}
+            UNION
+            ALL
+            SELECT chb.*
+                  ,LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)'))) AS TravelerID
+                  ,ROW_NUMBER() OVER(
+                        PARTITION BY chb.TripID
+                        ORDER BY(
+                            SELECT NULL
+                        )
+                    )  AS TravelerOrder
+            FROM   CDS_HRBUSS_BusTripData chb
+                    CROSS APPLY (
+                SELECT CAST(
+                            '<x>'
+                          +REPLACE(REPLACE(chb.AssisstedIDs ,',' ,'$') ,'$' ,'</x><x>')
+                          +'</x>' AS XML
+                        ) AS DATA
+            )         AS s
+            CROSS APPLY s.data.nodes('/x') AS t(v)
+            WHERE  chb.BPMStatus = 'F'
+                    AND chb.AssisstedIDs IS NOT NULL
+                    AND LTRIM(RTRIM(chb.AssisstedIDs))<>''
+                    AND LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)')))<>''
+                    ${where}
+        )
+
+          SELECT tr.*
+                ,COALESCE(
+                    vwd.GROUP_NAME
+                    ,(
+                        SELECT TOP 1 vwd2.GROUP_NAME
+                        FROM   TB_EB_USER teu2
+                                OUTER APPLY (
+                            SELECT teed2.GROUP_ID
+                            FROM   TB_EB_EMPL_DEP AS teed2
+                            WHERE  teed2.USER_GUID = teu2.USER_GUID
+                                    AND teed2.ORDERS = 0
+                        ) teed2
+                        LEFT JOIN vwDepartment_Factory vwd2
+                                    ON  vwd2.GROUP_ID = teed2.GROUP_ID
+                        WHERE  teu2.ACCOUNT = ISNULL(tr.Factory_User ,'')+tr.TravelerID
+                                AND vwd2.GROUP_NAME IS NOT NULL
+                    )
+                    ,(
+                        SELECT TOP 1 vwd3.GROUP_NAME
+                        FROM   TB_EB_USER teu3
+                                OUTER APPLY (
+                            SELECT teed3.GROUP_ID
+                            FROM   TB_EB_EMPL_DEP AS teed3
+                            WHERE  teed3.USER_GUID = teu3.USER_GUID
+                                    AND teed3.ORDERS = 0
+                        ) teed3
+                        LEFT JOIN vwDepartment_Factory vwd3
+                                    ON  vwd3.GROUP_ID = teed3.GROUP_ID
+                        WHERE  teu3.ACCOUNT = ISNULL(tr.Departure ,'')+tr.TravelerID
+                                AND vwd3.GROUP_NAME IS NOT NULL
+                    )
+                    ,(
+                        SELECT TOP 1 vwd4.GROUP_NAME
+                        FROM   CDS_FMEval_Employee cfe
+                                JOIN TB_EB_USER teu4
+                                    ON  teu4.ACCOUNT = cfe.BPMAccount
+                                OUTER APPLY (
+                            SELECT teed4.GROUP_ID
+                            FROM   TB_EB_EMPL_DEP AS teed4
+                            WHERE  teed4.USER_GUID = teu4.USER_GUID
+                                    AND teed4.ORDERS = 0
+                        ) teed4
+                        LEFT JOIN vwDepartment_Factory vwd4
+                                    ON  vwd4.GROUP_ID = teed4.GROUP_ID
+                        WHERE  cfe.EmpID = tr.TravelerID
+                                AND vwd4.GROUP_NAME IS NOT NULL
+                    )
+                    ,(
+                        SELECT TOP 1 vwd5.GROUP_NAME
+                        FROM   TB_EB_USER teu5
+                                OUTER APPLY (
+                            SELECT teed5.GROUP_ID
+                            FROM   TB_EB_EMPL_DEP AS teed5
+                            WHERE  teed5.USER_GUID = teu5.USER_GUID
+                                    AND teed5.ORDERS = 0
+                        ) teed5
+                        LEFT JOIN vwDepartment_Factory vwd5
+                                    ON  vwd5.GROUP_ID = teed5.GROUP_ID
+                        WHERE  teu5.ACCOUNT = tr.TravelerID
+                                AND vwd5.GROUP_NAME IS NOT NULL
+                    )
+                    ,(
+                        SELECT TOP 1 vwd6.GROUP_NAME
+                        FROM   TB_EB_USER teu6
+                                JOIN TB_EB_EMPL_DEP teed6
+                                    ON  teed6.USER_GUID = teu6.USER_GUID
+                                LEFT JOIN vwDepartment_Factory vwd6
+                                    ON  vwd6.GROUP_ID = teed6.GROUP_ID
+                        WHERE  teu6.ACCOUNT = tr.TravelerID
+                                AND vwd6.GROUP_NAME IS NOT NULL
+                        ORDER BY
+                                teed6.ORDERS
+                    )
+                    ,(
+                        SELECT TOP 1 vwd7.GROUP_NAME
+                        FROM   TB_EB_USER teu7
+                                JOIN TB_EB_EMPL_DEP teed7
+                                    ON  teed7.USER_GUID = teu7.USER_GUID
+                                LEFT JOIN vwDepartment_Factory vwd7
+                                    ON  vwd7.GROUP_ID = teed7.GROUP_ID
+                        WHERE  teu7.ACCOUNT LIKE '%'+tr.TravelerID
+                                AND vwd7.GROUP_NAME IS NOT NULL
+                        ORDER BY
+                                teed7.ORDERS
+                    )
+                    ,tr.TravelerID
+                )                        AS Dept
+                ,COUNT(*) OVER()          AS TotalRow
+          FROM   Travelers tr
+                OUTER APPLY (
+              SELECT TOP 1 teu.USER_GUID
+              FROM   TB_EB_USER teu
+              WHERE  (
+                        tr.Factory_User IS NOT NULL
+                        AND teu.ACCOUNT=tr.Factory_User+tr.TravelerID
+                    )
+                    OR (tr.Factory_User IS NULL AND teu.ACCOUNT=tr.TravelerID)
+          )                               AS teu
+
+          OUTER APPLY (
+              SELECT teed.GROUP_ID
+              FROM   TB_EB_EMPL_DEP AS teed
+              WHERE  teed.USER_GUID = teu.USER_GUID
+                    AND teed.ORDERS = 0
+          )                               AS teed
+
+          LEFT JOIN vwDepartment_Factory  AS vwd
+                      ON  vwd.GROUP_ID = teed.GROUP_ID
+          WHERE  tr.DOC_NBR LIKE 'LYV-HR-BT%'
+                OR tr.DOC_NBR LIKE 'LHG-SUGG%'
+                OR tr.DOC_NBR LIKE 'LVL-HR-BTF%'
+                OR tr.DOC_NBR LIKE 'LVL-ODBT%'
+                OR tr.DOC_NBR LIKE 'LYM-HR-BT%'
+                OR tr.DOC_NBR LIKE 'JZS-SUGG%'
+                OR tr.DOC_NBR LIKE 'JAZ_BizTrip%'
+          ORDER BY
+                tr.CreatedAt ASC
+                ,tr.DOC_NBR
+                ,tr.TravelerOrder;
     `;
 
     const rawRows = (await this.UOF.query(query, {
       type: QueryTypes.SELECT,
-      replacements,
+      replacements: finalReplacements,
     })) as Record<string, any>[];
 
     const transformedRows = rawRows.flatMap((row) =>
@@ -1278,6 +1371,7 @@ export class PreviewpayloadService {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    ry: string,
     userID: string,
     dockeyCMS: string,
   ) {
@@ -1304,6 +1398,7 @@ export class PreviewpayloadService {
       dateFrom,
       dateTo,
       factory,
+      ry,
       dockeyCMS,
     );
 
@@ -1317,6 +1412,7 @@ export class PreviewpayloadService {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    ry: string,
     dockeyCMS: string,
   ) {
     try {
@@ -1334,13 +1430,31 @@ export class PreviewpayloadService {
           );
           break;
         case 'cat5':
-          await this.exportExcelCat5(sheet, dateFrom, dateTo, factory, dockeyCMS);
+          await this.exportExcelCat5(
+            sheet,
+            dateFrom,
+            dateTo,
+            factory,
+            dockeyCMS,
+          );
           break;
         case 'cat6':
-          await this.exportExcelCat6(sheet, dateFrom, dateTo, factory, dockeyCMS);
+          await this.exportExcelCat6(
+            sheet,
+            dateFrom,
+            dateTo,
+            factory,
+            dockeyCMS,
+          );
           break;
         case 'cat7':
-          await this.exportExcelCat7(sheet, dateFrom, dateTo, factory, dockeyCMS);
+          await this.exportExcelCat7(
+            sheet,
+            dateFrom,
+            dateTo,
+            factory,
+            dockeyCMS,
+          );
           break;
         case 'cat9andcat12':
           await this.exportExcelCat9And12(
@@ -1348,6 +1462,7 @@ export class PreviewpayloadService {
             dateFrom,
             dateTo,
             factory,
+            ry,
             dockeyCMS,
           );
           break;
@@ -1526,11 +1641,18 @@ export class PreviewpayloadService {
     let data: any[];
     if (factory.trim().toUpperCase() === 'ALL') {
       const results = await Promise.all(
-        FACTORY_LIST.map((f) => this.getCMSByFactoryCat7(f, dateFrom, dateTo, dockeyCMS)),
+        FACTORY_LIST.map((f) =>
+          this.getCMSByFactoryCat7(f, dateFrom, dateTo, dockeyCMS),
+        ),
       );
       data = results.flat();
     } else {
-      data = await this.getCMSByFactoryCat7(factory, dateFrom, dateTo, dockeyCMS);
+      data = await this.getCMSByFactoryCat7(
+        factory,
+        dateFrom,
+        dateTo,
+        dockeyCMS,
+      );
     }
 
     sheet.columns = [
@@ -1568,13 +1690,14 @@ export class PreviewpayloadService {
     dateFrom: string,
     dateTo: string,
     factory: string,
+    ry: string,
     dockeyCMS: string,
   ) {
     let data: any[];
     if (factory.trim().toUpperCase() === 'ALL') {
       const results = await Promise.all(
         FACTORY_LIST.map((f) =>
-          this.getCMSByFactoryCat9(f, dateFrom, dateTo, dockeyCMS),
+          this.getCMSByFactoryCat9(f, dateFrom, dateTo, ry, dockeyCMS),
         ),
       );
       data = results.flat();
@@ -1583,6 +1706,7 @@ export class PreviewpayloadService {
         factory as FactoryCode,
         dateFrom,
         dateTo,
+        ry,
         dockeyCMS,
       );
     }

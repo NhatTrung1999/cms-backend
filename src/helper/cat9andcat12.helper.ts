@@ -9,6 +9,7 @@ export const getADataExcelFactoryCat9AndCat12 = async (
   dateFrom: string,
   dateTo: string,
   factory: string,
+  ry: string,
   dbEIP?: Sequelize,
 ) => {
   let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
@@ -21,10 +22,34 @@ export const getADataExcelFactoryCat9AndCat12 = async (
     replacements.push(dateFrom, dateTo, dateFrom, dateTo);
   }
 
+  if (ry === 'Product') {
+    where += ` AND CHARINDEX('-', id.RYNO) > 0`;
+    where1 += ` AND CHARINDEX('-', id.RYNO) > 0`;
+  } else if (ry === 'Component') {
+    where += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
+    where1 += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
+  }
+
   const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
                           ,*
                     FROM   (
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,im.INV_NO               AS Invoice_Number
                                     ,id.STYLE_NAME           AS Article_Name
@@ -84,6 +109,22 @@ export const getADataExcelFactoryCat9AndCat12 = async (
                                                 )
                               UNION
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE 
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,is1.Inv_No              AS Invoice_Number
                                     ,'SAMPLE SHOE'           AS Article_Name
@@ -214,7 +255,6 @@ export const getADataExcelFactoryCat9AndCat12 = async (
               portOfDeparture = 'SGN';
             }
             break;
-            break;
         }
       }
       const queryPoA = `SELECT PortCode
@@ -241,6 +281,18 @@ export const getADataExcelFactoryCat9AndCat12 = async (
     {
       header: 'Date',
       key: 'Date',
+    },
+    {
+      header: 'RY Product',
+      key: 'RYProduct',
+    },
+    {
+      header: 'RY Component',
+      key: 'RYComponent',
+    },
+    {
+      header: 'Component Name',
+      key: 'ComponentName',
     },
     {
       header: 'Shipment Date',
@@ -340,6 +392,7 @@ export const buildQueryAutoSentCMS = async (
   dateFrom: string,
   dateTo: string,
   factory: string,
+  ry: string,
   db?: Sequelize,
 ) => {
   const queryAddress = `SELECT ${factory?.trim().toLowerCase() === 'lym'.trim().toLowerCase() ? `N'TSANG YIH Co., Ltd /Polo/ချန်းရိ' as [Address]` : '[Address]'}
@@ -359,6 +412,13 @@ export const buildQueryAutoSentCMS = async (
     where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
     where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
     replacements.push(dateFrom, dateTo, dateFrom, dateTo);
+  }
+  if (ry === 'Product') {
+    where += ` AND CHARINDEX('-', id.RYNO) > 0`;
+    where1 += ` AND CHARINDEX('-', id.RYNO) > 0`;
+  } else if (ry === 'Component') {
+    where += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
+    where1 += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
   }
   const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
                           ,*

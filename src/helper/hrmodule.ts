@@ -214,7 +214,8 @@ export const buildQueryHRModule = (
   fullName: string,
   id: string,
   department: string,
-  joinDate: string,
+  joinDateFrom: string,
+  joinDateTo: string,
   factory: string,
 ) => {
   const isLYM = factory === 'LYM';
@@ -236,8 +237,7 @@ export const buildQueryHRModule = (
       : isLVL
         ? `AND cio.Check_In  <> '1900-01-01 00:00:00.000'
        AND cio.Check_Out <> '1900-01-01 00:00:00.000'`
-        : 
-          `AND Check_In  <> '1900-01-01 00:00:00.000'
+        : `AND Check_In  <> '1900-01-01 00:00:00.000'
        AND Check_Out <> '1900-01-01 00:00:00.000'`;
 
   const cte = isLYM
@@ -300,12 +300,13 @@ export const buildQueryHRModule = (
   if (id) conditions.push(`a.userId LIKE ?`);
   if (department)
     conditions.push(isLYM ? `d.__sno = ?` : `c.Department_Serial_Key LIKE ?`);
-  if (joinDate)
+  if (joinDateFrom && joinDateTo) {
     conditions.push(
       isLYM
-        ? `CAST(b.[Start_Date] AS DATE) = ?`
-        : `CONVERT(VARCHAR, b.Date_Come_In, 23) = ?`,
+        ? `CAST(b.[Start_Date] AS DATE) >= ? AND CAST(b.[Start_Date] AS DATE) <= ?`
+        : `CONVERT(VARCHAR, b.Date_Come_In, 23) >= ? AND CONVERT(VARCHAR, b.Date_Come_In, 23) <= ?`,
     );
+  }
 
   const where = [
     // 'a.Vehicle IS NOT NULL',

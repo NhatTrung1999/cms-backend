@@ -22,6 +22,7 @@ export class Cat9andcat12Controller {
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,
+    @Query('ry') ry: string,
     @Query('page') page: number,
     @Query('limit') limit: number,
     @Query('sortField') sortField: string,
@@ -31,6 +32,7 @@ export class Cat9andcat12Controller {
       dateFrom,
       dateTo,
       factory,
+      ry,
       +page,
       +limit,
       sortField,
@@ -72,12 +74,15 @@ export class Cat9andcat12Controller {
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,
+    @Query('ry') ry: string,
     @Query('dockey') dockeyCMS: string,
   ) {
+    console.log(ry);
     const data = await this.cat9andcat12Service.autoSentCMS(
       dateFrom,
       dateTo,
       factory,
+      ry,
       dockeyCMS,
     );
     return data;
