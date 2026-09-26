@@ -364,7 +364,7 @@ export class Cat1andcat4Service {
         throw new NotFoundException('Update failed!');
       }
       return results[0];
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof NotFoundException) {
         throw error;
       }

@@ -100,6 +100,29 @@ type Cat6PreviewPayload = {
   Creator: string;
 };
 
+type Cat6AccommodationPreviewPayload = {
+  System: string;
+  Corporation: string;
+  Factory: string;
+  Department: string;
+  DocKey: string;
+  ActivitySource: string;
+  SPeriodData: string;
+  EPeriodData: string;
+  ActivityType: string;
+  DataType: string;
+  DocType: string;
+  DocDate: string;
+  DocDate2: string;
+  DocNo: string;
+  UndDocNo: string;
+  TransType: string;
+  ActivityData: number;
+  Memo: string;
+  CreateDateTime: string;
+  Creator: string;
+};
+
 @Injectable()
 export class PreviewpayloadService {
   private rootFolder: string;
@@ -958,6 +981,7 @@ export class PreviewpayloadService {
     const accommodations =
       this.parseJsonArray<Cat6AccommodationItem>(accommodationValue);
     return accommodations.reduce((sum, item) => {
+      if (item?.type?.trim().toLowerCase() !== 'hotel') return sum;
       const nights = Number(item?.nights ?? 0);
       return sum + (Number.isFinite(nights) ? nights : 0);
     }, 0);
@@ -1143,6 +1167,45 @@ export class PreviewpayloadService {
     }));
   }
 
+  private mapCat6RowToAccommodationPreviewPayload(
+    row: Cat6ActivePreviewRow,
+    factory: string,
+    dateFrom: string,
+    dateTo: string,
+  ): Cat6AccommodationPreviewPayload {
+    const resolvedFactoryCode =
+      factory.trim().toUpperCase() === 'ALL'
+        ? row.Factory_Code
+        : factory.trim().toUpperCase();
+
+    return {
+      System: 'BPM',
+      Corporation: 'LAI YIH',
+      Factory: getFactory(resolvedFactoryCode as FactoryCode),
+      Department: row.Dept ?? '',
+      DocKey: '3.5.5',
+      ActivitySource: '住宿',
+      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
+      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
+      ActivityType: '3.5',
+      DataType: '3',
+      DocType: '出差住宿單',
+      DocDate: row.Application_Day
+        ? dayjs(row.Application_Day).format('YYYY/MM/DD')
+        : '',
+      DocDate2: row.Start_Time
+        ? dayjs(row.Start_Time).format('YYYY/MM/DD')
+        : '',
+      DocNo: row.Document_Number ?? '',
+      UndDocNo: row.Document_Number ?? '',
+      TransType: 'double',
+      ActivityData: Number(row.Number_of_nights_stayed ?? 0),
+      Memo: row.Business_Trip_Type ?? '',
+      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
+      Creator: '',
+    };
+  }
+
   async exportExcelCat6(
     sheet: ExcelJS.Worksheet,
     dateFrom: string,
@@ -1166,161 +1229,161 @@ export class PreviewpayloadService {
 
     const query = `
       WITH Travelers AS (
-            SELECT chb.*
-                  ,chb.UserCreate          AS TravelerID
-                  ,0                       AS TravelerOrder
-            FROM   CDS_HRBUSS_BusTripData     chb
-            WHERE  chb.BPMStatus = 'F'
-                    AND (
-                            chb.AssisstedIDs IS NULL
-                            OR LTRIM(RTRIM(chb.AssisstedIDs))=''
-                        )
-                    ${where}
-            UNION
-            ALL
-            SELECT chb.*
-                  ,LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)'))) AS TravelerID
-                  ,ROW_NUMBER() OVER(
-                        PARTITION BY chb.TripID
-                        ORDER BY(
-                            SELECT NULL
-                        )
-                    )  AS TravelerOrder
-            FROM   CDS_HRBUSS_BusTripData chb
-                    CROSS APPLY (
-                SELECT CAST(
-                            '<x>'
-                          +REPLACE(REPLACE(chb.AssisstedIDs ,',' ,'$') ,'$' ,'</x><x>')
-                          +'</x>' AS XML
-                        ) AS DATA
-            )         AS s
-            CROSS APPLY s.data.nodes('/x') AS t(v)
-            WHERE  chb.BPMStatus = 'F'
-                    AND chb.AssisstedIDs IS NOT NULL
-                    AND LTRIM(RTRIM(chb.AssisstedIDs))<>''
-                    AND LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)')))<>''
-                    ${where}
-        )
+                          SELECT chb.*
+                                ,chb.UserCreate          AS TravelerID
+                                ,0                       AS TravelerOrder
+                          FROM   CDS_HRBUSS_BusTripData     chb
+                          WHERE  chb.BPMStatus = 'F'
+                                  AND (
+                                          chb.AssisstedIDs IS NULL
+                                          OR LTRIM(RTRIM(chb.AssisstedIDs))=''
+                                      )
+                                  ${where}
+                          UNION
+                          ALL
+                          SELECT chb.*
+                                ,LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)'))) AS TravelerID
+                                ,ROW_NUMBER() OVER(
+                                      PARTITION BY chb.TripID
+                                      ORDER BY(
+                                          SELECT NULL
+                                      )
+                                  )  AS TravelerOrder
+                          FROM   CDS_HRBUSS_BusTripData chb
+                                  CROSS APPLY (
+                              SELECT CAST(
+                                          '<x>'
+                                        +REPLACE(REPLACE(chb.AssisstedIDs ,',' ,'$') ,'$' ,'</x><x>')
+                                        +'</x>' AS XML
+                                      ) AS DATA
+                          )         AS s
+                          CROSS APPLY s.data.nodes('/x') AS t(v)
+                          WHERE  chb.BPMStatus = 'F'
+                                  AND chb.AssisstedIDs IS NOT NULL
+                                  AND LTRIM(RTRIM(chb.AssisstedIDs))<>''
+                                  AND LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)')))<>''
+                                  ${where}
+                      )
 
-          SELECT tr.*
-                ,COALESCE(
-                    vwd.GROUP_NAME
-                    ,(
-                        SELECT TOP 1 vwd2.GROUP_NAME
-                        FROM   TB_EB_USER teu2
-                                OUTER APPLY (
-                            SELECT teed2.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed2
-                            WHERE  teed2.USER_GUID = teu2.USER_GUID
-                                    AND teed2.ORDERS = 0
-                        ) teed2
-                        LEFT JOIN vwDepartment_Factory vwd2
-                                    ON  vwd2.GROUP_ID = teed2.GROUP_ID
-                        WHERE  teu2.ACCOUNT = ISNULL(tr.Factory_User ,'')+tr.TravelerID
-                                AND vwd2.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd3.GROUP_NAME
-                        FROM   TB_EB_USER teu3
-                                OUTER APPLY (
-                            SELECT teed3.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed3
-                            WHERE  teed3.USER_GUID = teu3.USER_GUID
-                                    AND teed3.ORDERS = 0
-                        ) teed3
-                        LEFT JOIN vwDepartment_Factory vwd3
-                                    ON  vwd3.GROUP_ID = teed3.GROUP_ID
-                        WHERE  teu3.ACCOUNT = ISNULL(tr.Departure ,'')+tr.TravelerID
-                                AND vwd3.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd4.GROUP_NAME
-                        FROM   CDS_FMEval_Employee cfe
-                                JOIN TB_EB_USER teu4
-                                    ON  teu4.ACCOUNT = cfe.BPMAccount
-                                OUTER APPLY (
-                            SELECT teed4.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed4
-                            WHERE  teed4.USER_GUID = teu4.USER_GUID
-                                    AND teed4.ORDERS = 0
-                        ) teed4
-                        LEFT JOIN vwDepartment_Factory vwd4
-                                    ON  vwd4.GROUP_ID = teed4.GROUP_ID
-                        WHERE  cfe.EmpID = tr.TravelerID
-                                AND vwd4.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd5.GROUP_NAME
-                        FROM   TB_EB_USER teu5
-                                OUTER APPLY (
-                            SELECT teed5.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed5
-                            WHERE  teed5.USER_GUID = teu5.USER_GUID
-                                    AND teed5.ORDERS = 0
-                        ) teed5
-                        LEFT JOIN vwDepartment_Factory vwd5
-                                    ON  vwd5.GROUP_ID = teed5.GROUP_ID
-                        WHERE  teu5.ACCOUNT = tr.TravelerID
-                                AND vwd5.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd6.GROUP_NAME
-                        FROM   TB_EB_USER teu6
-                                JOIN TB_EB_EMPL_DEP teed6
-                                    ON  teed6.USER_GUID = teu6.USER_GUID
-                                LEFT JOIN vwDepartment_Factory vwd6
-                                    ON  vwd6.GROUP_ID = teed6.GROUP_ID
-                        WHERE  teu6.ACCOUNT = tr.TravelerID
-                                AND vwd6.GROUP_NAME IS NOT NULL
-                        ORDER BY
-                                teed6.ORDERS
-                    )
-                    ,(
-                        SELECT TOP 1 vwd7.GROUP_NAME
-                        FROM   TB_EB_USER teu7
-                                JOIN TB_EB_EMPL_DEP teed7
-                                    ON  teed7.USER_GUID = teu7.USER_GUID
-                                LEFT JOIN vwDepartment_Factory vwd7
-                                    ON  vwd7.GROUP_ID = teed7.GROUP_ID
-                        WHERE  teu7.ACCOUNT LIKE '%'+tr.TravelerID
-                                AND vwd7.GROUP_NAME IS NOT NULL
-                        ORDER BY
-                                teed7.ORDERS
-                    )
-                    ,tr.TravelerID
-                )                        AS Dept
-                ,COUNT(*) OVER()          AS TotalRow
-          FROM   Travelers tr
-                OUTER APPLY (
-              SELECT TOP 1 teu.USER_GUID
-              FROM   TB_EB_USER teu
-              WHERE  (
-                        tr.Factory_User IS NOT NULL
-                        AND teu.ACCOUNT=tr.Factory_User+tr.TravelerID
-                    )
-                    OR (tr.Factory_User IS NULL AND teu.ACCOUNT=tr.TravelerID)
-          )                               AS teu
-
-          OUTER APPLY (
-              SELECT teed.GROUP_ID
-              FROM   TB_EB_EMPL_DEP AS teed
-              WHERE  teed.USER_GUID = teu.USER_GUID
-                    AND teed.ORDERS = 0
-          )                               AS teed
-
-          LEFT JOIN vwDepartment_Factory  AS vwd
-                      ON  vwd.GROUP_ID = teed.GROUP_ID
-          WHERE  tr.DOC_NBR LIKE 'LYV-HR-BT%'
-                OR tr.DOC_NBR LIKE 'LHG-SUGG%'
-                OR tr.DOC_NBR LIKE 'LVL-HR-BTF%'
-                OR tr.DOC_NBR LIKE 'LVL-ODBT%'
-                OR tr.DOC_NBR LIKE 'LYM-HR-BT%'
-                OR tr.DOC_NBR LIKE 'JZS-SUGG%'
-                OR tr.DOC_NBR LIKE 'JAZ_BizTrip%'
-          ORDER BY
-                tr.CreatedAt ASC
-                ,tr.DOC_NBR
-                ,tr.TravelerOrder;
+                  SELECT tr.*
+                        ,COALESCE(
+                            dp.Department_Name COLLATE SQL_Latin1_General_CP1_CI_AS
+                            ,vwd.GROUP_NAME
+                            ,(
+                                SELECT TOP 1 vwd2.GROUP_NAME
+                                FROM   TB_EB_USER teu2
+                                        OUTER APPLY (
+                                    SELECT teed2.GROUP_ID
+                                    FROM   TB_EB_EMPL_DEP AS teed2
+                                    WHERE  teed2.USER_GUID = teu2.USER_GUID
+                                            AND teed2.ORDERS = 0
+                                ) teed2
+                                LEFT JOIN vwDepartment_Factory vwd2
+                                            ON  vwd2.GROUP_ID = teed2.GROUP_ID
+                                WHERE  teu2.ACCOUNT = ISNULL(tr.Factory_User ,'')+tr.TravelerID
+                                        AND vwd2.GROUP_NAME IS NOT NULL
+                            )
+                            ,(
+                                SELECT TOP 1 vwd3.GROUP_NAME
+                                FROM   TB_EB_USER teu3
+                                        OUTER APPLY (
+                                    SELECT teed3.GROUP_ID
+                                    FROM   TB_EB_EMPL_DEP AS teed3
+                                    WHERE  teed3.USER_GUID = teu3.USER_GUID
+                                            AND teed3.ORDERS = 0
+                                ) teed3
+                                LEFT JOIN vwDepartment_Factory vwd3
+                                            ON  vwd3.GROUP_ID = teed3.GROUP_ID
+                                WHERE  teu3.ACCOUNT = ISNULL(tr.Departure ,'')+tr.TravelerID
+                                        AND vwd3.GROUP_NAME IS NOT NULL
+                            )
+                            ,(
+                                SELECT TOP 1 vwd4.GROUP_NAME
+                                FROM   CDS_FMEval_Employee cfe
+                                        JOIN TB_EB_USER teu4
+                                            ON  teu4.ACCOUNT = cfe.BPMAccount
+                                        OUTER APPLY (
+                                    SELECT teed4.GROUP_ID
+                                    FROM   TB_EB_EMPL_DEP AS teed4
+                                    WHERE  teed4.USER_GUID = teu4.USER_GUID
+                                            AND teed4.ORDERS = 0
+                                ) teed4
+                                LEFT JOIN vwDepartment_Factory vwd4
+                                            ON  vwd4.GROUP_ID = teed4.GROUP_ID
+                                WHERE  cfe.EmpID = tr.TravelerID
+                                        AND vwd4.GROUP_NAME IS NOT NULL
+                            )
+                            ,(
+                                SELECT TOP 1 vwd5.GROUP_NAME
+                                FROM   TB_EB_USER teu5
+                                        OUTER APPLY (
+                                    SELECT teed5.GROUP_ID
+                                    FROM   TB_EB_EMPL_DEP AS teed5
+                                    WHERE  teed5.USER_GUID = teu5.USER_GUID
+                                            AND teed5.ORDERS = 0
+                                ) teed5
+                                LEFT JOIN vwDepartment_Factory vwd5
+                                            ON  vwd5.GROUP_ID = teed5.GROUP_ID
+                                WHERE  teu5.ACCOUNT = tr.TravelerID
+                                        AND vwd5.GROUP_NAME IS NOT NULL
+                            )
+                            ,(
+                                SELECT TOP 1 vwd6.GROUP_NAME
+                                FROM   TB_EB_USER teu6
+                                        JOIN TB_EB_EMPL_DEP teed6
+                                            ON  teed6.USER_GUID = teu6.USER_GUID
+                                        LEFT JOIN vwDepartment_Factory vwd6
+                                            ON  vwd6.GROUP_ID = teed6.GROUP_ID
+                                WHERE  teu6.ACCOUNT = tr.TravelerID
+                                        AND vwd6.GROUP_NAME IS NOT NULL
+                                ORDER BY
+                                        teed6.ORDERS
+                            )
+                            ,(
+                                SELECT TOP 1 vwd7.GROUP_NAME
+                                FROM   TB_EB_USER teu7
+                                        JOIN TB_EB_EMPL_DEP teed7
+                                            ON  teed7.USER_GUID = teu7.USER_GUID
+                                        LEFT JOIN vwDepartment_Factory vwd7
+                                            ON  vwd7.GROUP_ID = teed7.GROUP_ID
+                                WHERE  teu7.ACCOUNT LIKE '%'+tr.TravelerID
+                                        AND vwd7.GROUP_NAME IS NOT NULL
+                                ORDER BY
+                                        teed7.ORDERS
+                            )
+                        )                        AS Dept
+                        ,COUNT(*) OVER()          AS TotalRow
+                  FROM   Travelers tr
+                        OUTER APPLY (
+                      SELECT TOP 1 teu.USER_GUID
+                      FROM   TB_EB_USER teu
+                      WHERE  (
+                                tr.Factory_User IS NOT NULL
+                                AND teu.ACCOUNT=tr.Factory_User+tr.TravelerID
+                            )
+                            OR (tr.Factory_User IS NULL AND teu.ACCOUNT=tr.TravelerID)
+                  )                               AS teu
+                  OUTER APPLY (
+                      SELECT teed.GROUP_ID
+                      FROM   TB_EB_EMPL_DEP AS teed
+                      WHERE  teed.USER_GUID = teu.USER_GUID
+                            AND teed.ORDERS = 0
+                  )                               AS teed
+                  LEFT JOIN vwDepartment_Factory  AS vwd
+                              ON  vwd.GROUP_ID = teed.GROUP_ID
+                        LEFT JOIN [JZS_HRIS].[HRIS].[dbo].[View_Data_Person] dp
+                              ON  dp.Person_ID COLLATE SQL_Latin1_General_CP1_CI_AS = tr.TravelerID COLLATE SQL_Latin1_General_CP1_CI_AS
+                  WHERE  tr.DOC_NBR LIKE 'LYV-HR-BT%'
+                        OR tr.DOC_NBR LIKE 'LHG-SUGG%'
+                        OR tr.DOC_NBR LIKE 'LVL-HR-BTF%'
+                        OR tr.DOC_NBR LIKE 'LVL-ODBT%'
+                        OR tr.DOC_NBR LIKE 'LYM-HR-BT%'
+                        OR tr.DOC_NBR LIKE 'JZS-SUGG%'
+                        OR tr.DOC_NBR LIKE 'JAZ_BizTrip%'
+                  ORDER BY
+                        tr.CreatedAt ASC
+                        ,tr.DOC_NBR
+                        ,tr.TravelerOrder;
     `;
 
     const rawRows = (await this.UOF.query(query, {
@@ -1333,9 +1396,53 @@ export class PreviewpayloadService {
         this.transformCat6ActiveRow(expandedRow),
       ),
     );
-    const payloadRows = transformedRows.flatMap((row) =>
-      this.mapCat6RowToPreviewPayload(row, factory, dateFrom, dateTo),
-    );
+
+    if (dockeyCMS === '3.5.5') {
+      const accommodationPayloadRows = transformedRows
+        .filter((row) => Number(row.Number_of_nights_stayed ?? 0) > 0)
+        .map((row) =>
+          this.mapCat6RowToAccommodationPreviewPayload(
+            row,
+            factory,
+            dateFrom,
+            dateTo,
+          ),
+        );
+
+      sheet.columns = [
+        { header: 'System', key: 'System', width: 15 },
+        { header: 'Corporation', key: 'Corporation', width: 15 },
+        { header: 'Factory', key: 'Factory', width: 18 },
+        { header: 'Department', key: 'Department', width: 20 },
+        { header: 'DocKey', key: 'DocKey', width: 12 },
+        { header: 'ActivitySource', key: 'ActivitySource', width: 15 },
+        { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
+        { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
+        { header: 'ActivityType', key: 'ActivityType', width: 12 },
+        { header: 'DataType', key: 'DataType', width: 10 },
+        { header: 'DocType', key: 'DocType', width: 18 },
+        { header: 'DocDate', key: 'DocDate', width: 15 },
+        { header: 'DocDate2', key: 'DocDate2', width: 15 },
+        { header: 'DocNo', key: 'DocNo', width: 20 },
+        { header: 'UndDocNo', key: 'UndDocNo', width: 22 },
+        { header: 'TransType', key: 'TransType', width: 20 },
+        { header: 'ActivityData', key: 'ActivityData', width: 18 },
+        { header: 'Memo', key: 'Memo', width: 35 },
+        { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
+        { header: 'Creator', key: 'Creator', width: 15 },
+      ];
+
+      sheet.getRow(1).font = { bold: true };
+
+      accommodationPayloadRows.forEach((item) => sheet.addRow(item));
+      return;
+    }
+
+    const payloadRows = transformedRows
+      .filter((row) => Number(row.Number_of_nights_stayed ?? 0) > 0)
+      .flatMap((row) =>
+        this.mapCat6RowToPreviewPayload(row, factory, dateFrom, dateTo),
+      );
 
     sheet.columns = [
       { header: 'System', key: 'System', width: 15 },

@@ -37,6 +37,19 @@ export class Cat6Controller {
     return this.cat6Service.autoSentCMS(dateFrom, dateTo, factory);
   }
 
+  @Get('auto-sent-cms-accommodation')
+  async autoSentCMSAccommodation(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('factory') factory: string,
+  ) {
+    return this.cat6Service.autoSentCMSAccommodation(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+  }
+
   // @Get('auto-sent-cms-v2')
   // async autoSentCMSV2(
   //   @Query('dateFrom') dateFrom: string,

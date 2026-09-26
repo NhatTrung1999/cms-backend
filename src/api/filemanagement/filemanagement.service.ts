@@ -29,13 +29,13 @@ import {
 import { buildQueryTest as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
 import dayjs from 'dayjs';
 
-type Cat6RouteItem = {
-  AddressName: string;
-  Transport: string;
-  AddressDetail: string;
-  isAirport: boolean;
-  From: string;
-  To: string;
+type Cat6MergedLegItem = {
+  LegNo?: number;
+  From?: string;
+  To?: string;
+  Transport?: string;
+  StayType?: string | null;
+  Nights?: number | null;
 };
 
 type Cat6AccommodationItem = {
@@ -117,8 +117,11 @@ export class FilemanagementService {
     return map[type.toLowerCase()] ?? type;
   }
 
-  private formatCat6PlacesAndTransports(routesValue: unknown) {
-    const routes = this.parseJsonArray<Cat6RouteItem>(routesValue);
+  private extractCat6PlacesAndTransports(routesValue: unknown) {
+    const legs = this.parseJsonArray<Cat6MergedLegItem>(routesValue)
+      .slice()
+      .sort((a, b) => (a.LegNo ?? 0) - (b.LegNo ?? 0));
+
     const places: string[] = [];
     const transports: string[] = [];
 
@@ -129,54 +132,11 @@ export class FilemanagementService {
       places.push(place);
     };
 
-    const isFlightRoute = (route: Cat6RouteItem) => {
-      const transport = route.Transport?.trim().toLowerCase() ?? '';
-      return route.isAirport === true || transport === 'flight';
-    };
-
-    let index = 0;
-    while (index < routes.length) {
-      const route = routes[index];
-      const transport = route.Transport?.trim() ?? '';
-      const nextRoute = routes[index + 1];
-
-      if (isFlightRoute(route)) {
-        const flightStart = route.From?.trim() ?? '';
-        let flightEnd = route.To?.trim() ?? '';
-        let cursor = index;
-
-        while (
-          cursor + 1 < routes.length &&
-          isFlightRoute(routes[cursor + 1])
-        ) {
-          cursor += 1;
-          flightEnd = routes[cursor].To?.trim() ?? flightEnd;
-        }
-
-        pushPlace(flightStart);
-        pushPlace(flightEnd);
-        transports.push('Flight');
-        index = cursor + 1;
-        continue;
-      }
-
-      if (
-        !transport &&
-        places.length === 0 &&
-        nextRoute &&
-        isFlightRoute(nextRoute)
-      ) {
-        pushPlace(nextRoute.From);
-        index += 1;
-        continue;
-      }
-
-      pushPlace(route.AddressDetail ?? route.AddressName);
-      if (transport) {
-        transports.push(transport);
-      }
-      index += 1;
-    }
+    legs.forEach((leg, index) => {
+      if (index === 0) pushPlace(leg.From);
+      pushPlace(leg.To);
+      transports.push(leg.Transport?.trim() ?? '');
+    });
 
     const transportLimit = Math.max(places.length - 1, 0);
     const normalizedTransports = transports.slice(0, transportLimit);
@@ -184,25 +144,36 @@ export class FilemanagementService {
       normalizedTransports.push('');
     }
 
-    return {
-      ...places.reduce<Record<string, string>>((acc, place, index) => {
-        acc[`Place${index + 1}`] = place;
-        return acc;
-      }, {}),
-      ...normalizedTransports.reduce<Record<string, string>>(
-        (acc, transport, index) => {
-          acc[`Transport_${index + 1}`] = transport;
-          return acc;
-        },
-        {},
-      ),
-    };
+    return { places, transports: normalizedTransports };
+  }
+
+  private buildCat6LegsFromPlaces(
+    places: string[],
+    transports: string[],
+  ): { dep: string; dest: string; transType: string }[] {
+    const legs: { dep: string; dest: string; transType: string }[] = [];
+    const maxLegs = Math.max(places.length - 1, 0);
+
+    for (let index = 0; index < maxLegs; index += 1) {
+      const dep = places[index]?.trim() ?? '';
+      const dest = places[index + 1]?.trim() ?? '';
+      const transType = transports[index]?.trim() ?? '';
+
+      if (!dep || !dest || !transType) {
+        continue;
+      }
+
+      legs.push({ dep, dest, transType });
+    }
+
+    return legs;
   }
 
   private getCat6AccommodationNights(accommodationValue: unknown) {
     const accommodations =
       this.parseJsonArray<Cat6AccommodationItem>(accommodationValue);
     return accommodations.reduce((sum, item) => {
+      if (item?.type?.trim().toLowerCase() !== 'hotel') return sum;
       const nights = Number(item?.nights ?? 0);
       return sum + (Number.isFinite(nights) ? nights : 0);
     }, 0);
@@ -449,7 +420,16 @@ export class FilemanagementService {
           await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
           break;
         case 'cat6':
+        case 'cat6businesstravel':
           await this.fileExcelCat6(sheet, dateFrom, dateTo, factory);
+          break;
+        case 'cat6accommodation':
+          await this.fileExcelCat6Accommodation(
+            sheet,
+            dateFrom,
+            dateTo,
+            factory,
+          );
           break;
         case 'cat7':
           await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
@@ -491,8 +471,7 @@ export class FilemanagementService {
     }
   }
 
-  async fileExcelCat6(
-    sheet: ExcelJS.Worksheet,
+  private async getCat6TransformedRows(
     dateFrom: string,
     dateTo: string,
     factory: string,
@@ -512,164 +491,360 @@ export class FilemanagementService {
 
     const finalReplacements = [...replacements, ...replacements];
 
+    const docNbrPatterns = `(chb.DOC_NBR LIKE 'LYV-HR-BT%'
+                 OR chb.DOC_NBR LIKE 'LHG-SUGG%'
+                 OR chb.DOC_NBR LIKE 'LVL-HR-BTF%'
+                 OR chb.DOC_NBR LIKE 'LVL-ODBT%'
+                 OR chb.DOC_NBR LIKE 'LYM-HR-BT%'
+                 OR chb.DOC_NBR LIKE 'JZS-SUGG%'
+                 OR chb.DOC_NBR LIKE 'JAZ_BizTrip%')`;
     const query = `
-      WITH Travelers AS (
-            SELECT chb.*
-                  ,chb.UserCreate          AS TravelerID
-                  ,0                       AS TravelerOrder
-            FROM   CDS_HRBUSS_BusTripData     chb
-            WHERE  chb.BPMStatus = 'F'
-                    AND (
-                            chb.AssisstedIDs IS NULL
-                            OR LTRIM(RTRIM(chb.AssisstedIDs))=''
-                        )
-                    ${where}
-            UNION
-            ALL
-            SELECT chb.*
-                  ,LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)'))) AS TravelerID
-                  ,ROW_NUMBER() OVER(
-                        PARTITION BY chb.TripID
-                        ORDER BY(
-                            SELECT NULL
-                        )
-                    )  AS TravelerOrder
-            FROM   CDS_HRBUSS_BusTripData chb
-                    CROSS APPLY (
-                SELECT CAST(
-                            '<x>'
-                          +REPLACE(REPLACE(chb.AssisstedIDs ,',' ,'$') ,'$' ,'</x><x>')
-                          +'</x>' AS XML
-                        ) AS DATA
-            )         AS s
-            CROSS APPLY s.data.nodes('/x') AS t(v)
-            WHERE  chb.BPMStatus = 'F'
-                    AND chb.AssisstedIDs IS NOT NULL
-                    AND LTRIM(RTRIM(chb.AssisstedIDs))<>''
-                    AND LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)')))<>''
-                    ${where}
-        )
+IF OBJECT_ID('tempdb..#Travelers')    IS NOT NULL DROP TABLE #Travelers;
+IF OBJECT_ID('tempdb..#RouteNodes')   IS NOT NULL DROP TABLE #RouteNodes;
+IF OBJECT_ID('tempdb..#AccomSeq')     IS NOT NULL DROP TABLE #AccomSeq;
+IF OBJECT_ID('tempdb..#StopSeq')      IS NOT NULL DROP TABLE #StopSeq;
+IF OBJECT_ID('tempdb..#Legs')         IS NOT NULL DROP TABLE #Legs;
+IF OBJECT_ID('tempdb..#Itinerary')    IS NOT NULL DROP TABLE #Itinerary;
+IF OBJECT_ID('tempdb..#DeptDistinct') IS NOT NULL DROP TABLE #DeptDistinct;
+IF OBJECT_ID('tempdb..#DeptLookup')   IS NOT NULL DROP TABLE #DeptLookup;
 
-          SELECT tr.*
-                ,COALESCE(
-                    vwd.GROUP_NAME
-                    ,(
-                        SELECT TOP 1 vwd2.GROUP_NAME
-                        FROM   TB_EB_USER teu2
-                                OUTER APPLY (
-                            SELECT teed2.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed2
-                            WHERE  teed2.USER_GUID = teu2.USER_GUID
-                                    AND teed2.ORDERS = 0
-                        ) teed2
-                        LEFT JOIN vwDepartment_Factory vwd2
-                                    ON  vwd2.GROUP_ID = teed2.GROUP_ID
-                        WHERE  teu2.ACCOUNT = ISNULL(tr.Factory_User ,'')+tr.TravelerID
-                                AND vwd2.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd3.GROUP_NAME
-                        FROM   TB_EB_USER teu3
-                                OUTER APPLY (
-                            SELECT teed3.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed3
-                            WHERE  teed3.USER_GUID = teu3.USER_GUID
-                                    AND teed3.ORDERS = 0
-                        ) teed3
-                        LEFT JOIN vwDepartment_Factory vwd3
-                                    ON  vwd3.GROUP_ID = teed3.GROUP_ID
-                        WHERE  teu3.ACCOUNT = ISNULL(tr.Departure ,'')+tr.TravelerID
-                                AND vwd3.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd4.GROUP_NAME
-                        FROM   CDS_FMEval_Employee cfe
-                                JOIN TB_EB_USER teu4
-                                    ON  teu4.ACCOUNT = cfe.BPMAccount
-                                OUTER APPLY (
-                            SELECT teed4.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed4
-                            WHERE  teed4.USER_GUID = teu4.USER_GUID
-                                    AND teed4.ORDERS = 0
-                        ) teed4
-                        LEFT JOIN vwDepartment_Factory vwd4
-                                    ON  vwd4.GROUP_ID = teed4.GROUP_ID
-                        WHERE  cfe.EmpID = tr.TravelerID
-                                AND vwd4.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd5.GROUP_NAME
-                        FROM   TB_EB_USER teu5
-                                OUTER APPLY (
-                            SELECT teed5.GROUP_ID
-                            FROM   TB_EB_EMPL_DEP AS teed5
-                            WHERE  teed5.USER_GUID = teu5.USER_GUID
-                                    AND teed5.ORDERS = 0
-                        ) teed5
-                        LEFT JOIN vwDepartment_Factory vwd5
-                                    ON  vwd5.GROUP_ID = teed5.GROUP_ID
-                        WHERE  teu5.ACCOUNT = tr.TravelerID
-                                AND vwd5.GROUP_NAME IS NOT NULL
-                    )
-                    ,(
-                        SELECT TOP 1 vwd6.GROUP_NAME
-                        FROM   TB_EB_USER teu6
-                                JOIN TB_EB_EMPL_DEP teed6
-                                    ON  teed6.USER_GUID = teu6.USER_GUID
-                                LEFT JOIN vwDepartment_Factory vwd6
-                                    ON  vwd6.GROUP_ID = teed6.GROUP_ID
-                        WHERE  teu6.ACCOUNT = tr.TravelerID
-                                AND vwd6.GROUP_NAME IS NOT NULL
-                        ORDER BY
-                                teed6.ORDERS
-                    )
-                    ,(
-                        SELECT TOP 1 vwd7.GROUP_NAME
-                        FROM   TB_EB_USER teu7
-                                JOIN TB_EB_EMPL_DEP teed7
-                                    ON  teed7.USER_GUID = teu7.USER_GUID
-                                LEFT JOIN vwDepartment_Factory vwd7
-                                    ON  vwd7.GROUP_ID = teed7.GROUP_ID
-                        WHERE  teu7.ACCOUNT LIKE '%'+tr.TravelerID
-                                AND vwd7.GROUP_NAME IS NOT NULL
-                        ORDER BY
-                                teed7.ORDERS
-                    )
-                    ,tr.TravelerID
-                )                        AS Dept
-                ,COUNT(*) OVER()          AS TotalRow
-          FROM   Travelers tr
-                OUTER APPLY (
-              SELECT TOP 1 teu.USER_GUID
-              FROM   TB_EB_USER teu
-              WHERE  (
-                        tr.Factory_User IS NOT NULL
-                        AND teu.ACCOUNT=tr.Factory_User+tr.TravelerID
-                    )
-                    OR (tr.Factory_User IS NULL AND teu.ACCOUNT=tr.TravelerID)
-          )                               AS teu
+SELECT  *
+INTO    #Travelers
+FROM
+(
+    SELECT  chb.*
+           ,chb.UserCreate          AS TravelerID
+           ,0                       AS TravelerOrder
+    FROM    CDS_HRBUSS_BusTripData chb
+    WHERE   chb.BPMStatus = 'F'
+            AND (
+                    chb.AssisstedIDs IS NULL
+                    OR LTRIM(RTRIM(chb.AssisstedIDs))=''
+                )
+            AND ${docNbrPatterns}
+            ${where}
 
-          OUTER APPLY (
-              SELECT teed.GROUP_ID
-              FROM   TB_EB_EMPL_DEP AS teed
-              WHERE  teed.USER_GUID = teu.USER_GUID
-                    AND teed.ORDERS = 0
-          )                               AS teed
+    UNION ALL
 
-          LEFT JOIN vwDepartment_Factory  AS vwd
-                      ON  vwd.GROUP_ID = teed.GROUP_ID
-          WHERE  tr.DOC_NBR LIKE 'LYV-HR-BT%'
-                OR tr.DOC_NBR LIKE 'LHG-SUGG%'
-                OR tr.DOC_NBR LIKE 'LVL-HR-BTF%'
-                OR tr.DOC_NBR LIKE 'LVL-ODBT%'
-                OR tr.DOC_NBR LIKE 'LYM-HR-BT%'
-                OR tr.DOC_NBR LIKE 'JZS-SUGG%'
-                OR tr.DOC_NBR LIKE 'JAZ_BizTrip%'
-          ORDER BY
-                tr.CreatedAt ASC
-                ,tr.DOC_NBR
-                ,tr.TravelerOrder;
-    `;
+    SELECT  chb.*
+           ,LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)'))) AS TravelerID
+           ,ROW_NUMBER() OVER(
+                PARTITION BY chb.TripID
+                ORDER BY(
+                    SELECT NULL
+                )
+            )  AS TravelerOrder
+    FROM    CDS_HRBUSS_BusTripData chb
+            CROSS APPLY (
+        SELECT CAST(
+                    '<x>'
+                   +REPLACE(REPLACE(chb.AssisstedIDs ,',' ,'$') ,'$' ,'</x><x>')
+                   +'</x>' AS XML
+                ) AS DATA
+    )         AS s
+    CROSS APPLY s.data.nodes('/x') AS t(v)
+    WHERE   chb.BPMStatus = 'F'
+            AND chb.AssisstedIDs IS NOT NULL
+            AND LTRIM(RTRIM(chb.AssisstedIDs))<>''
+            AND LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)')))<>''
+            AND ${docNbrPatterns}
+            ${where}
+) AS trUnion;
+
+CREATE CLUSTERED INDEX IX_Travelers_Key
+    ON #Travelers (DOC_NBR, TravelerID, TravelerOrder);
+
+SELECT  tr.DOC_NBR
+       ,tr.TravelerID
+       ,tr.TravelerOrder
+       ,CAST(r.[key] AS INT)                       AS NodeIdx
+       ,JSON_VALUE(r.value, '$.AddressName')       AS AddressName
+       ,JSON_VALUE(r.value, '$.AddressDetail')     AS AddressDetail
+       ,JSON_VALUE(r.value, '$.Transport')         AS Transport
+       ,COALESCE(JSON_VALUE(r.value, '$.From'), '') AS AirFrom
+       ,COALESCE(JSON_VALUE(r.value, '$.To'), '')   AS AirTo
+       ,CASE WHEN LOWER(ISNULL(COALESCE(JSON_VALUE(r.value, '$.isAirport')
+                                        ,JSON_VALUE(r.value, '$.IsAirport')), 'false'))
+                  IN ('true', '1')
+             THEN 1 ELSE 0 END                       AS IsAirport
+INTO    #RouteNodes
+FROM    #Travelers tr
+        CROSS APPLY OPENJSON(NULLIF(LTRIM(RTRIM(tr.Routes)), '')) AS r
+WHERE   ISJSON(tr.Routes) = 1;
+
+CREATE CLUSTERED INDEX IX_RouteNodes_Key
+    ON #RouteNodes (DOC_NBR, TravelerID, TravelerOrder, NodeIdx);
+
+SELECT  tr.DOC_NBR
+       ,tr.TravelerID
+       ,tr.TravelerOrder
+       ,ROW_NUMBER() OVER (PARTITION BY tr.DOC_NBR, tr.TravelerID, tr.TravelerOrder
+                           ORDER BY CAST(a.[key] AS INT))   AS AccomIdx
+       ,JSON_VALUE(a.value, '$.type')                       AS StayType
+       ,JSON_VALUE(a.value, '$.address')                    AS StayAddress
+       ,TRY_CONVERT(INT, JSON_VALUE(a.value, '$.nights'))    AS StayNights
+       ,CASE WHEN LOWER(ISNULL(JSON_VALUE(a.value, '$.isSameAsAbove'), 'false')) IN ('true', '1')
+             THEN 1 ELSE 0 END                               AS SameAsAbove
+INTO    #AccomSeq
+FROM    #Travelers tr
+        CROSS APPLY OPENJSON(NULLIF(LTRIM(RTRIM(tr.Accommodation)), '')) AS a
+WHERE   ISJSON(tr.Accommodation) = 1;
+
+CREATE CLUSTERED INDEX IX_AccomSeq_Key
+    ON #AccomSeq (DOC_NBR, TravelerID, TravelerOrder, AccomIdx);
+
+SELECT  s.*
+       ,ROW_NUMBER() OVER (PARTITION BY s.DOC_NBR, s.TravelerID, s.TravelerOrder
+                           ORDER BY s.NodeIdx, s.SubIdx)    AS StopIdx
+INTO    #StopSeq
+FROM
+(
+    SELECT  rn.DOC_NBR, rn.TravelerID, rn.TravelerOrder
+           ,rn.NodeIdx
+           ,0                                               AS SubIdx
+           ,COALESCE(NULLIF(LTRIM(RTRIM(rn.AddressDetail)), ''), rn.AddressName, '') AS StopName
+           ,ISNULL(rn.Transport, '')                         AS LeaveBy
+    FROM    #RouteNodes rn
+    WHERE   rn.IsAirport = 0
+
+    UNION ALL
+
+    SELECT  rn.DOC_NBR, rn.TravelerID, rn.TravelerOrder
+           ,rn.NodeIdx
+           ,0                                               AS SubIdx
+           ,rn.AirFrom                                       AS StopName
+           ,N'Flight'                                        AS LeaveBy
+    FROM    #RouteNodes rn
+    WHERE   rn.IsAirport = 1
+            AND NULLIF(LTRIM(RTRIM(rn.AirFrom)), '') IS NOT NULL
+
+    UNION ALL
+
+    SELECT  rn.DOC_NBR, rn.TravelerID, rn.TravelerOrder
+           ,rn.NodeIdx
+           ,1                                               AS SubIdx
+           ,rn.AirTo                                         AS StopName
+           ,NULL                                             AS LeaveBy
+    FROM    #RouteNodes rn
+    WHERE   rn.IsAirport = 1
+            AND NULLIF(LTRIM(RTRIM(rn.AirTo)), '') IS NOT NULL
+) s;
+
+CREATE CLUSTERED INDEX IX_StopSeq_Key
+    ON #StopSeq (DOC_NBR, TravelerID, TravelerOrder, StopIdx);
+
+SELECT  lr.DOC_NBR, lr.TravelerID, lr.TravelerOrder
+       ,ROW_NUMBER() OVER (PARTITION BY lr.DOC_NBR, lr.TravelerID, lr.TravelerOrder
+                           ORDER BY lr.StopIdx)              AS LegNo
+       ,lr.LegFrom
+       ,lr.LegTo
+       ,lr.LegTransport
+INTO    #Legs
+FROM
+(
+    SELECT  cur.DOC_NBR
+           ,cur.TravelerID
+           ,cur.TravelerOrder
+           ,cur.StopIdx
+           ,cur.StopName                                    AS LegFrom
+           ,nxt.StopName                                    AS LegTo
+           ,COALESCE(NULLIF(cur.LeaveBy, ''), NULLIF(nxt.LeaveBy, ''), '') AS LegTransport
+    FROM    #StopSeq cur
+            JOIN #StopSeq nxt
+                 ON  nxt.DOC_NBR       = cur.DOC_NBR
+                 AND nxt.TravelerID    = cur.TravelerID
+                 AND nxt.TravelerOrder = cur.TravelerOrder
+                 AND nxt.StopIdx       = cur.StopIdx + 1
+    WHERE   cur.StopName <> nxt.StopName
+) lr;
+
+CREATE CLUSTERED INDEX IX_Legs_Key
+    ON #Legs (DOC_NBR, TravelerID, TravelerOrder, LegNo);
+
+SELECT  l.DOC_NBR, l.TravelerID, l.TravelerOrder
+       ,(
+            SELECT  l2.LegNo         AS LegNo
+                   ,l2.LegFrom       AS [From]
+                   ,l2.LegTo         AS [To]
+                   ,l2.LegTransport  AS Transport
+                   ,CASE WHEN acc.SameAsAbove = 1 THEN N'sameasabove' ELSE acc.StayType END AS StayType
+                   ,acc.StayNights   AS Nights
+            FROM    #Legs l2
+                    LEFT JOIN #AccomSeq acc
+                         ON  acc.DOC_NBR       = l2.DOC_NBR
+                         AND acc.TravelerID    = l2.TravelerID
+                         AND acc.TravelerOrder = l2.TravelerOrder
+                         AND acc.AccomIdx      = l2.LegNo
+            WHERE   l2.DOC_NBR       = l.DOC_NBR
+                    AND l2.TravelerID    = l.TravelerID
+                    AND l2.TravelerOrder = l.TravelerOrder
+            ORDER BY l2.LegNo
+            FOR JSON PATH, INCLUDE_NULL_VALUES
+        )                                                     AS RoutesMerged
+INTO    #Itinerary
+FROM    #Legs l
+GROUP BY l.DOC_NBR, l.TravelerID, l.TravelerOrder;
+
+CREATE CLUSTERED INDEX IX_Itinerary_Key
+    ON #Itinerary (DOC_NBR, TravelerID, TravelerOrder);
+
+SELECT DISTINCT
+        tr.Factory_User
+       ,tr.Departure
+       ,tr.TravelerID
+INTO    #DeptDistinct
+FROM    #Travelers tr;
+
+SELECT  d.Factory_User
+       ,d.Departure
+       ,d.TravelerID
+       ,COALESCE(
+            dp.Department_Name COLLATE SQL_Latin1_General_CP1_CI_AS
+           ,vwd.GROUP_NAME
+           ,(
+                SELECT TOP 1 vwd2.GROUP_NAME
+                FROM   TB_EB_USER teu2
+                        OUTER APPLY (
+                    SELECT teed2.GROUP_ID
+                    FROM   TB_EB_EMPL_DEP AS teed2
+                    WHERE  teed2.USER_GUID = teu2.USER_GUID
+                            AND teed2.ORDERS = 0
+                ) teed2
+                LEFT JOIN vwDepartment_Factory vwd2
+                            ON  vwd2.GROUP_ID = teed2.GROUP_ID
+                WHERE  teu2.ACCOUNT = ISNULL(d.Factory_User ,'')+d.TravelerID
+                        AND vwd2.GROUP_NAME IS NOT NULL
+            )
+           ,(
+                SELECT TOP 1 vwd3.GROUP_NAME
+                FROM   TB_EB_USER teu3
+                        OUTER APPLY (
+                    SELECT teed3.GROUP_ID
+                    FROM   TB_EB_EMPL_DEP AS teed3
+                    WHERE  teed3.USER_GUID = teu3.USER_GUID
+                            AND teed3.ORDERS = 0
+                ) teed3
+                LEFT JOIN vwDepartment_Factory vwd3
+                            ON  vwd3.GROUP_ID = teed3.GROUP_ID
+                WHERE  teu3.ACCOUNT = ISNULL(d.Departure ,'')+d.TravelerID
+                        AND vwd3.GROUP_NAME IS NOT NULL
+            )
+           ,(
+                SELECT TOP 1 vwd4.GROUP_NAME
+                FROM   CDS_FMEval_Employee cfe
+                        JOIN TB_EB_USER teu4
+                            ON  teu4.ACCOUNT = cfe.BPMAccount
+                        OUTER APPLY (
+                    SELECT teed4.GROUP_ID
+                    FROM   TB_EB_EMPL_DEP AS teed4
+                    WHERE  teed4.USER_GUID = teu4.USER_GUID
+                            AND teed4.ORDERS = 0
+                ) teed4
+                LEFT JOIN vwDepartment_Factory vwd4
+                            ON  vwd4.GROUP_ID = teed4.GROUP_ID
+                WHERE  cfe.EmpID = d.TravelerID
+                        AND vwd4.GROUP_NAME IS NOT NULL
+            )
+           ,(
+                SELECT TOP 1 vwd5.GROUP_NAME
+                FROM   TB_EB_USER teu5
+                        OUTER APPLY (
+                    SELECT teed5.GROUP_ID
+                    FROM   TB_EB_EMPL_DEP AS teed5
+                    WHERE  teed5.USER_GUID = teu5.USER_GUID
+                            AND teed5.ORDERS = 0
+                ) teed5
+                LEFT JOIN vwDepartment_Factory vwd5
+                            ON  vwd5.GROUP_ID = teed5.GROUP_ID
+                WHERE  teu5.ACCOUNT = d.TravelerID
+                        AND vwd5.GROUP_NAME IS NOT NULL
+            )
+           ,(
+                SELECT TOP 1 vwd6.GROUP_NAME
+                FROM   TB_EB_USER teu6
+                        JOIN TB_EB_EMPL_DEP teed6
+                            ON  teed6.USER_GUID = teu6.USER_GUID
+                        LEFT JOIN vwDepartment_Factory vwd6
+                            ON  vwd6.GROUP_ID = teed6.GROUP_ID
+                WHERE  teu6.ACCOUNT = d.TravelerID
+                        AND vwd6.GROUP_NAME IS NOT NULL
+                ORDER BY
+                        teed6.ORDERS
+            )
+           ,(
+                SELECT TOP 1 vwd7.GROUP_NAME
+                FROM   TB_EB_USER teu7
+                        JOIN TB_EB_EMPL_DEP teed7
+                            ON  teed7.USER_GUID = teu7.USER_GUID
+                        LEFT JOIN vwDepartment_Factory vwd7
+                            ON  vwd7.GROUP_ID = teed7.GROUP_ID
+                WHERE  teu7.ACCOUNT LIKE '%'+d.TravelerID
+                        AND vwd7.GROUP_NAME IS NOT NULL
+                ORDER BY
+                        teed7.ORDERS
+            )
+        )                        AS Dept
+INTO    #DeptLookup
+FROM    #DeptDistinct d
+        OUTER APPLY (
+    SELECT TOP 1 teu.USER_GUID
+    FROM   TB_EB_USER teu
+    WHERE  (
+               d.Factory_User IS NOT NULL
+               AND teu.ACCOUNT=d.Factory_User+d.TravelerID
+           )
+           OR (d.Factory_User IS NULL AND teu.ACCOUNT=d.TravelerID)
+)                               AS teu
+OUTER APPLY (
+    SELECT teed.GROUP_ID
+    FROM   TB_EB_EMPL_DEP AS teed
+    WHERE  teed.USER_GUID = teu.USER_GUID
+           AND teed.ORDERS = 0
+)                               AS teed
+LEFT JOIN vwDepartment_Factory  AS vwd
+            ON  vwd.GROUP_ID = teed.GROUP_ID
+LEFT JOIN [JZS_HRIS].[HRIS].[dbo].[View_Data_Person] dp
+            ON  dp.Person_ID COLLATE SQL_Latin1_General_CP1_CI_AS = d.TravelerID COLLATE SQL_Latin1_General_CP1_CI_AS;
+
+CREATE CLUSTERED INDEX IX_DeptLookup_Key
+    ON #DeptLookup (Factory_User, Departure, TravelerID);
+
+SELECT  tr.TripID
+       ,tr.DOC_NBR
+       ,tr.Factory
+       ,tr.Departure
+       ,tr.Destination
+       ,tr.TypeTravel
+       ,ISNULL(it.RoutesMerged, tr.Routes)  AS Routes
+       ,tr.DuringDay
+       ,tr.Distance
+       ,tr.TotalMoney
+       ,tr.Accommodation
+       ,tr.CreatedAt
+       ,tr.UserCreate
+       ,tr.BPMStatus
+       ,tr.YN
+       ,tr.Factory_User
+       ,tr.DateStart
+       ,tr.DateEnd
+       ,tr.StayNight
+       ,tr.AssisstedIDs
+       ,tr.TravelerID
+       ,tr.TravelerOrder
+       ,dl.Dept
+       ,COUNT(*) OVER()          AS TotalRow
+FROM    #Travelers tr
+        LEFT JOIN #Itinerary it
+               ON  it.DOC_NBR       = tr.DOC_NBR
+               AND it.TravelerID    = tr.TravelerID
+               AND it.TravelerOrder = tr.TravelerOrder
+        LEFT JOIN #DeptLookup dl
+               ON  ISNULL(dl.Factory_User ,'') = ISNULL(tr.Factory_User ,'')
+               AND ISNULL(dl.Departure ,'')    = ISNULL(tr.Departure ,'')
+               AND dl.TravelerID                = tr.TravelerID
+ORDER BY tr.CreatedAt ASC ,tr.DOC_NBR ,tr.TravelerOrder;
+
+DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #DeptDistinct, #DeptLookup;`;
 
     const rawRows = (await this.UOF.query(query, {
       type: QueryTypes.SELECT,
@@ -694,50 +869,17 @@ export class FilemanagementService {
           : '',
         Business_Trip_Type:
           this.formatCat6BusinessTripType(expandedRow.Factory) ?? '',
-        ...this.formatCat6PlacesAndTransports(expandedRow.Routes),
+        Routes: expandedRow.Routes,
         Number_of_nights_stayed: this.getCat6AccommodationNights(
           expandedRow.Accommodation,
         ),
       })),
     );
 
-    const placeCount = Math.max(
-      1,
-      ...transformed.map(
-        (row) =>
-          Object.keys(row).filter((key) => /^Place\d+$/.test(key)).length,
-      ),
-    );
-    const transportCount = Math.max(
-      0,
-      placeCount - 1,
-      ...transformed.map(
-        (row) =>
-          Object.keys(row).filter((key) => /^Transport_\d+$/.test(key)).length,
-      ),
-    );
+    return transformed;
+  }
 
-    sheet.columns = [
-      { header: 'Application Day', key: 'Application_Day' },
-      { header: 'Document Number', key: 'Document_Number' },
-      { header: 'Staff ID', key: 'Staff_ID' },
-      { header: 'Dept', key: 'Dept' },
-      { header: 'Round trip / One way', key: 'Round_trip_One_way' },
-      { header: 'Start Time', key: 'Start_Time' },
-      { header: 'End Time', key: 'End_Time' },
-      { header: 'Business Trip Type', key: 'Business_Trip_Type' },
-      ...Array.from({ length: placeCount }, (_, index) => ({
-        header: `Place ${index + 1}`,
-        key: `Place${index + 1}`,
-      })),
-      ...Array.from({ length: transportCount }, (_, index) => ({
-        header: `Transport ${index + 1}`,
-        key: `Transport_${index + 1}`,
-      })),
-      { header: 'Number of nights stayed', key: 'Number_of_nights_stayed' },
-    ];
-
-    transformed.forEach((item) => sheet.addRow(item));
+  private applyCat6SheetFormatting(sheet: ExcelJS.Worksheet) {
     sheet.columns.forEach((column) => {
       let maxLength = 0;
       if (typeof column.eachCell === 'function') {
@@ -758,6 +900,102 @@ export class FilemanagementService {
         };
       });
     });
+  }
+
+  async fileExcelCat6(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    const transformed = await this.getCat6TransformedRows(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+    const withNightsStayed = transformed.filter(
+      (row) => Number(row.Number_of_nights_stayed ?? 0) > 0,
+    );
+
+    const legRows = withNightsStayed.flatMap((row) => {
+      const { Routes, Document_Number, ...tripFields } = row;
+      const documentNumberBase = Document_Number ?? '';
+      const { places, transports } =
+        this.extractCat6PlacesAndTransports(Routes);
+      const legs = this.buildCat6LegsFromPlaces(places, transports);
+
+      if (legs.length === 0) {
+        return [
+          {
+            ...tripFields,
+            Document_Number: `${documentNumberBase}-1`,
+            Departure: '',
+            Destination: '',
+            Transport: '',
+          },
+        ];
+      }
+
+      return legs.map((leg, index) => ({
+        ...tripFields,
+        Document_Number: `${documentNumberBase}-${index + 1}`,
+        Departure: leg.dep,
+        Destination: leg.dest,
+        Transport: leg.transType,
+      }));
+    });
+
+    sheet.columns = [
+      { header: 'Application Day', key: 'Application_Day' },
+      { header: 'Document Number', key: 'Document_Number' },
+      { header: 'Staff ID', key: 'Staff_ID' },
+      { header: 'Dept', key: 'Dept' },
+      { header: 'Round trip / One way', key: 'Round_trip_One_way' },
+      { header: 'Start Time', key: 'Start_Time' },
+      { header: 'End Time', key: 'End_Time' },
+      { header: 'Business Trip Type', key: 'Business_Trip_Type' },
+      { header: 'Departure', key: 'Departure' },
+      { header: 'Destination', key: 'Destination' },
+      { header: 'Transport', key: 'Transport' },
+      {
+        header: 'Number of nights stayed (Hotel)',
+        key: 'Number_of_nights_stayed',
+      },
+    ];
+
+    legRows.forEach((item) => sheet.addRow(item));
+    this.applyCat6SheetFormatting(sheet);
+  }
+
+  async fileExcelCat6Accommodation(
+    sheet: ExcelJS.Worksheet,
+    dateFrom: string,
+    dateTo: string,
+    factory: string,
+  ) {
+    const transformed = await this.getCat6TransformedRows(
+      dateFrom,
+      dateTo,
+      factory,
+    );
+    const withNightsStayed = transformed.filter(
+      (row) => Number(row.Number_of_nights_stayed ?? 0) > 0,
+    );
+
+    sheet.columns = [
+      { header: 'Application Day', key: 'Application_Day' },
+      { header: 'Document Number', key: 'Document_Number' },
+      { header: 'Staff ID', key: 'Staff_ID' },
+      { header: 'Dept', key: 'Dept' },
+      { header: 'Business Trip Type', key: 'Business_Trip_Type' },
+      {
+        header: 'Number of nights stayed (Hotel)',
+        key: 'Number_of_nights_stayed',
+      },
+    ];
+
+    withNightsStayed.forEach((item) => sheet.addRow(item));
+    this.applyCat6SheetFormatting(sheet);
   }
 
   async fileExcelCat9AndCat12(

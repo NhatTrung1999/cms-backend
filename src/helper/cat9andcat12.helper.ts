@@ -427,6 +427,22 @@ export const buildQueryAutoSentCMS = async (
                           ,'${factory}' AS Factory_Name
                   FROM   (
                             SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,sb.Booking_No AS Booking_No
                                     ,im.INV_NO               AS Invoice_Number
@@ -487,6 +503,22 @@ export const buildQueryAutoSentCMS = async (
                                                 )
                               UNION
                               SELECT im.INV_DATE             AS [Date]
+                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
+                                    ,IIF(
+                                          id.RYNO LIKE '%[BSU]%'
+                                          AND CHARINDEX('-' ,id.RYNO)=0
+                                        ,id.RYNO
+                                        ,'N/A'
+                                      )                       AS RYComponent
+                                    ,CASE
+                                          WHEN id.RYNO LIKE '%B%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
+                                          WHEN id.RYNO LIKE '%S%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
+                                          WHEN id.RYNO LIKE '%U%'
+                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
+                                          ELSE 'FINISH SHOE'
+                                      END                     AS ComponentName
                                     ,sb.ExFty_Date           AS Shipment_Date
                                     ,sb.Booking_No AS Booking_No
                                     ,is1.Inv_No              AS Invoice_Number

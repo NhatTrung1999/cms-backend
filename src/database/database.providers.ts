@@ -20,7 +20,8 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
-        // logging: false,
+        // logging: true,
+        logging: true,
       });
       return sequelize;
     },
@@ -44,6 +45,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -66,6 +68,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -88,6 +91,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -110,6 +114,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -132,6 +137,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -154,6 +160,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -176,6 +183,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -199,6 +207,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -221,6 +230,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -243,6 +253,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -265,6 +276,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -287,6 +299,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -309,6 +322,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -332,6 +346,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -354,6 +369,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -376,6 +392,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -398,6 +415,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -420,6 +438,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -442,6 +461,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        logging: true,
       });
       return sequelize;
     },
@@ -465,6 +485,7 @@ export const databaseProviders = [
             requestTimeout: 86400000,
           },
         },
+        // logging: true,
       });
       return sequelize;
     },
