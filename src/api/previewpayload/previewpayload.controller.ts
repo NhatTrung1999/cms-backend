@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Request } from '@nestjs/common';
 import { PreviewpayloadService } from './previewpayload.service';
-import { getUserId } from 'src/helper/common.helper';
+import { getUserId, UserRequest } from 'src/helper/common.helper';
 
 @Controller('previewpayload')
 export class PreviewpayloadController {
@@ -14,7 +14,7 @@ export class PreviewpayloadController {
     @Query('factory') factory: string,
     @Query('ry') ry: string,
     @Query('dockeyCMS') dockeyCMS: string,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
     const userId = getUserId(req);
     const res = await this.previewpayloadService.previewExcel(

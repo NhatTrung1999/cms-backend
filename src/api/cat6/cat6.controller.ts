@@ -43,19 +43,6 @@ export class Cat6Controller {
     @Query('dateTo') dateTo: string,
     @Query('factory') factory: string,
   ) {
-    return this.cat6Service.autoSentCMSAccommodation(
-      dateFrom,
-      dateTo,
-      factory,
-    );
+    return this.cat6Service.autoSentCMSAccommodation(dateFrom, dateTo, factory);
   }
-
-  // @Get('auto-sent-cms-v2')
-  // async autoSentCMSV2(
-  //   @Query('dateFrom') dateFrom: string,
-  //   @Query('dateTo') dateTo: string,
-  //   @Query('factory') factory: string,
-  // ) {
-  //   return this.cat6Service.autoSentCMSV2(dateFrom, dateTo, factory);
-  // }
 }

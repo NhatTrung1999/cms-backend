@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { HrService } from './hr.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { getFactortyID, getUserId } from 'src/helper/common.helper';
+import { getFactoryID, getUserId, UserRequest } from 'src/helper/common.helper';
 import { Response } from 'express';
 
 @Controller('hr')
@@ -34,9 +34,9 @@ export class HrController {
     @Query('limit') limit: number,
     @Query('sortField') sortField: string,
     @Query('sortOrder') sortOrder: string,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     return this.hrService.findAll(
       dateFrom,
       dateTo,
@@ -54,8 +54,8 @@ export class HrController {
   }
 
   @Get('department')
-  async findAllDepartment(@Request() req) {
-    const factory = getFactortyID(req);
+  async findAllDepartment(@Request() req: UserRequest) {
+    const factory = getFactoryID(req);
     return this.hrService.findAllDepartment(factory);
   }
 
@@ -67,9 +67,9 @@ export class HrController {
       CurrentAddress: string;
       TransportationMethod: string;
     },
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.hrService.update(id, updateDto, factory, userid);
   }
@@ -78,9 +78,9 @@ export class HrController {
   @UseInterceptors(FileInterceptor('file'))
   async importFromExcel(
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     if (!file) throw new BadRequestException('No file uploaded!');
     return this.hrService.importFromExcel(file, userid, factory);
@@ -95,10 +95,10 @@ export class HrController {
     @Query('department') department: string,
     @Query('joinDateFrom') joinDateFrom: string,
     @Query('joinDateTo') joinDateTo: string,
-    @Request() req,
+    @Request() req: UserRequest,
     @Res() res: Response,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const buffer = await this.hrService.exportToExcel(
       dateFrom,
       dateTo,

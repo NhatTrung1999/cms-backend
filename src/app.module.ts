@@ -44,7 +44,7 @@ import { DefaultaddressModule } from './api/defaultaddress/defaultaddress.module
     Cat6Module,
     Cat1andcat4Module,
     PreviewpayloadModule,
-    DefaultaddressModule
+    DefaultaddressModule,
   ],
   controllers: [AppController],
   providers: [

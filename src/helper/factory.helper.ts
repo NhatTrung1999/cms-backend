@@ -1,3 +1,5 @@
+import { getOwn } from './object.helper';
+
 const FACTORY_LABEL_MAP: Record<string, string> = {
   LYV: '樂億 - LYV',
   LHG: '樂億II - LHG',
@@ -11,7 +13,19 @@ const FACTORY_LABEL_MAP: Record<string, string> = {
 export type FactoryCode = keyof typeof FACTORY_LABEL_MAP;
 
 export const getFactory = (factory: FactoryCode): string => {
-  return FACTORY_LABEL_MAP[factory] ?? '';
+  return getOwn(FACTORY_LABEL_MAP, factory) ?? '';
+};
+
+const FACTORY_CODE_BY_LABEL = new Map(
+  Object.entries(FACTORY_LABEL_MAP).map(([code, label]) => [
+    label.trim().toLowerCase(),
+    code,
+  ]),
+);
+
+/** Reverse of getFactory: '樂億 - LYV' -> 'LYV'. Returns '' for an unknown label. */
+export const getFactoryCodeByLabel = (label: string): string => {
+  return FACTORY_CODE_BY_LABEL.get(label.trim().toLowerCase()) ?? '';
 };
 
 export const FACTORY_LIST: FactoryCode[] = [

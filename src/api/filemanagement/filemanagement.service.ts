@@ -4,47 +4,61 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { orderByClause } from 'src/helper/sql.helper';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as ExcelJS from 'exceljs';
 import { v4 as uuidv4 } from 'uuid';
 import { EventsGateway } from '../events/events.gateway';
 import { getADataExcelFactoryCat5 } from 'src/helper/cat5.helper';
-import { getADataExcelFactoryCat9AndCat12 } from 'src/helper/cat9andcat12.helper';
-import { getADataExcelFactoryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
 import {
-  buildQuery,
+  findFileRecord,
+  getExcelFilePath,
+  getExcelRootFolder,
+  insertFileRecord,
+  runFileExport,
+} from 'src/helper/file-export.helper';
+import { getADataExcelFactoryCat9AndCat12 } from 'src/helper/cat9andcat12.helper';
+import { getDayAfter } from 'src/helper/date.helper';
+import {
+  buildCat9AndCat12Filter,
+  EXPORT_DATE_COLUMN,
+} from 'src/helper/cat9andcat12.queries';
+import { getADataExcelFactoryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
+import { buildQuery, getADataExcelFactoryCat7 } from 'src/helper/cat7.helper';
+import {
   buildQueryCustomExport,
   getADataCustomExport,
-  getADataExcelFactoryCat7,
-} from 'src/helper/cat7.helper';
-import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
+} from 'src/helper/cat7.customexport';
+
+import { buildQuery as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
 import {
-  appendCat6DocumentSuffix,
-  getCat6AssistedIds,
-} from 'src/helper/cat6-assisted.helper';
+  autoFitColumnsAndAddBorders,
+  fillSheet,
+} from 'src/helper/excel.helper';
+import { addPortsToRows } from 'src/helper/shipment.helper';
+import { buildCat6Filter } from 'src/helper/cat6.queries';
+import { applyTaxFreeZoneToRows } from 'src/helper/cat1andcat4.taxfree';
+import {
+  buildCat6LegsFromPlaces,
+  extractCat6PlacesAndTransports,
+  toCat6ExportRows,
+} from 'src/helper/cat6.helper';
+import {
+  buildAllFactoryCat5Query,
+  buildAllFactoryCat9AndCat12Query,
+  buildCat6TripQuery,
+} from './filemanagement.queries';
+import {
+  CAT1_AND_CAT4_COLUMNS,
+  CAT5_COLUMNS,
+  CAT6_ACCOMMODATION_COLUMNS,
+  CAT6_COLUMNS,
+  CAT7_COLUMNS,
+  CAT9_AND_CAT12_COLUMNS,
+} from './filemanagement.columns';
 
-import { buildQueryTest as buildQueryCat1AndCat4 } from 'src/helper/cat1andcat4.helper';
-import dayjs from 'dayjs';
-
-type Cat6MergedLegItem = {
-  LegNo?: number;
-  From?: string;
-  To?: string;
-  Transport?: string;
-  StayType?: string | null;
-  Nights?: number | null;
-};
-
-type Cat6AccommodationItem = {
-  id?: string;
-  isSameAsAbove?: boolean;
-  type?: string;
-  nights?: number | string;
-  addressID?: string;
-};
+type FactoryConnection = { factoryName: string; conn: Sequelize };
 
 @Injectable()
 export class FilemanagementService {
@@ -78,137 +92,59 @@ export class FilemanagementService {
     // cat 6
     @Inject('UOF') private readonly UOF: Sequelize,
   ) {
-    this.rootFolder = this.configService.get(
-      'EXCEL_STORAGE_PATH',
-      'D:/FileExcel',
-    );
-    if (!fs.existsSync(this.rootFolder)) {
-      fs.mkdirSync(this.rootFolder, { recursive: true });
-    }
+    this.rootFolder = getExcelRootFolder(this.configService);
   }
 
-  private parseJsonArray<T = unknown>(value: unknown): T[] {
-    if (Array.isArray(value)) return value as T[];
-    if (typeof value !== 'string' || !value.trim()) return [];
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? (parsed as T[]) : [];
-    } catch {
-      return [];
-    }
+  // Connections per export, in the order the "all factories" export reads them
+  // (this order is also the row order of the Excel file).
+  private get erpConnections(): FactoryConnection[] {
+    return [
+      { factoryName: 'LYV', conn: this.LYV_ERP },
+      { factoryName: 'LHG', conn: this.LHG_ERP },
+      { factoryName: 'LYM', conn: this.LYM_ERP },
+      { factoryName: 'LVL', conn: this.LVL_ERP },
+      { factoryName: 'LYF', conn: this.LYF_ERP },
+      { factoryName: 'JAZ', conn: this.JAZ_ERP },
+      { factoryName: 'JZS', conn: this.JZS_ERP },
+    ];
   }
 
-  private formatCat6TripType(type: unknown): string | null {
-    if (!type || typeof type !== 'string') return null;
-    const t = type.toLowerCase().trim();
-    if (t === 'round' || t === 'roundtrip' || t === 'round trip')
-      return 'Round trip';
-    return 'One-way';
+  /** Cat 1 & 4 only exists in four factories. */
+  private get cat1And4Connections(): FactoryConnection[] {
+    return [
+      { factoryName: 'LYV', conn: this.LYV_ERP },
+      { factoryName: 'LHG', conn: this.LHG_ERP },
+      { factoryName: 'LVL', conn: this.LVL_ERP },
+      { factoryName: 'LYM', conn: this.LYM_ERP },
+    ];
   }
 
-  private formatCat6BusinessTripType(type: unknown): string | null {
-    if (!type || typeof type !== 'string') return null;
-    const map: Record<string, string> = {
-      factory_domestic: 'Domestic business trip within the group',
-      outside_domestic: 'Domestic business trip to third party entities',
-      factory_oversea: 'Overseas business trip within the group',
-      outside_oversea: 'Overseas business trip to third party entities',
-    };
-    return map[type.toLowerCase()] ?? type;
+  private get wmsConnections(): FactoryConnection[] {
+    return [
+      { factoryName: 'LYV', conn: this.LYV_WMS },
+      { factoryName: 'LHG', conn: this.LHG_WMS },
+      { factoryName: 'LYM', conn: this.LYM_WMS },
+      { factoryName: 'LVL', conn: this.LVL_WMS },
+      { factoryName: 'JAZ', conn: this.JAZ_WMS },
+      { factoryName: 'JZS', conn: this.JZS_WMS },
+    ];
   }
 
-  private extractCat6PlacesAndTransports(routesValue: unknown) {
-    const legs = this.parseJsonArray<Cat6MergedLegItem>(routesValue)
-      .slice()
-      .sort((a, b) => (a.LegNo ?? 0) - (b.LegNo ?? 0));
-
-    const places: string[] = [];
-    const transports: string[] = [];
-
-    const pushPlace = (value?: string) => {
-      const place = getCat6AirportName(value);
-      if (!place) return;
-      if (places[places.length - 1] === place) return;
-      places.push(place);
-    };
-
-    legs.forEach((leg, index) => {
-      if (index === 0) pushPlace(leg.From);
-      pushPlace(leg.To);
-      transports.push(leg.Transport?.trim() ?? '');
-    });
-
-    const transportLimit = Math.max(places.length - 1, 0);
-    const normalizedTransports = transports.slice(0, transportLimit);
-    while (normalizedTransports.length < transportLimit) {
-      normalizedTransports.push('');
-    }
-
-    return { places, transports: normalizedTransports };
+  private get hrisConnections(): FactoryConnection[] {
+    return [
+      { factoryName: 'LYV', conn: this.LYV_HRIS },
+      { factoryName: 'LHG', conn: this.LHG_HRIS },
+      { factoryName: 'LVL', conn: this.LVL_HRIS },
+      { factoryName: 'LYM', conn: this.LYM_HRIS },
+      { factoryName: 'JAZ', conn: this.JAZ_HRIS },
+      { factoryName: 'JZS', conn: this.JZS_HRIS },
+    ];
   }
 
-  private buildCat6LegsFromPlaces(
-    places: string[],
-    transports: string[],
-  ): { dep: string; dest: string; transType: string }[] {
-    const legs: { dep: string; dest: string; transType: string }[] = [];
-    const maxLegs = Math.max(places.length - 1, 0);
-
-    for (let index = 0; index < maxLegs; index += 1) {
-      const dep = places[index]?.trim() ?? '';
-      const dest = places[index + 1]?.trim() ?? '';
-      const transType = transports[index]?.trim() ?? '';
-
-      if (!dep || !dest || !transType) {
-        continue;
-      }
-
-      legs.push({ dep, dest, transType });
-    }
-
-    return legs;
-  }
-
-  private getCat6AccommodationNights(accommodationValue: unknown) {
-    const accommodations =
-      this.parseJsonArray<Cat6AccommodationItem>(accommodationValue);
-    return accommodations.reduce((sum, item) => {
-      if (item?.type?.trim().toLowerCase() !== 'hotel') return sum;
-      const nights = Number(item?.nights ?? 0);
-      return sum + (Number.isFinite(nights) ? nights : 0);
-    }, 0);
-  }
-
-  private expandCat6RowsByAssistedIds(
-    row: Record<string, any>,
-  ): Record<string, any>[] {
-    const assistedIds = getCat6AssistedIds(row.AssisstedIDs);
-
-    if (assistedIds.length === 0) {
-      return [
-        {
-          ...row,
-          DOC_NBR: row.DOC_NBR ?? '',
-          EffectiveStaffID: row.UserCreate ?? '',
-        },
-      ];
-    }
-
-    if (assistedIds.length === 1) {
-      return [
-        {
-          ...row,
-          DOC_NBR: row.DOC_NBR ?? '',
-          EffectiveStaffID: assistedIds[0],
-        },
-      ];
-    }
-
-    return assistedIds.map((assistedId, index) => ({
-      ...row,
-      DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
-      EffectiveStaffID: assistedId,
-    }));
+  /** The connection of one factory, or undefined when it is not in the list (e.g. 'ALL'). */
+  private findConnection(connections: FactoryConnection[], factory: string) {
+    const factoryName = factory.trim();
+    return connections.find((item) => item.factoryName === factoryName)?.conn;
   }
 
   async getData(
@@ -220,24 +156,27 @@ export class FilemanagementService {
   ) {
     try {
       let where = ' AND 1 = 1 ';
+      const replacements: string[] = [userID];
 
       if (module !== '') {
-        where += ` AND Module LIKE '%${module}%'`;
+        where += ` AND Module LIKE ?`;
+        replacements.push(`%${module}%`);
       }
 
       if (file_name !== '') {
-        where += ` AND File_Name LIKE '%${file_name}%'`;
+        where += ` AND File_Name LIKE ?`;
+        replacements.push(`%${file_name}%`);
       }
 
       const payload: any = await this.EIP.query<any>(
         `
           SELECT *
           FROM CMW_File_Management
-          WHERE CreatedAt = '${userID}' ${where}
-          ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+          WHERE CreatedAt = ? ${where}
+          ORDER BY ${orderByClause(sortField, sortOrder)}
         `,
         {
-          replacements: [],
+          replacements,
           type: QueryTypes.SELECT,
         },
       );
@@ -276,11 +215,7 @@ export class FilemanagementService {
   ) {
     const id = uuidv4();
     const fileName = `${factory}-${module}-${dateFrom}-${dateTo}.xlsx`;
-    const folder = path.join(this.rootFolder, module);
-    if (!fs.existsSync(folder)) {
-      fs.mkdirSync(folder, { recursive: true });
-    }
-    const filePath = path.join(folder, fileName);
+    const filePath = getExcelFilePath(this.rootFolder, module, fileName);
 
     const statusWaiting = await this.fileExcelWaiting(
       id,
@@ -292,6 +227,8 @@ export class FilemanagementService {
     );
     if (statusWaiting.length === 0) return false;
 
+    // Runs in the background: nothing awaits it, so an error that escapes must be caught here
+    // (an unhandled rejection would stop the whole backend).
     this.createFileExcel(
       id,
       module,
@@ -305,7 +242,7 @@ export class FilemanagementService {
       unitWeight,
       weight,
       departure,
-    );
+    ).catch((error) => console.error('createFileExcel failed:', error));
 
     return true;
   }
@@ -319,67 +256,15 @@ export class FilemanagementService {
     userID: string,
   ) {
     try {
-      await this.EIP.query(
-        `INSERT INTO CMW_File_Management
-          (
-            ID,
-            Module,
-            [File_Name],
-            [Path],
-            [Status],
-            CreatedAt,
-            CreatedFactory,
-            CreatedDate
-          )
-          VALUES
-          (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?
-          )`,
-        {
-          replacements: [
-            id,
-            module,
-            fileName,
-            filePath,
-            '0',
-            userID,
-            factory,
-            new Date().toISOString(),
-          ],
-          type: QueryTypes.INSERT,
-        },
-      );
-      const result = await this.EIP.query(
-        `SELECT * FROM CMW_File_Management WHERE ID = ? ORDER BY CreatedDate`,
-        { replacements: [id], type: QueryTypes.SELECT },
-      );
-      return result;
-    } catch (error: any) {
-      throw new Error(error);
-    }
-  }
-
-  async fileExcelDone(id: string) {
-    try {
-      await this.EIP.query(
-        `UPDATE CMW_File_Management
-          SET
-            [Status] = '1'
-          WHERE ID = ?`,
-        { replacements: [id], type: QueryTypes.UPDATE },
-      );
-      const result = await this.EIP.query(
-        `SELECT * FROM CMW_File_Management WHERE ID = ? ORDER BY CreatedDate`,
-        { replacements: [id], type: QueryTypes.SELECT },
-      );
-      return result;
+      await insertFileRecord(this.EIP, {
+        id,
+        module,
+        fileName,
+        filePath,
+        factory,
+        userID,
+      });
+      return await findFileRecord(this.EIP, id);
     } catch (error: any) {
       throw new Error(error);
     }
@@ -399,76 +284,67 @@ export class FilemanagementService {
     weight?: boolean,
     departure?: boolean,
   ) {
-    try {
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet(module);
-
-      switch (module.trim().toLowerCase()) {
-        case 'cat1andcat4':
-          await this.fileExcelCat1AndCat4(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-            usage,
-            unitWeight,
-            weight,
-            departure,
-          );
-          break;
-        case 'cat5':
-          await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
-          break;
-        case 'cat6':
-        case 'cat6businesstravel':
-          await this.fileExcelCat6(sheet, dateFrom, dateTo, factory);
-          break;
-        case 'cat6accommodation':
-          await this.fileExcelCat6Accommodation(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-          );
-          break;
-        case 'cat7':
-          await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
-          break;
-        case 'cat9andcat12':
-          await this.fileExcelCat9AndCat12(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-            ry,
-          );
-          break;
-        case 'customexport':
-          await this.fileCustomExport(sheet, dateFrom, dateTo, factory, fields);
-          break;
-        default:
-          throw new Error(`Unknown excel file module: ${module}`);
-      }
-
-      await workbook.xlsx.writeFile(filePath);
-
-      const statusDone = await this.fileExcelDone(id);
-      if (statusDone.length) {
-        this.eventsGateway.broadcastEvent(
-          'file-excel-done',
-          'Export file excel success!',
-        );
-      }
-    } catch (error: any) {
-      await this.EIP.query(
-        `UPDATE CMW_File_Management SET [Status] = '2' WHERE ID = ?`,
-        { replacements: [id], type: QueryTypes.UPDATE },
-      );
-      this.eventsGateway.broadcastEvent(
-        'file-excel-error',
-        'Error export file excel!',
-      );
-    }
+    await runFileExport({
+      eip: this.EIP,
+      gateway: this.eventsGateway,
+      id,
+      filePath,
+      sheetName: module,
+      fill: async (sheet) => {
+        switch (module.trim().toLowerCase()) {
+          case 'cat1andcat4':
+            await this.fileExcelCat1AndCat4(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              usage,
+              unitWeight,
+              weight,
+              departure,
+            );
+            break;
+          case 'cat5':
+            await this.fileExcelCat5(sheet, dateFrom, dateTo, factory);
+            break;
+          case 'cat6':
+          case 'cat6businesstravel':
+            await this.fileExcelCat6(sheet, dateFrom, dateTo, factory);
+            break;
+          case 'cat6accommodation':
+            await this.fileExcelCat6Accommodation(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+            );
+            break;
+          case 'cat7':
+            await this.fileExcelCat7(sheet, dateFrom, dateTo, factory);
+            break;
+          case 'cat9andcat12':
+            await this.fileExcelCat9AndCat12(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              ry,
+            );
+            break;
+          case 'customexport':
+            await this.fileCustomExport(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              fields,
+            );
+            break;
+          default:
+            throw new Error(`Unknown excel file module: ${module}`);
+        }
+      },
+    });
   }
 
   private async getCat6TransformedRows(
@@ -476,430 +352,21 @@ export class FilemanagementService {
     dateTo: string,
     factory: string,
   ) {
-    let where = '';
-    const replacements: any[] = [];
-
-    if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR ,chb.CreatedAt ,23) BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo);
-    }
-
-    if (factory) {
-      where += ` AND chb.DOC_NBR LIKE ?`;
-      replacements.push(`%${factory}%`);
-    }
-
-    const finalReplacements = [...replacements, ...replacements];
-
-    const docNbrPatterns = `(chb.DOC_NBR LIKE 'LYV-HR-BT%'
-                 OR chb.DOC_NBR LIKE 'LHG-SUGG%'
-                 OR chb.DOC_NBR LIKE 'LVL-HR-BTF%'
-                 OR chb.DOC_NBR LIKE 'LVL-ODBT%'
-                 OR chb.DOC_NBR LIKE 'LYM-HR-BT%'
-                 OR chb.DOC_NBR LIKE 'JZS-SUGG%'
-                 OR chb.DOC_NBR LIKE 'JAZ_BizTrip%')`;
-    const query = `
-IF OBJECT_ID('tempdb..#Travelers')    IS NOT NULL DROP TABLE #Travelers;
-IF OBJECT_ID('tempdb..#RouteNodes')   IS NOT NULL DROP TABLE #RouteNodes;
-IF OBJECT_ID('tempdb..#AccomSeq')     IS NOT NULL DROP TABLE #AccomSeq;
-IF OBJECT_ID('tempdb..#StopSeq')      IS NOT NULL DROP TABLE #StopSeq;
-IF OBJECT_ID('tempdb..#Legs')         IS NOT NULL DROP TABLE #Legs;
-IF OBJECT_ID('tempdb..#Itinerary')    IS NOT NULL DROP TABLE #Itinerary;
-IF OBJECT_ID('tempdb..#DeptDistinct') IS NOT NULL DROP TABLE #DeptDistinct;
-IF OBJECT_ID('tempdb..#DeptLookup')   IS NOT NULL DROP TABLE #DeptLookup;
-
-SELECT  *
-INTO    #Travelers
-FROM
-(
-    SELECT  chb.*
-           ,chb.UserCreate          AS TravelerID
-           ,0                       AS TravelerOrder
-    FROM    CDS_HRBUSS_BusTripData chb
-    WHERE   chb.BPMStatus = 'F'
-            AND (
-                    chb.AssisstedIDs IS NULL
-                    OR LTRIM(RTRIM(chb.AssisstedIDs))=''
-                )
-            AND ${docNbrPatterns}
-            ${where}
-
-    UNION ALL
-
-    SELECT  chb.*
-           ,LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)'))) AS TravelerID
-           ,ROW_NUMBER() OVER(
-                PARTITION BY chb.TripID
-                ORDER BY(
-                    SELECT NULL
-                )
-            )  AS TravelerOrder
-    FROM    CDS_HRBUSS_BusTripData chb
-            CROSS APPLY (
-        SELECT CAST(
-                    '<x>'
-                   +REPLACE(REPLACE(chb.AssisstedIDs ,',' ,'$') ,'$' ,'</x><x>')
-                   +'</x>' AS XML
-                ) AS DATA
-    )         AS s
-    CROSS APPLY s.data.nodes('/x') AS t(v)
-    WHERE   chb.BPMStatus = 'F'
-            AND chb.AssisstedIDs IS NOT NULL
-            AND LTRIM(RTRIM(chb.AssisstedIDs))<>''
-            AND LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)')))<>''
-            AND ${docNbrPatterns}
-            ${where}
-) AS trUnion;
-
-CREATE CLUSTERED INDEX IX_Travelers_Key
-    ON #Travelers (DOC_NBR, TravelerID, TravelerOrder);
-
-SELECT  tr.DOC_NBR
-       ,tr.TravelerID
-       ,tr.TravelerOrder
-       ,CAST(r.[key] AS INT)                       AS NodeIdx
-       ,JSON_VALUE(r.value, '$.AddressName')       AS AddressName
-       ,JSON_VALUE(r.value, '$.AddressDetail')     AS AddressDetail
-       ,JSON_VALUE(r.value, '$.Transport')         AS Transport
-       ,COALESCE(JSON_VALUE(r.value, '$.From'), '') AS AirFrom
-       ,COALESCE(JSON_VALUE(r.value, '$.To'), '')   AS AirTo
-       ,CASE WHEN LOWER(ISNULL(COALESCE(JSON_VALUE(r.value, '$.isAirport')
-                                        ,JSON_VALUE(r.value, '$.IsAirport')), 'false'))
-                  IN ('true', '1')
-             THEN 1 ELSE 0 END                       AS IsAirport
-INTO    #RouteNodes
-FROM    #Travelers tr
-        CROSS APPLY OPENJSON(NULLIF(LTRIM(RTRIM(tr.Routes)), '')) AS r
-WHERE   ISJSON(tr.Routes) = 1;
-
-CREATE CLUSTERED INDEX IX_RouteNodes_Key
-    ON #RouteNodes (DOC_NBR, TravelerID, TravelerOrder, NodeIdx);
-
-SELECT  tr.DOC_NBR
-       ,tr.TravelerID
-       ,tr.TravelerOrder
-       ,ROW_NUMBER() OVER (PARTITION BY tr.DOC_NBR, tr.TravelerID, tr.TravelerOrder
-                           ORDER BY CAST(a.[key] AS INT))   AS AccomIdx
-       ,JSON_VALUE(a.value, '$.type')                       AS StayType
-       ,JSON_VALUE(a.value, '$.address')                    AS StayAddress
-       ,TRY_CONVERT(INT, JSON_VALUE(a.value, '$.nights'))    AS StayNights
-       ,CASE WHEN LOWER(ISNULL(JSON_VALUE(a.value, '$.isSameAsAbove'), 'false')) IN ('true', '1')
-             THEN 1 ELSE 0 END                               AS SameAsAbove
-INTO    #AccomSeq
-FROM    #Travelers tr
-        CROSS APPLY OPENJSON(NULLIF(LTRIM(RTRIM(tr.Accommodation)), '')) AS a
-WHERE   ISJSON(tr.Accommodation) = 1;
-
-CREATE CLUSTERED INDEX IX_AccomSeq_Key
-    ON #AccomSeq (DOC_NBR, TravelerID, TravelerOrder, AccomIdx);
-
-SELECT  s.*
-       ,ROW_NUMBER() OVER (PARTITION BY s.DOC_NBR, s.TravelerID, s.TravelerOrder
-                           ORDER BY s.NodeIdx, s.SubIdx)    AS StopIdx
-INTO    #StopSeq
-FROM
-(
-    SELECT  rn.DOC_NBR, rn.TravelerID, rn.TravelerOrder
-           ,rn.NodeIdx
-           ,0                                               AS SubIdx
-           ,COALESCE(NULLIF(LTRIM(RTRIM(rn.AddressDetail)), ''), rn.AddressName, '') AS StopName
-           ,ISNULL(rn.Transport, '')                         AS LeaveBy
-    FROM    #RouteNodes rn
-    WHERE   rn.IsAirport = 0
-
-    UNION ALL
-
-    SELECT  rn.DOC_NBR, rn.TravelerID, rn.TravelerOrder
-           ,rn.NodeIdx
-           ,0                                               AS SubIdx
-           ,rn.AirFrom                                       AS StopName
-           ,N'Flight'                                        AS LeaveBy
-    FROM    #RouteNodes rn
-    WHERE   rn.IsAirport = 1
-            AND NULLIF(LTRIM(RTRIM(rn.AirFrom)), '') IS NOT NULL
-
-    UNION ALL
-
-    SELECT  rn.DOC_NBR, rn.TravelerID, rn.TravelerOrder
-           ,rn.NodeIdx
-           ,1                                               AS SubIdx
-           ,rn.AirTo                                         AS StopName
-           ,NULL                                             AS LeaveBy
-    FROM    #RouteNodes rn
-    WHERE   rn.IsAirport = 1
-            AND NULLIF(LTRIM(RTRIM(rn.AirTo)), '') IS NOT NULL
-) s;
-
-CREATE CLUSTERED INDEX IX_StopSeq_Key
-    ON #StopSeq (DOC_NBR, TravelerID, TravelerOrder, StopIdx);
-
-SELECT  lr.DOC_NBR, lr.TravelerID, lr.TravelerOrder
-       ,ROW_NUMBER() OVER (PARTITION BY lr.DOC_NBR, lr.TravelerID, lr.TravelerOrder
-                           ORDER BY lr.StopIdx)              AS LegNo
-       ,lr.LegFrom
-       ,lr.LegTo
-       ,lr.LegTransport
-INTO    #Legs
-FROM
-(
-    SELECT  cur.DOC_NBR
-           ,cur.TravelerID
-           ,cur.TravelerOrder
-           ,cur.StopIdx
-           ,cur.StopName                                    AS LegFrom
-           ,nxt.StopName                                    AS LegTo
-           ,COALESCE(NULLIF(cur.LeaveBy, ''), NULLIF(nxt.LeaveBy, ''), '') AS LegTransport
-    FROM    #StopSeq cur
-            JOIN #StopSeq nxt
-                 ON  nxt.DOC_NBR       = cur.DOC_NBR
-                 AND nxt.TravelerID    = cur.TravelerID
-                 AND nxt.TravelerOrder = cur.TravelerOrder
-                 AND nxt.StopIdx       = cur.StopIdx + 1
-    WHERE   cur.StopName <> nxt.StopName
-) lr;
-
-CREATE CLUSTERED INDEX IX_Legs_Key
-    ON #Legs (DOC_NBR, TravelerID, TravelerOrder, LegNo);
-
-SELECT  l.DOC_NBR, l.TravelerID, l.TravelerOrder
-       ,(
-            SELECT  l2.LegNo         AS LegNo
-                   ,l2.LegFrom       AS [From]
-                   ,l2.LegTo         AS [To]
-                   ,l2.LegTransport  AS Transport
-                   ,CASE WHEN acc.SameAsAbove = 1 THEN N'sameasabove' ELSE acc.StayType END AS StayType
-                   ,acc.StayNights   AS Nights
-            FROM    #Legs l2
-                    LEFT JOIN #AccomSeq acc
-                         ON  acc.DOC_NBR       = l2.DOC_NBR
-                         AND acc.TravelerID    = l2.TravelerID
-                         AND acc.TravelerOrder = l2.TravelerOrder
-                         AND acc.AccomIdx      = l2.LegNo
-            WHERE   l2.DOC_NBR       = l.DOC_NBR
-                    AND l2.TravelerID    = l.TravelerID
-                    AND l2.TravelerOrder = l.TravelerOrder
-            ORDER BY l2.LegNo
-            FOR JSON PATH, INCLUDE_NULL_VALUES
-        )                                                     AS RoutesMerged
-INTO    #Itinerary
-FROM    #Legs l
-GROUP BY l.DOC_NBR, l.TravelerID, l.TravelerOrder;
-
-CREATE CLUSTERED INDEX IX_Itinerary_Key
-    ON #Itinerary (DOC_NBR, TravelerID, TravelerOrder);
-
-SELECT DISTINCT
-        tr.Factory_User
-       ,tr.Departure
-       ,tr.TravelerID
-INTO    #DeptDistinct
-FROM    #Travelers tr;
-
-SELECT  d.Factory_User
-       ,d.Departure
-       ,d.TravelerID
-       ,COALESCE(
-            dp.Department_Name COLLATE SQL_Latin1_General_CP1_CI_AS
-           ,vwd.GROUP_NAME
-           ,(
-                SELECT TOP 1 vwd2.GROUP_NAME
-                FROM   TB_EB_USER teu2
-                        OUTER APPLY (
-                    SELECT teed2.GROUP_ID
-                    FROM   TB_EB_EMPL_DEP AS teed2
-                    WHERE  teed2.USER_GUID = teu2.USER_GUID
-                            AND teed2.ORDERS = 0
-                ) teed2
-                LEFT JOIN vwDepartment_Factory vwd2
-                            ON  vwd2.GROUP_ID = teed2.GROUP_ID
-                WHERE  teu2.ACCOUNT = ISNULL(d.Factory_User ,'')+d.TravelerID
-                        AND vwd2.GROUP_NAME IS NOT NULL
-            )
-           ,(
-                SELECT TOP 1 vwd3.GROUP_NAME
-                FROM   TB_EB_USER teu3
-                        OUTER APPLY (
-                    SELECT teed3.GROUP_ID
-                    FROM   TB_EB_EMPL_DEP AS teed3
-                    WHERE  teed3.USER_GUID = teu3.USER_GUID
-                            AND teed3.ORDERS = 0
-                ) teed3
-                LEFT JOIN vwDepartment_Factory vwd3
-                            ON  vwd3.GROUP_ID = teed3.GROUP_ID
-                WHERE  teu3.ACCOUNT = ISNULL(d.Departure ,'')+d.TravelerID
-                        AND vwd3.GROUP_NAME IS NOT NULL
-            )
-           ,(
-                SELECT TOP 1 vwd4.GROUP_NAME
-                FROM   CDS_FMEval_Employee cfe
-                        JOIN TB_EB_USER teu4
-                            ON  teu4.ACCOUNT = cfe.BPMAccount
-                        OUTER APPLY (
-                    SELECT teed4.GROUP_ID
-                    FROM   TB_EB_EMPL_DEP AS teed4
-                    WHERE  teed4.USER_GUID = teu4.USER_GUID
-                            AND teed4.ORDERS = 0
-                ) teed4
-                LEFT JOIN vwDepartment_Factory vwd4
-                            ON  vwd4.GROUP_ID = teed4.GROUP_ID
-                WHERE  cfe.EmpID = d.TravelerID
-                        AND vwd4.GROUP_NAME IS NOT NULL
-            )
-           ,(
-                SELECT TOP 1 vwd5.GROUP_NAME
-                FROM   TB_EB_USER teu5
-                        OUTER APPLY (
-                    SELECT teed5.GROUP_ID
-                    FROM   TB_EB_EMPL_DEP AS teed5
-                    WHERE  teed5.USER_GUID = teu5.USER_GUID
-                            AND teed5.ORDERS = 0
-                ) teed5
-                LEFT JOIN vwDepartment_Factory vwd5
-                            ON  vwd5.GROUP_ID = teed5.GROUP_ID
-                WHERE  teu5.ACCOUNT = d.TravelerID
-                        AND vwd5.GROUP_NAME IS NOT NULL
-            )
-           ,(
-                SELECT TOP 1 vwd6.GROUP_NAME
-                FROM   TB_EB_USER teu6
-                        JOIN TB_EB_EMPL_DEP teed6
-                            ON  teed6.USER_GUID = teu6.USER_GUID
-                        LEFT JOIN vwDepartment_Factory vwd6
-                            ON  vwd6.GROUP_ID = teed6.GROUP_ID
-                WHERE  teu6.ACCOUNT = d.TravelerID
-                        AND vwd6.GROUP_NAME IS NOT NULL
-                ORDER BY
-                        teed6.ORDERS
-            )
-           ,(
-                SELECT TOP 1 vwd7.GROUP_NAME
-                FROM   TB_EB_USER teu7
-                        JOIN TB_EB_EMPL_DEP teed7
-                            ON  teed7.USER_GUID = teu7.USER_GUID
-                        LEFT JOIN vwDepartment_Factory vwd7
-                            ON  vwd7.GROUP_ID = teed7.GROUP_ID
-                WHERE  teu7.ACCOUNT LIKE '%'+d.TravelerID
-                        AND vwd7.GROUP_NAME IS NOT NULL
-                ORDER BY
-                        teed7.ORDERS
-            )
-        )                        AS Dept
-INTO    #DeptLookup
-FROM    #DeptDistinct d
-        OUTER APPLY (
-    SELECT TOP 1 teu.USER_GUID
-    FROM   TB_EB_USER teu
-    WHERE  (
-               d.Factory_User IS NOT NULL
-               AND teu.ACCOUNT=d.Factory_User+d.TravelerID
-           )
-           OR (d.Factory_User IS NULL AND teu.ACCOUNT=d.TravelerID)
-)                               AS teu
-OUTER APPLY (
-    SELECT teed.GROUP_ID
-    FROM   TB_EB_EMPL_DEP AS teed
-    WHERE  teed.USER_GUID = teu.USER_GUID
-           AND teed.ORDERS = 0
-)                               AS teed
-LEFT JOIN vwDepartment_Factory  AS vwd
-            ON  vwd.GROUP_ID = teed.GROUP_ID
-LEFT JOIN [JZS_HRIS].[HRIS].[dbo].[View_Data_Person] dp
-            ON  dp.Person_ID COLLATE SQL_Latin1_General_CP1_CI_AS = d.TravelerID COLLATE SQL_Latin1_General_CP1_CI_AS;
-
-CREATE CLUSTERED INDEX IX_DeptLookup_Key
-    ON #DeptLookup (Factory_User, Departure, TravelerID);
-
-SELECT  tr.TripID
-       ,tr.DOC_NBR
-       ,tr.Factory
-       ,tr.Departure
-       ,tr.Destination
-       ,tr.TypeTravel
-       ,ISNULL(it.RoutesMerged, tr.Routes)  AS Routes
-       ,tr.DuringDay
-       ,tr.Distance
-       ,tr.TotalMoney
-       ,tr.Accommodation
-       ,tr.CreatedAt
-       ,tr.UserCreate
-       ,tr.BPMStatus
-       ,tr.YN
-       ,tr.Factory_User
-       ,tr.DateStart
-       ,tr.DateEnd
-       ,tr.StayNight
-       ,tr.AssisstedIDs
-       ,tr.TravelerID
-       ,tr.TravelerOrder
-       ,dl.Dept
-       ,COUNT(*) OVER()          AS TotalRow
-FROM    #Travelers tr
-        LEFT JOIN #Itinerary it
-               ON  it.DOC_NBR       = tr.DOC_NBR
-               AND it.TravelerID    = tr.TravelerID
-               AND it.TravelerOrder = tr.TravelerOrder
-        LEFT JOIN #DeptLookup dl
-               ON  ISNULL(dl.Factory_User ,'') = ISNULL(tr.Factory_User ,'')
-               AND ISNULL(dl.Departure ,'')    = ISNULL(tr.Departure ,'')
-               AND dl.TravelerID                = tr.TravelerID
-ORDER BY tr.CreatedAt ASC ,tr.DOC_NBR ,tr.TravelerOrder;
-
-DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #DeptDistinct, #DeptLookup;`;
-
-    const rawRows = (await this.UOF.query(query, {
-      type: QueryTypes.SELECT,
-      replacements: finalReplacements,
-    })) as Record<string, any>[];
-
-    const transformed = rawRows.flatMap((row) =>
-      this.expandCat6RowsByAssistedIds(row).map((expandedRow) => ({
-        Application_Day: expandedRow.CreatedAt
-          ? dayjs(expandedRow.CreatedAt).format('YYYY-MM-DD')
-          : '',
-        Document_Number: expandedRow.DOC_NBR ?? '',
-        Staff_ID: expandedRow.EffectiveStaffID ?? '',
-        Dept: expandedRow.Dept ?? expandedRow.Department ?? '',
-        Round_trip_One_way:
-          this.formatCat6TripType(expandedRow.TypeTravel) ?? '',
-        Start_Time: expandedRow.DateStart
-          ? dayjs(expandedRow.DateStart).format('YYYY-MM-DD')
-          : '',
-        End_Time: expandedRow.DateEnd
-          ? dayjs(expandedRow.DateEnd).format('YYYY-MM-DD')
-          : '',
-        Business_Trip_Type:
-          this.formatCat6BusinessTripType(expandedRow.Factory) ?? '',
-        Routes: expandedRow.Routes,
-        Number_of_nights_stayed: this.getCat6AccommodationNights(
-          expandedRow.Accommodation,
-        ),
-      })),
+    // Like the preview: 'ALL' (or no factory) means no factory filter.
+    const { where, replacements: finalReplacements } = buildCat6Filter(
+      dateFrom,
+      dateTo,
+      factory && factory.trim().toUpperCase() !== 'ALL' ? factory : null,
     );
 
-    return transformed;
-  }
+    const query = buildCat6TripQuery(where);
 
-  private applyCat6SheetFormatting(sheet: ExcelJS.Worksheet) {
-    sheet.columns.forEach((column) => {
-      let maxLength = 0;
-      if (typeof column.eachCell === 'function') {
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const cellValue = cell.value ? String(cell.value) : '';
-          maxLength = Math.max(maxLength, cellValue.length);
-        });
-      }
-      column.width = maxLength * 1.2;
+    const rawRows = await this.UOF.query(query, {
+      type: QueryTypes.SELECT,
+      replacements: finalReplacements,
     });
-    sheet.eachRow({ includeEmpty: true }, (row) => {
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+
+    return toCat6ExportRows(rawRows);
   }
 
   async fileExcelCat6(
@@ -920,9 +387,8 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     const legRows = withNightsStayed.flatMap((row) => {
       const { Routes, Document_Number, ...tripFields } = row;
       const documentNumberBase = Document_Number ?? '';
-      const { places, transports } =
-        this.extractCat6PlacesAndTransports(Routes);
-      const legs = this.buildCat6LegsFromPlaces(places, transports);
+      const { places, transports } = extractCat6PlacesAndTransports(Routes);
+      const legs = buildCat6LegsFromPlaces(places, transports);
 
       if (legs.length === 0) {
         return [
@@ -945,26 +411,7 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
       }));
     });
 
-    sheet.columns = [
-      { header: 'Application Day', key: 'Application_Day' },
-      { header: 'Document Number', key: 'Document_Number' },
-      { header: 'Staff ID', key: 'Staff_ID' },
-      { header: 'Dept', key: 'Dept' },
-      { header: 'Round trip / One way', key: 'Round_trip_One_way' },
-      { header: 'Start Time', key: 'Start_Time' },
-      { header: 'End Time', key: 'End_Time' },
-      { header: 'Business Trip Type', key: 'Business_Trip_Type' },
-      { header: 'Departure', key: 'Departure' },
-      { header: 'Destination', key: 'Destination' },
-      { header: 'Transport', key: 'Transport' },
-      {
-        header: 'Number of nights stayed (Hotel)',
-        key: 'Number_of_nights_stayed',
-      },
-    ];
-
-    legRows.forEach((item) => sheet.addRow(item));
-    this.applyCat6SheetFormatting(sheet);
+    fillSheet(sheet, CAT6_COLUMNS, legRows);
   }
 
   async fileExcelCat6Accommodation(
@@ -982,20 +429,7 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
       (row) => Number(row.Number_of_nights_stayed ?? 0) > 0,
     );
 
-    sheet.columns = [
-      { header: 'Application Day', key: 'Application_Day' },
-      { header: 'Document Number', key: 'Document_Number' },
-      { header: 'Staff ID', key: 'Staff_ID' },
-      { header: 'Dept', key: 'Dept' },
-      { header: 'Business Trip Type', key: 'Business_Trip_Type' },
-      {
-        header: 'Number of nights stayed (Hotel)',
-        key: 'Number_of_nights_stayed',
-      },
-    ];
-
-    withNightsStayed.forEach((item) => sheet.addRow(item));
-    this.applyCat6SheetFormatting(sheet);
+    fillSheet(sheet, CAT6_ACCOMMODATION_COLUMNS, withNightsStayed);
   }
 
   async fileExcelCat9AndCat12(
@@ -1005,37 +439,15 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     factory: string,
     ry: string,
   ) {
-    let db: Sequelize;
-    switch (factory.trim()) {
-      case 'LYV':
-        db = this.LYV_ERP;
-        break;
-      case 'LHG':
-        db = this.LHG_ERP;
-        break;
-      case 'LYM':
-        db = this.LYM_ERP;
-        break;
-      case 'LVL':
-        db = this.LVL_ERP;
-        break;
-      case 'LYF':
-        db = this.LYF_ERP;
-        break;
-      case 'JAZ':
-        db = this.JAZ_ERP;
-        break;
-      case 'JZS':
-        db = this.JZS_ERP;
-        break;
-      default:
-        return await this.getAllExcelFactoryCat9AndCat12Data(
-          sheet,
-          dateFrom,
-          dateTo,
-          factory,
-          ry,
-        );
+    const db = this.findConnection(this.erpConnections, factory);
+    if (!db) {
+      return await this.getAllExcelFactoryCat9AndCat12Data(
+        sheet,
+        dateFrom,
+        dateTo,
+        factory,
+        ry,
+      );
     }
 
     await getADataExcelFactoryCat9AndCat12(
@@ -1057,177 +469,19 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     ry,
     dbEIP?: Sequelize,
   ) {
-    const getQuery = (
-      factoryName: string,
-    ) => `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
-                          ,*
-                          ,'${factoryName}' AS Factory_Name
-                    FROM   (
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,im.INV_NO               AS Invoice_Number
-                                    ,id.STYLE_NAME           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
-                                    ,p.Qty                   AS Quantity
-                                    ,p.GW                    AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,pc.PortCode             AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,ISNULL(
-                                        ISNULL(
-                                            bg.SHPIDS
-                                          ,CASE 
-                                                WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                                WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                                WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                                WHEN do.ShipMode_1 IS NULL THEN ''
-                                                ELSE do.ShipMode_1 END
-                                        )
-                                      ,y.ShipMode
-                                    )                       AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_M im
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = im.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = im.INV_NO
-                                    LEFT JOIN (
-                                              SELECT INV_NO
-                                                    ,RYNO
-                                                    ,SUM(PAIRS)     Qty
-                                                    ,SUM(GW)        GW
-                                              FROM   PACKING
-                                              GROUP BY
-                                                    INV_NO
-                                                    ,RYNO
-                                          ) p
-                                          ON  p.INV_NO = id.INV_NO
-                                              AND p.RYNO = id.RYNO
-                                    LEFT JOIN YWDD y
-                                          ON  y.DDBH = id.RYNO
-                                    LEFT JOIN DE_ORDERM do
-                                          ON  do.ORDERNO = y.YSBH
-                                    LEFT JOIN B_GradeOrder bg
-                                          ON  bg.ORDER_B = y.YSBH
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'SEA'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                              ${where} AND NOT EXISTS (
-                                                    SELECT 1
-                                                    FROM   INVOICE_SAMPLE is1
-                                                    WHERE  is1.Inv_No = im.Inv_No
-                                                )
-                              UNION
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,is1.Inv_No              AS Invoice_Number
-                                    ,'SAMPLE SHOE'           AS Article_Name
-                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
-                                    ,is1.Qty                 AS Quantity
-                                    ,is1.GW                  AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,pc.PortCode             AS Port_Of_Arrival
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'AIR'                   AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_SAMPLE is1
-                                    LEFT JOIN INVOICE_M im
-                                          ON  im.Inv_No = is1.Inv_No
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = is1.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = is1.Inv_No
-                                    LEFT JOIN (
-                                              SELECT CustomerNumber
-                                                    ,PortCode
-                                                    ,TransportMethod
-                                              FROM   CMW.CMW.dbo.CMW_PortCode
-                                              WHERE  TransportMethod = 'AIR'
-                                          ) pc
-                                          ON  pc.CustomerNumber COLLATE Chinese_Taiwan_Stroke_CI_AS = im.CUSTID
-                              ${where1}
-                          ) AS Cat9AndCat12`;
-
-    let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-    let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-    const replacements: any[] = [];
-
-    if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
-      where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date,23) BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo, dateFrom, dateTo);
-    }
-
-    if (ry === 'Product') {
-      where += ` AND CHARINDEX('-', id.RYNO) > 0`;
-      where1 += ` AND CHARINDEX('-', id.RYNO) > 0`;
-    } else if (ry === 'Component') {
-      where += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
-      where1 += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
-    }
-    // const query = ``;
-    const connects = [
-      { conn: this.LYV_ERP, factoryName: 'LYV' },
-      { conn: this.LHG_ERP, factoryName: 'LHG' },
-      { conn: this.LYM_ERP, factoryName: 'LYM' },
-      { conn: this.LVL_ERP, factoryName: 'LVL' },
-      { conn: this.LYF_ERP, factoryName: 'LYF' },
-      { conn: this.JAZ_ERP, factoryName: 'JAZ' },
-      { conn: this.JZS_ERP, factoryName: 'JZS' },
-    ];
+    const { where, where1, replacements } = buildCat9AndCat12Filter(
+      dateFrom,
+      dateTo,
+      ry,
+      EXPORT_DATE_COLUMN,
+    );
     const dataResults = await Promise.all(
-      connects.map(({ conn, factoryName }) => {
-        const query = getQuery(factoryName);
+      this.erpConnections.map(({ conn, factoryName }) => {
+        const query = buildAllFactoryCat9AndCat12Query(
+          factoryName,
+          where,
+          where1,
+        );
         return conn.query(query, {
           type: QueryTypes.SELECT,
           replacements,
@@ -1239,238 +493,9 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
 
     let data: any = allData.map((item, index) => ({ ...item, No: index + 1 }));
 
-    data = await Promise.all(
-      data.map(async (item) => {
-        let portOfDeparture = '';
-        if (
-          item?.Article_ID.trim().toLowerCase() ===
-          'SAMPLE SHOE'.trim().toLowerCase()
-        ) {
-          item.Transport_Method = 'AIR';
-          portOfDeparture = 'SGN';
-        } else {
-          switch (item?.Transport_Method.trim().toLowerCase()) {
-            case '11 SC'.trim().toLowerCase():
-            case 'Ocean'.trim().toLowerCase():
-            case 'Sea Air Collect'.trim().toLowerCase():
-            case 'SC'.trim().toLowerCase():
-            case 'Sea/Air'.trim().toLowerCase():
-            case 'Partial'.trim().toLowerCase():
-              item.Transport_Method = 'SEA';
-              break;
-            case '20 CC'.trim().toLowerCase():
-            case 'AC'.trim().toLowerCase():
-            case '10 AC'.trim().toLowerCase():
-            case 'CC'.trim().toLowerCase():
-            case 'Air PP'.trim().toLowerCase():
-            case 'Air Express'.trim().toLowerCase():
-            case 'AE'.trim().toLowerCase():
-              item.Transport_Method = 'AIR';
-              break;
-            case 'RAIL'.trim().toLowerCase():
-            case 'Rail Collect'.trim().toLowerCase():
-            case 'Rail Colle'.trim().toLowerCase():
-              item.Transport_Method = 'Land';
-              break;
-            default:
-              item.Transport_Method = 'SEA';
-              break;
-          }
+    data = await addPortsToRows(data, dbEIP);
 
-          switch (item.Factory_Name.trim().toLowerCase()) {
-            case 'LYV'.trim().toLowerCase():
-            case 'LVL'.trim().toLowerCase():
-            case 'LHG'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SGN';
-              }
-              break;
-            case 'LYM'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'MMRGN';
-              } else {
-                portOfDeparture = 'RGN';
-              }
-              break;
-            case 'LYF'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'IDSRG';
-              } else {
-                portOfDeparture = 'CGK';
-              }
-              break;
-            default:
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SGN';
-              }
-              break;
-          }
-        }
-
-        const queryPoA = `SELECT PortCode
-                        FROM CMW_PortCode
-                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
-        const result: any = await dbEIP?.query(queryPoA, {
-          type: QueryTypes.SELECT,
-          replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
-        });
-
-        return {
-          ...item,
-          Transport_Method: item.Transport_Method,
-          Port_Of_Departure: portOfDeparture,
-          Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
-        };
-      }),
-    );
-
-    sheet.columns = [
-      {
-        header: 'No.',
-        key: 'No',
-      },
-      {
-        header: 'Date',
-        key: 'Date',
-      },
-      {
-        header: 'RY Product',
-        key: 'RYProduct',
-      },
-      {
-        header: 'RY Component',
-        key: 'RYComponent',
-      },
-      {
-        header: 'Component Name',
-        key: 'ComponentName',
-      },
-      {
-        header: 'Shipment Date',
-        key: 'Shipment_Date',
-      },
-      {
-        header: 'Invoice Number',
-        key: 'Invoice_Number',
-      },
-      {
-        header: 'Article Name',
-        key: 'Article_Name',
-      },
-      {
-        header: 'Article ID',
-        key: 'Article_ID',
-      },
-      {
-        header: 'Quantity',
-        key: 'Quantity',
-      },
-      {
-        header: 'Gross Weight',
-        key: 'Gross_Weight',
-      },
-      {
-        header: 'Customer ID',
-        key: 'Customer_ID',
-      },
-      {
-        header: 'Local land transportation',
-        key: 'Local_Land_Transportation',
-      },
-      {
-        header: 'Port of Departure',
-        key: 'Port_Of_Departure',
-      },
-      {
-        header: 'Port of Arrival',
-        key: 'Port_Of_Arrival',
-      },
-      {
-        header: 'Land Transport Distance',
-        key: 'Land_Transport_Distance',
-      },
-      {
-        header: 'Sea Transport Distance',
-        key: 'Sea_Transport_Distance',
-      },
-      {
-        header: 'Air Transport Distance',
-        key: 'Air_Transport_Distance',
-      },
-      {
-        header: 'Transport Method',
-        key: 'Transport_Method',
-      },
-      {
-        header: 'Land Transport Ton-Kilometers',
-        key: 'Land_Transport_Ton_Kilometers',
-      },
-      {
-        header: 'Sea Transport Ton-Kilometers',
-        key: 'Sea_Transport_Ton_Kilometers',
-      },
-      {
-        header: 'Air Transport Ton-Kilometers',
-        key: 'Air_Transport_Ton_Kilometers',
-      },
-    ];
-    data.forEach((item) => sheet.addRow(item));
-    sheet.columns.forEach((column) => {
-      let maxLength = 0;
-      if (typeof column.eachCell === 'function') {
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const cellValue = cell.value ? String(cell.value) : '';
-          maxLength = Math.max(maxLength, cellValue.length);
-        });
-      }
-      column.width = maxLength * 1.2;
-    });
-    sheet.eachRow({ includeEmpty: true }, (row) => {
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+    fillSheet(sheet, CAT9_AND_CAT12_COLUMNS, data);
   }
 
   async fileExcelCat5(
@@ -1479,29 +504,9 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     dateTo: string,
     factory: string,
   ) {
-    // console.log(dateFrom, dateTo, factory);
-    let db: Sequelize;
-    switch (factory.trim()) {
-      case 'LYV':
-        db = this.LYV_WMS;
-        break;
-      case 'LHG':
-        db = this.LHG_WMS;
-        break;
-      case 'LYM':
-        db = this.LYM_WMS;
-        break;
-      case 'LVL':
-        db = this.LVL_WMS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_WMS;
-        break;
-      case 'JZS':
-        db = this.JZS_WMS;
-        break;
-      default:
-        return await this.getAllDataExcelFactoryCat5(sheet, dateFrom, dateTo);
+    const db = this.findConnection(this.wmsConnections, factory);
+    if (!db) {
+      return await this.getAllDataExcelFactoryCat5(sheet, dateFrom, dateTo);
     }
 
     await getADataExcelFactoryCat5(sheet, db, dateFrom, dateTo);
@@ -1518,136 +523,17 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
       where += ` AND dwo.WASTE_DATE BETWEEN ? AND ?`;
       replacements.push(dateFrom, dateTo);
     }
-    const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
-                          ,dwc.CONSOLIDATED_WASTE_CODE AS Consolidated_Waste
-                          ,dwc.WASTE_CODE AS Waste_Code
-                          ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
-                          ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
-                          ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
-                          ,dwc.LOCATION_CODE AS Location_Code
-                          ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                          ,CASE 
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
-                                ELSE NULL
-                          END                                AS The_type_of_waste
-                          ,CASE 
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
-                                ELSE NULL
-                          END                                AS Waste_type
-                          ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
-                          ,dtm.TREATMENT_METHOD_ID            AS Treatment_Method_ID
-                          ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
-                          ,CAST('0' AS INT)                   AS TKT_Ton_km
-                    FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
-                          LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
-                                ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
-                          LEFT JOIN dbo.DATA_TREATMENT_METHOD dtm
-                                ON  dtm.TREATMENT_METHOD_ID = dwo.TREATMENT_METHOD_ID
-                          LEFT JOIN dbo.DATA_EMERET_WASTE_CATEGORY dewc
-                                ON  dewc.EMERET_WASTE_ID = dwo.EMERET_WASTE_ID
-                          LEFT JOIN dbo.DATA_WASTE_CATEGORY dwc
-                                ON  dwc.WASTE_CODE = dwo.WASTE_CODE
-                          LEFT JOIN dbo.DATA_TREATMENT_DISTANCE td
-                                ON  td.CODE = dwo.LOCATION_CODE
-                    ${where}`;
-    const connects = [
-      this.LYV_WMS,
-      this.LHG_WMS,
-      this.LYM_WMS,
-      this.LVL_WMS,
-      this.JAZ_WMS,
-      this.JZS_WMS,
-    ];
+    const query = buildAllFactoryCat5Query(where);
     const dataResults = await Promise.all(
-      connects.map((conn) => {
+      this.wmsConnections.map(({ conn }) => {
         return conn.query(query, {
           type: QueryTypes.SELECT,
           replacements,
         });
       }),
     );
-    let data = dataResults.flat();
-    sheet.columns = [
-      {
-        header: 'Waste disposal date',
-        key: 'Waste_disposal_date',
-      },
-      {
-        header: 'Consolidated Waste',
-        key: 'Consolidated_Waste',
-      },
-      {
-        header: 'Waste Code',
-        key: 'Waste_Code',
-      },
-      {
-        header: 'Vendor Name',
-        key: 'Vendor_Name',
-      },
-      {
-        header: 'Vendor ID',
-        key: 'Vendor_ID',
-      },
-      {
-        header: 'Waste collection address',
-        key: 'Waste_collection_address',
-      },
-      {
-        header: 'Location Code',
-        key: 'Location_Code',
-      },
-      {
-        header: 'Transportation Distance (km)',
-        key: 'Transportation_Distance_km',
-      },
-      {
-        header: '*The type of waste',
-        key: 'The_type_of_waste',
-      },
-      {
-        header: '*Waste type',
-        key: 'Waste_type',
-      },
-      {
-        header: '*Waste Treatment method',
-        key: 'Waste_Treatment_method',
-      },
-      {
-        header: 'Treatment Method ID',
-        key: 'Treatment_Method_ID',
-      },
-      {
-        header: '*Weight of waste treated (Unit：kg)',
-        key: 'Weight_of_waste_treated_Unit_kg',
-      },
-      {
-        header: 'TKT (Ton-km)',
-        key: 'TKT_Ton_km',
-      },
-    ];
-    data.forEach((item) => sheet.addRow(item));
-    sheet.columns.forEach((column) => {
-      let maxLength = 0;
-      if (typeof column.eachCell === 'function') {
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const cellValue = cell.value ? String(cell.value) : '';
-          maxLength = Math.max(maxLength, cellValue.length);
-        });
-      }
-      column.width = maxLength * 1.2;
-    });
-    sheet.eachRow({ includeEmpty: true }, (row) => {
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+    const data = dataResults.flat();
+    fillSheet(sheet, CAT5_COLUMNS, data);
   }
 
   async fileExcelCat1AndCat4(
@@ -1660,30 +546,17 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     weight?: boolean,
     departure?: boolean,
   ) {
-    let db: Sequelize;
-    switch (factory.trim()) {
-      case 'LYV':
-        db = this.LYV_ERP;
-        break;
-      case 'LHG':
-        db = this.LHG_ERP;
-        break;
-      case 'LYM':
-        db = this.LYM_ERP;
-        break;
-      case 'LVL':
-        db = this.LVL_ERP;
-        break;
-      default:
-        return await this.getAllDataExcelFactoryCat1AndCat4(
-          sheet,
-          dateFrom,
-          dateTo,
-          usage,
-          unitWeight,
-          weight,
-          departure,
-        );
+    const db = this.findConnection(this.cat1And4Connections, factory);
+    if (!db) {
+      return await this.getAllDataExcelFactoryCat1AndCat4(
+        sheet,
+        dateFrom,
+        dateTo,
+        usage,
+        unitWeight,
+        weight,
+        departure,
+      );
     }
 
     await getADataExcelFactoryCat1AndCat4(
@@ -1709,20 +582,14 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     weight?: boolean,
     departure?: boolean,
   ) {
-    const connects: { factoryName: string; conn: Sequelize }[] = [
-      { factoryName: 'LYV', conn: this.LYV_ERP },
-      { factoryName: 'LHG', conn: this.LHG_ERP },
-      { factoryName: 'LVL', conn: this.LVL_ERP },
-      { factoryName: 'LYM', conn: this.LYM_ERP },
-    ];
     const replacements = {
       startDate: dateFrom,
-      endDate: dayjs(dateTo).add(1, 'day').startOf('day').format('YYYY-MM-DD'),
+      endDate: getDayAfter(dateTo),
       offset: 1,
       limit: 20,
     };
     const dataResults = await Promise.all(
-      connects.map(async ({ factoryName, conn }) => {
+      this.cat1And4Connections.map(async ({ factoryName, conn }) => {
         const query = await buildQueryCat1AndCat4(
           'No',
           'asc',
@@ -1738,100 +605,13 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
           replacements,
         });
 
-        rows = await Promise.all(
-          rows.map(async (item: any) => {
-            const taxFreeZone: any[] = await this.EIP.query(
-              `SELECT TaxFreeZoneAddress
-              FROM CMW_TAX_FREE_ZONE_ADDRESS
-              WHERE SupplierID = ? AND Factory = ?`,
-              {
-                replacements: [item.SupplierCode.trim(), factoryName],
-                type: QueryTypes.SELECT,
-              },
-            );
-            return {
-              ...item,
-              TransportationMethod:
-                taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
-              Departure:
-                taxFreeZone.length > 0
-                  ? taxFreeZone[0].TaxFreeZoneAddress
-                  : item.Departure,
-            };
-          }),
-        );
+        rows = await applyTaxFreeZoneToRows(rows, factoryName, this.EIP);
 
         return rows;
       }),
     );
-    let data = dataResults.flat();
-    sheet.columns = [
-      { header: 'No.', key: 'No' },
-      { header: 'Factory Code', key: 'FactoryCode' },
-      { header: 'Pur Date', key: 'PurDate' },
-      { header: 'RK Date', key: 'RKDate' },
-      { header: 'Purchase Order', key: 'PurNo' },
-      { header: 'Received No.', key: 'ReceivedNo' },
-      { header: 'Material No.', key: 'MatID' },
-      { header: 'Qty.(Usage)', key: 'QtyUsage' },
-      { header: 'Qty.(receive)', key: 'QtyReceive' },
-      { header: 'Unit weight', key: 'UnitWeight' },
-      { header: 'Weight (Unit：KG)', key: 'WeightUnitkg' },
-      { header: 'Supplier Code', key: 'SupplierCode' },
-      { header: 'Style', key: 'Style' },
-      { header: 'Transportation Method', key: 'TransportationMethod' },
-      { header: 'Departure', key: 'Departure' },
-      {
-        header: 'Third-country Land Transport (A)',
-        key: 'ThirdCountryLandTransport',
-      },
-      { header: 'Port of Departure', key: 'PortOfDeparture' },
-      { header: 'Port of Arrival', key: 'PortOfArrival' },
-      {
-        header: 'Factory (Domestic Land Transport)(B)',
-        key: 'FactoryDomesticLandTransport',
-      },
-      { header: 'Destination', key: 'Destination' },
-      {
-        header: 'Land Transport Distance (A+B)',
-        key: 'LandTransportDistance',
-      },
-      { header: 'Sea Transport Distance', key: 'SeaTransportDistance' },
-      { header: 'Air Transport Distance', key: 'AirTransportDistance' },
-      {
-        header: 'Land Transport Ton-Kilometer',
-        key: 'LandTransportTonKilometers',
-      },
-      {
-        header: 'Sea Transport Ton-Kilometers',
-        key: 'SeaTransportTonKilometers',
-      },
-      {
-        header: '	Air Transport Ton-Kilomete',
-        key: 'AirTransportTonKilometers',
-      },
-    ];
-    data.forEach((item) => sheet.addRow(item));
-    sheet.columns.forEach((column) => {
-      let maxLength = 0;
-      if (typeof column.eachCell === 'function') {
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const cellValue = cell.value ? String(cell.value) : '';
-          maxLength = Math.max(maxLength, cellValue.length);
-        });
-      }
-      column.width = maxLength * 1.2;
-    });
-    sheet.eachRow({ includeEmpty: true }, (row) => {
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+    const data = dataResults.flat();
+    fillSheet(sheet, CAT1_AND_CAT4_COLUMNS, data);
   }
 
   async fileExcelCat7(
@@ -1840,28 +620,9 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     dateTo: string,
     factory: string,
   ) {
-    let db: Sequelize;
-    switch (factory.trim()) {
-      case 'LYV':
-        db = this.LYV_HRIS;
-        break;
-      case 'LHG':
-        db = this.LHG_HRIS;
-        break;
-      case 'LYM':
-        db = this.LYM_HRIS;
-        break;
-      case 'LVL':
-        db = this.LVL_HRIS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_HRIS;
-        break;
-      case 'JZS':
-        db = this.JZS_HRIS;
-        break;
-      default:
-        return await this.getAllDataExcelFactoryCat7(sheet, dateFrom, dateTo);
+    const db = this.findConnection(this.hrisConnections, factory);
+    if (!db) {
+      return await this.getAllDataExcelFactoryCat7(sheet, dateFrom, dateTo);
     }
 
     await getADataExcelFactoryCat7(sheet, db, dateFrom, dateTo, factory);
@@ -1872,59 +633,17 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     dateFrom: string,
     dateTo: string,
   ) {
-    const connects: { facotryName: string; conn: Sequelize }[] = [
-      { facotryName: 'LYV', conn: this.LYV_HRIS },
-      { facotryName: 'LHG', conn: this.LHG_HRIS },
-      { facotryName: 'LVL', conn: this.LVL_HRIS },
-      { facotryName: 'LYM', conn: this.LYM_HRIS },
-      { facotryName: 'JAZ', conn: this.JAZ_HRIS },
-      { facotryName: 'JZS', conn: this.JZS_HRIS },
-    ];
-
     const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
 
     const dataResults = await Promise.all(
-      connects.map(({ facotryName, conn }) => {
-        const { query } = buildQuery(facotryName, dateFrom, dateTo);
+      this.hrisConnections.map(({ factoryName, conn }) => {
+        const { query } = buildQuery(factoryName, dateFrom, dateTo);
         return conn.query(query, { type: QueryTypes.SELECT, replacements });
       }),
     );
 
-    let data = dataResults.flat();
-    sheet.columns = [
-      { header: 'Staff ID', key: 'Staff_ID' },
-      { header: 'Residential address', key: 'Residential_address' },
-      {
-        header: 'Main transportation type',
-        key: 'Main_transportation_type',
-      },
-      { header: 'km', key: 'km' },
-      { header: 'Number of working days', key: 'Number_of_working_days' },
-      { header: 'PKT (p-km)', key: 'PKT_p_km' },
-    ];
-    data.forEach((item) => sheet.addRow(item));
-
-    sheet.columns.forEach((column) => {
-      let maxLength = 0;
-      if (typeof column.eachCell === 'function') {
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const cellValue = cell.value ? String(cell.value) : '';
-          maxLength = Math.max(maxLength, cellValue.length);
-        });
-      }
-      column.width = maxLength * 1.2;
-    });
-
-    sheet.eachRow({ includeEmpty: true }, (row) => {
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+    const data = dataResults.flat();
+    fillSheet(sheet, CAT7_COLUMNS, data);
   }
 
   private async fileCustomExport(
@@ -1934,33 +653,9 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     factory: string,
     fields?: string[],
   ) {
-    let db: Sequelize;
-    switch (factory.trim()) {
-      case 'LYV':
-        db = this.LYV_HRIS;
-        break;
-      case 'LHG':
-        db = this.LHG_HRIS;
-        break;
-      case 'LYM':
-        db = this.LYM_HRIS;
-        break;
-      case 'LVL':
-        db = this.LVL_HRIS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_HRIS;
-        break;
-      case 'JZS':
-        db = this.JZS_HRIS;
-        break;
-      default:
-        return await this.getAllDataCustomExport(
-          sheet,
-          dateFrom,
-          dateTo,
-          fields,
-        );
+    const db = this.findConnection(this.hrisConnections, factory);
+    if (!db) {
+      return await this.getAllDataCustomExport(sheet, dateFrom, dateTo, fields);
     }
     await getADataCustomExport(sheet, db, dateFrom, dateTo, factory, fields);
   }
@@ -1971,25 +666,17 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
     dateTo: string,
     fields?: string[],
   ) {
-    const connects: { facotryName: string; conn: Sequelize }[] = [
-      { facotryName: 'LYV', conn: this.LYV_HRIS },
-      { facotryName: 'LHG', conn: this.LHG_HRIS },
-      { facotryName: 'LVL', conn: this.LVL_HRIS },
-      { facotryName: 'LYM', conn: this.LYM_HRIS },
-      { facotryName: 'JAZ', conn: this.JAZ_HRIS },
-      { facotryName: 'JZS', conn: this.JZS_HRIS },
-    ];
     const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
     const dataResults = await Promise.all(
-      connects.map(({ facotryName, conn }) => {
-        const { query } = buildQueryCustomExport(dateFrom, dateTo, facotryName);
+      this.hrisConnections.map(({ factoryName, conn }) => {
+        const { query } = buildQueryCustomExport(dateFrom, dateTo, factoryName);
         return conn.query(query, { type: QueryTypes.SELECT, replacements });
       }),
     );
 
     const allData = dataResults.flat();
 
-    let data = allData.map((item, index) => ({ ...item, No: index + 1 }));
+    const data = allData.map((item, index) => ({ ...item, No: index + 1 }));
 
     if (!data || data.length === 0) return;
 
@@ -2009,28 +696,6 @@ DROP TABLE #Travelers, #RouteNodes, #AccomSeq, #StopSeq, #Legs, #Itinerary, #Dep
       sheet.addRow(rowData);
     });
 
-    // console.log(data);
-
-    sheet.columns.forEach((column) => {
-      let maxLength = 0;
-      if (typeof column.eachCell === 'function') {
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const cellValue = cell.value ? String(cell.value) : '';
-          maxLength = Math.max(maxLength, cellValue.length);
-        });
-      }
-      column.width = maxLength * 1.2;
-    });
-
-    sheet.eachRow({ includeEmpty: true }, (row) => {
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+    autoFitColumnsAndAddBorders(sheet);
   }
 }

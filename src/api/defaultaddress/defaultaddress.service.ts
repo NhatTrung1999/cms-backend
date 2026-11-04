@@ -5,10 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
+import { orderByClause } from 'src/helper/sql.helper';
 import { Sequelize } from 'sequelize-typescript';
 import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs';
-import * as ExcelJS from 'exceljs';
+import { readImportRows } from 'src/helper/excel-import.helper';
+import { getOwn } from 'src/helper/object.helper';
 
 @Injectable()
 export class DefaultaddressService {
@@ -21,11 +22,23 @@ export class DefaultaddressService {
     @Inject('JAZ_HRIS') private readonly JAZ_HRIS: Sequelize,
     @Inject('JZS_HRIS') private readonly JZS_HRIS: Sequelize,
   ) {}
+
+  private get factoryDbMap(): Record<string, Sequelize> {
+    return {
+      LYV: this.LYV_HRIS,
+      LHG: this.LHG_HRIS,
+      LVL: this.LVL_HRIS,
+      LYM: this.LYM_HRIS,
+      JAZ: this.JAZ_HRIS,
+      JZS: this.JZS_HRIS,
+    };
+  }
+
   async getDefaultAddress(sortField: string = 'No', sortOrder: string = 'asc') {
     const records: any[] = await this.EIP.query(
       `SELECT ROW_NUMBER() OVER (ORDER BY ID) AS No,*
         FROM CMW_Default_Address
-        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+        ORDER BY ${orderByClause(sortField, sortOrder)}
         `,
       { type: QueryTypes.SELECT },
     );
@@ -96,59 +109,16 @@ export class DefaultaddressService {
   ) {
     try {
       let insertCount = 0;
-      if (!file.path || !fs.existsSync(file.path)) {
-        throw new Error('File path not found!');
-      }
-
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(file.path);
-      const worksheet = workbook.getWorksheet(1);
-      if (!worksheet) {
-        throw new Error('No worksheet found in the Excel file');
-      }
-
-      const headerRow = worksheet.getRow(1);
-      const headers: string[] = [];
-      headerRow.eachCell((cell) => {
-        if (cell.value) {
-          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
-        }
-      });
-
-      const requiredHeaders = ['Factory', 'Default_Address'];
-      const missingHeaders = requiredHeaders.filter(
-        (h) => !headers.includes(h),
-      );
-
-      if (missingHeaders.length > 0) {
-        throw new Error(
-          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
-        );
-      }
-
-      const data: {
+      const data = await readImportRows<{
         Factory: string;
         Default_Address: string;
-      }[] = [];
+      }>(
+        file,
+        ['Factory', 'Default_Address'],
+        (rowData) => rowData?.Factory || rowData?.Default_Address,
+      );
 
-      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-        if (rowNumber === 1 && row.cellCount > 0) return;
-
-        const rowData: any = {};
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const headerCell = headerRow.getCell(colNumber);
-          const headerValue = headerCell.value;
-          if (headerValue !== null && headerValue !== undefined) {
-            const key = headerValue.toString().trim().replace(/\s+/g, '_');
-            rowData[key] = cell.value;
-          }
-        });
-        if (rowData?.Factory || rowData?.Default_Address) {
-          data.push(rowData);
-        }
-      });
-
-      for (let item of data) {
+      for (const item of data) {
         const id = uuidv4();
         await this.EIP.query(
           `INSERT INTO CMW_Default_Address
@@ -200,29 +170,8 @@ export class DefaultaddressService {
     syncDefaultAddress: string,
   ) {
     try {
-      let db: Sequelize;
-      switch (factory.trim().toUpperCase()) {
-        case 'LYV':
-          db = this.LYV_HRIS;
-          break;
-        case 'LHG':
-          db = this.LHG_HRIS;
-          break;
-        case 'LVL':
-          db = this.LVL_HRIS;
-          break;
-        case 'LYM':
-          db = this.LYM_HRIS;
-          break;
-        case 'JAZ':
-          db = this.JAZ_HRIS;
-          break;
-        case 'JZS':
-          db = this.JZS_HRIS;
-          break;
-        default:
-          throw new Error('Invalid factory code');
-      }
+      const db = getOwn(this.factoryDbMap, factory.trim().toUpperCase());
+      if (!db) throw new Error('Invalid factory code');
       await db.query(
         `UPDATE users
           SET    Address_Live     = :address

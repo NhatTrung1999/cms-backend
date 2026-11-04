@@ -1,127 +1,52 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { EventsGateway } from '../events/events.gateway';
 import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
-import * as fs from 'fs';
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { ConfigService } from '@nestjs/config';
 import * as ExcelJS from 'exceljs';
-import {
-  FACTORY_LIST,
-  FactoryCode,
-  getFactory,
-} from 'src/helper/factory.helper';
-import { getCat6AirportName } from 'src/helper/cat6-airport.helper';
-import {
-  appendCat6DocumentSuffix,
-  getCat6AssistedIds,
-} from 'src/helper/cat6-assisted.helper';
-import dayjs from 'dayjs';
-import { ACTIVITY_TYPES, ActivityType } from 'src/types/cat1andcat4';
-import {
-  ACTIVITY_TYPES as ACTIVITY_TYPES_CAT9,
-  ActivityType as ActivityTypeCat9,
-} from 'src/types/cat9andcat12';
-import {
-  ACTIVITY_TYPES as ACTIVITY_TYPES_CAT5,
-  ActivityType as ActivityTypeCat5,
-} from 'src/types/cat5';
-import {
-  ACTIVITY_TYPES as ACTIVITY_TYPES_CAT7,
-  ActivityType as ActivityTypeCat7,
-} from 'src/types/cat7';
+import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
 import { buildQueryAutoSentCMS } from 'src/helper/cat1andcat4.helper';
-import { buildQueryAutoSentCMS as buildQueryAutoSentCMSCat9 } from 'src/helper/cat9andcat12.helper';
-import { buildQueryAutoSentCMS as buildQueryAutoSentCMSCat5 } from 'src/helper/cat5.helper';
+import { buildReplacements } from 'src/helper/date.helper';
 import {
-  buildQueryAutoSentCmsLYV,
+  buildQueryAutoSentCmsJAZ,
+  buildQueryAutoSentCmsJZS,
   buildQueryAutoSentCmsLHG,
   buildQueryAutoSentCmsLVL,
   buildQueryAutoSentCmsLYM,
-  buildQueryAutoSentCmsJAZ,
-  buildQueryAutoSentCmsJZS,
-  buildReplacements,
-} from 'src/helper/cat7.helper';
+  buildQueryAutoSentCmsLYV,
+} from 'src/helper/cat7.cms-queries';
 import { BuildQueryFn } from 'src/types/cat7';
+import { buildCat6PreviewQuery } from './previewpayload.queries';
+import { buildCat6Filter } from 'src/helper/cat6.queries';
+import { getDayAfter } from 'src/helper/date.helper';
+import { getOwn } from 'src/helper/object.helper';
+import {
+  getExcelFilePath,
+  getExcelRootFolder,
+  insertFileRecord,
+  runFileExport,
+} from 'src/helper/file-export.helper';
+import { applyTaxFreeZoneToRows } from 'src/helper/cat1andcat4.taxfree';
+import { mapToCMSFormatCat7 } from './previewpayload.mappers';
+import { mapToCMSFormatCat1And4 } from 'src/helper/cat1andcat4.cms';
+import { getCat5CMSRows } from 'src/helper/cat5.cms';
+import { getCat9AndCat12CMSRows } from 'src/helper/cat9andcat12.cms';
+import {
+  mapCat6RowToAccommodationPreviewPayload,
+  mapCat6RowToPreviewPayload,
+  toCat6ActiveRows,
+} from './previewpayload.cat6';
+import {
+  PREVIEW_CAT1_AND_CAT4_COLUMNS,
+  PREVIEW_CAT5_COLUMNS,
+  PREVIEW_CAT6_ACCOMMODATION_COLUMNS,
+  PREVIEW_CAT6_COLUMNS,
+  PREVIEW_CAT7_COLUMNS,
+  PREVIEW_CAT9_AND_CAT12_COLUMNS,
+} from './previewpayload.columns';
 
-type Cat6RouteItem = {
-  AddressName: string;
-  Transport: string;
-  AddressDetail: string;
-  isAirport: boolean;
-  From: string;
-  To: string;
-};
-
-type Cat6AccommodationItem = {
-  nights?: number | string;
-  addressID?: string;
-  id?: string;
-  isSameAsAbove?: boolean;
-  type?: string;
-};
-
-type Cat6ActivePreviewRow = {
-  Application_Day: string;
-  Document_Number: string;
-  Staff_ID: string;
-  Dept: string;
-  Round_trip_One_way: string;
-  Start_Time: string;
-  End_Time: string;
-  Business_Trip_Type: string;
-  Number_of_nights_stayed: number;
-  Factory_Code: string;
-  [key: string]: string | number | undefined;
-};
-
-type Cat6PreviewPayload = {
-  System: string;
-  Corporation: string;
-  Factory: string;
-  Department: string;
-  DocKey: string;
-  ActivitySource: string;
-  SPeriodData: string;
-  EPeriodData: string;
-  ActivityType: string;
-  DataType: string;
-  DocType: string;
-  DocDate: string;
-  DocDate2: string;
-  DocNo: string;
-  UndDocNo: string;
-  TransType: string;
-  Departure: string;
-  Destination: string;
-  Memo: string;
-  CreateDateTime: string;
-  Creator: string;
-};
-
-type Cat6AccommodationPreviewPayload = {
-  System: string;
-  Corporation: string;
-  Factory: string;
-  Department: string;
-  DocKey: string;
-  ActivitySource: string;
-  SPeriodData: string;
-  EPeriodData: string;
-  ActivityType: string;
-  DataType: string;
-  DocType: string;
-  DocDate: string;
-  DocDate2: string;
-  DocNo: string;
-  UndDocNo: string;
-  TransType: string;
-  ActivityData: number;
-  Memo: string;
-  CreateDateTime: string;
-  Creator: string;
-};
+type DbSystem = 'ERP' | 'WMS' | 'HRIS';
 
 @Injectable()
 export class PreviewpayloadService {
@@ -154,64 +79,68 @@ export class PreviewpayloadService {
     @Inject('JZS_HRIS') private readonly JZS_HRIS: Sequelize,
     @Inject('UOF') private readonly UOF: Sequelize,
   ) {
-    this.rootFolder = this.configService.get(
-      'EXCEL_STORAGE_PATH',
-      'D:/FileExcel',
-    );
-    if (!fs.existsSync(this.rootFolder)) {
-      fs.mkdirSync(this.rootFolder, { recursive: true });
-    }
+    this.rootFolder = getExcelRootFolder(this.configService);
   }
 
-  private async insertFileRecord(
-    id: string,
-    module: string,
-    fileName: string,
-    filePath: string,
-    factory: string,
-    userID: string,
-  ): Promise<void> {
-    await this.EIP.query(
-      `INSERT INTO CMW_File_Management
-        (ID, Module, [File_Name], [Path], [Status], CreatedAt, CreatedFactory, CreatedDate)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      {
-        replacements: [
-          id,
-          module,
-          fileName,
-          filePath,
-          '0',
-          userID,
-          factory,
-          new Date().toISOString(),
-        ],
-        type: QueryTypes.INSERT,
+  /** Databases of the factories, per system (ERP: cat1&4, cat9&12 / WMS: cat5 / HRIS: cat7). */
+  private get databases(): Record<DbSystem, Record<string, Sequelize>> {
+    return {
+      ERP: {
+        LYV: this.LYV_ERP,
+        LHG: this.LHG_ERP,
+        LVL: this.LVL_ERP,
+        LYM: this.LYM_ERP,
+        LYF: this.LYF_ERP,
+        JAZ: this.JAZ_ERP,
+        JZS: this.JZS_ERP,
       },
-    );
+      WMS: {
+        LYV: this.LYV_WMS,
+        LHG: this.LHG_WMS,
+        LVL: this.LVL_WMS,
+        LYM: this.LYM_WMS,
+        JAZ: this.JAZ_WMS,
+        JZS: this.JZS_WMS,
+      },
+      HRIS: {
+        LYV: this.LYV_HRIS,
+        LHG: this.LHG_HRIS,
+        LVL: this.LVL_HRIS,
+        LYM: this.LYM_HRIS,
+        JAZ: this.JAZ_HRIS,
+        JZS: this.JZS_HRIS,
+      },
+    };
   }
 
-  private async updateFileSuccess(id: string) {
-    try {
-      await this.EIP.query(
-        `UPDATE CMW_File_Management SET [Status] = '1' WHERE ID = ?`,
-        { replacements: [id], type: QueryTypes.UPDATE },
-      );
-      const result = await this.EIP.query(
-        `SELECT * FROM CMW_File_Management WHERE ID = ? ORDER BY CreatedDate`,
-        { replacements: [id], type: QueryTypes.SELECT },
-      );
-      return result;
-    } catch (error: any) {
-      throw new Error(error);
+  private getDb(system: DbSystem, factory: FactoryCode): Sequelize | null {
+    return getOwn(this.databases[system], factory) ?? null;
+  }
+
+  /** Rows of every factory (in FACTORY_LIST order) when factory is 'ALL', otherwise of that one factory. */
+  private async collectByFactory(
+    factory: string,
+    fetchOne: (factory: FactoryCode) => Promise<any[]>,
+  ): Promise<any[]> {
+    if (factory.trim().toUpperCase() === 'ALL') {
+      const results = await Promise.all(FACTORY_LIST.map((f) => fetchOne(f)));
+      return results.flat();
     }
+    return fetchOne(factory);
   }
 
-  private async updateFileError(id: string): Promise<void> {
-    await this.EIP.query(
-      `UPDATE CMW_File_Management SET [Status] = '2' WHERE ID = ?`,
-      { replacements: [id], type: QueryTypes.UPDATE },
-    );
+  private writePreviewSheet(
+    sheet: ExcelJS.Worksheet,
+    columns: Partial<ExcelJS.Column>[],
+    rows: any[],
+  ) {
+    sheet.columns = columns;
+
+    sheet.getRow(1).font = { bold: true };
+
+    for (const row of rows) {
+      sheet.addRow(row);
+    }
   }
 
   private readonly buildQueryMap: Record<FactoryCode, BuildQueryFn> = {
@@ -223,116 +152,13 @@ export class PreviewpayloadService {
     JZS: buildQueryAutoSentCmsJZS,
   };
 
-  //preview cat1 and cat4
-  private getDbByFactory(factory: FactoryCode): Sequelize | null {
-    const dbMap: Record<FactoryCode, Sequelize> = {
-      LYV: this.LYV_ERP,
-      LHG: this.LHG_ERP,
-      LVL: this.LVL_ERP,
-      LYM: this.LYM_ERP,
-      LYF: this.LYF_ERP,
-      JAZ: this.JAZ_ERP,
-      JZS: this.JZS_ERP,
-    };
-    return dbMap[factory] ?? null;
-  }
-
-  private mapToCMSFormat(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-    dockeyCMS: string,
-  ) {
-    const factory = item.FactoryCode ?? '';
-    const matId = item.MatID ?? '';
-    const docKey = matId.substring(0, 1);
-    if (docKey.startsWith('W')) {
-      return [];
-    }
-    const docDate = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
-    const custVenName = item.SupplierCode ?? '';
-    const transportationMethod = item.TransportationMethod ?? '';
-    const departure = item.Departure ?? '';
-    const portOfDeparture = item.PortOfDeparture ?? '';
-    const portOfArrival = item.PortOfArrival ?? '';
-    const destination = item.Destination ?? '';
-    const activityData = item.WeightUnitkg ?? 0;
-    const qtyReceive = item.QtyReceive ?? 0;
-    const receivedNo = item.ReceivedNo ?? '';
-
-    let transType = '';
-    let portType = '';
-
-    switch (transportationMethod.trim().toLowerCase()) {
-      case 'SEA'.trim().toLowerCase():
-      case 'SEA+LAND'.trim().toLowerCase():
-        transType = '海運';
-        portType = '海港';
-        break;
-      case 'AIR'.trim().toLowerCase():
-        transType = '空運';
-        portType = '空港';
-        break;
-      case 'LAND'.trim().toLowerCase():
-        transType = '陸運';
-        portType = '';
-        break;
-      default:
-        break;
-    }
-
-    return ACTIVITY_TYPES.filter((item) => item === dockeyCMS).map(
-      (activityType: ActivityType) => ({
-        System: 'CMS Web',
-        Corporation: 'Lai Yih',
-        Factory: factory,
-        Department: '',
-        DocKey:
-          activityType.trim() === '4.1'
-            ? `${activityType.trim()}${docKey}`
-            : activityType.trim(),
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType.trim(),
-        DataType: activityType.trim() === '3.1' ? '1' : '999',
-        DocType: '入庫單',
-        UndDoc: '',
-        DocFlow: '',
-        DocDate: docDate,
-        DocDate2: docDate,
-        DocNo: receivedNo.trim(),
-        UndDocNo: '',
-        CustVenName: custVenName,
-        InvoiceNo: '',
-        TransType: transType,
-        Departure: departure,
-        Destination: destination,
-        PortType: portType,
-        StPort: portOfDeparture,
-        ThPort: '',
-        EndPort: portOfArrival,
-        Product: matId.trim(),
-        Quity: qtyReceive,
-        Amount: '',
-        ActivityData: activityData,
-        ActivityUnit: 'KG',
-        Unit: '',
-        UnitWeight: '',
-        Memo: '',
-        CreateDateTime: '',
-        Creator: '',
-        ActivitySource: matId.charAt(0),
-      }),
-    );
-  }
-
   private async getCMSByFactory(
     factory: FactoryCode,
     dateFrom: string,
     dateTo: string,
     dockeyCMS: string,
   ) {
-    const db = this.getDbByFactory(factory);
+    const db = this.getDb('ERP', factory);
     if (!db) return [];
 
     const query = await buildQueryAutoSentCMS(factory, this.EIP);
@@ -341,10 +167,7 @@ export class PreviewpayloadService {
       dateFrom && dateTo
         ? {
             startDate: dateFrom,
-            endDate: dayjs(dateTo)
-              .add(1, 'day')
-              .startOf('day')
-              .format('YYYY-MM-DD'),
+            endDate: getDayAfter(dateTo),
           }
         : {};
 
@@ -353,122 +176,14 @@ export class PreviewpayloadService {
       replacements,
     });
 
-    data = await Promise.all(
-      data.map(async (item: any) => {
-        const taxFreeZone: any[] = await this.EIP.query(
-          `SELECT TaxFreeZoneAddress
-              FROM CMW_TAX_FREE_ZONE_ADDRESS
-              WHERE SupplierID = ? AND Factory = ?`,
-          {
-            replacements: [item.SupplierCode.trim(), factory],
-            type: QueryTypes.SELECT,
-          },
-        );
-        return {
-          ...item,
-          TransportationMethod:
-            taxFreeZone.length > 0 ? 'Land' : item.TransportationMethod,
-          Departure:
-            taxFreeZone.length > 0
-              ? taxFreeZone[0].TaxFreeZoneAddress
-              : item.Departure,
-        };
-      }),
-    );
+    data = await applyTaxFreeZoneToRows(data, factory, this.EIP);
 
     return data.flatMap((item) =>
-      this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
+      mapToCMSFormatCat1And4(item, dateFrom, dateTo, dockeyCMS),
     );
   }
 
   // cat9 & 12
-  private mapToCMSFormatCat9(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-    dockeyCMS: string,
-  ) {
-    const date = item.Date;
-    const factory = item.Factory;
-    const factoryAddress = item.Factory_address;
-    const shipmentDate = item.Shipment_Date;
-    const bookingNo = item.Booking_No;
-    const customerID = item.Customer_ID;
-    const invoiceNumber = item.Invoice_Number;
-    const transportMethod = item.Transport_Method; // AIR OR SEA
-    const portOfArrival = item.Port_Of_Arrival; // DEPARTURE AND END PORT
-    const portOfDeparture = item.Port_Of_Departure; // ST PORT
-    const quantity = item.Quantity;
-    const grossWeight = item.Gross_Weight; // ACTIVITY DATA
-    const createdDate = dayjs().format('YYYY-MM-DD HH:mm:ss');
-
-    let dockey = '';
-    let transType = '';
-    let portType = '';
-
-    switch (transportMethod.trim().toLowerCase()) {
-      case 'SEA'.trim().toLowerCase():
-        dockey = '3.2.01';
-        transType = '海運';
-        portType = '海港';
-        break;
-      case 'AIR'.trim().toLowerCase():
-        dockey = '3.2.02';
-        transType = '空運';
-        portType = '空港';
-        break;
-      case 'LAND'.trim().toLowerCase():
-        dockey = '3.2.03';
-        transType = '陸運';
-        portType = '';
-        break;
-      default:
-        dockey = '';
-        break;
-    }
-
-    return ACTIVITY_TYPES_CAT9.filter((item) => item === dockeyCMS).map(
-      (activityType: ActivityTypeCat9) => ({
-        System: 'ERP',
-        Corporation: 'LAI YIH',
-        Factory: factory,
-        Department: 'Shipping',
-        DocKey: activityType.trim() === '5.3'.trim() ? '5.3' : dockey,
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType,
-        DataType: activityType.trim() === '3.2' ? '1' : '999',
-        DocType: 'Invoice',
-        UndDoc: '銷貨單',
-        DocFlow: '銷貨相關流程',
-        DocDate: dayjs(date).format('YYYY/MM/DD'),
-        DocDate2: dayjs(shipmentDate).format('YYYY/MM/DD'),
-        DocNo: bookingNo,
-        UndDocNo: '',
-        CustVenName: customerID,
-        InvoiceNo: invoiceNumber,
-        TransType: transType,
-        Departure: factoryAddress,
-        Destination: portOfArrival,
-        PortType: portType,
-        StPort: portOfDeparture,
-        ThPort: '',
-        EndPort: portOfArrival,
-        Product: '',
-        Quity: quantity,
-        Amount: '',
-        ActivityData: +Number(grossWeight).toFixed(2) || 0,
-        ActivityUnit: 'Kg',
-        Unit: '',
-        UnitWeight: '',
-        Memo: '',
-        CreateDateTime: createdDate,
-        Creator: '',
-        ActivitySource: 'Incineration (not energy recovery)',
-      }),
-    );
-  }
-
   private async getCMSByFactoryCat9(
     factory: FactoryCode,
     dateFrom: string,
@@ -476,364 +191,30 @@ export class PreviewpayloadService {
     ry: string,
     dockeyCMS: string,
   ) {
-    const db = this.getDbByFactory(factory);
+    const db = this.getDb('ERP', factory);
     if (!db) return [];
 
-    const query = await buildQueryAutoSentCMSCat9(
+    return getCat9AndCat12CMSRows(
+      db,
+      this.EIP,
+      factory,
       dateFrom,
       dateTo,
-      factory,
       ry,
-      this.EIP,
-    );
-
-    const replacements =
-      dateFrom && dateTo ? [dateFrom, dateTo, dateFrom, dateTo] : [];
-
-    let data = await db.query<any>(query, {
-      type: QueryTypes.SELECT,
-      replacements,
-    });
-
-    data = await Promise.all(
-      data.map(async (item: any) => {
-        let portOfDeparture = '';
-        if (
-          item?.Article_ID.trim().toLowerCase() ===
-          'SAMPLE SHOE'.trim().toLowerCase()
-        ) {
-          item.Transport_Method = 'AIR';
-          portOfDeparture = 'SGN';
-        } else {
-          switch (item?.Transport_Method.trim().toLowerCase()) {
-            case '11 SC'.trim().toLowerCase():
-            case 'Ocean'.trim().toLowerCase():
-            case 'Sea Air Collect'.trim().toLowerCase():
-            case 'SC'.trim().toLowerCase():
-            case 'Sea/Air'.trim().toLowerCase():
-            case 'Partial'.trim().toLowerCase():
-              item.Transport_Method = 'SEA';
-              break;
-            case '20 CC'.trim().toLowerCase():
-            case 'AC'.trim().toLowerCase():
-            case '10 AC'.trim().toLowerCase():
-            case 'CC'.trim().toLowerCase():
-            case 'Air PP'.trim().toLowerCase():
-            case 'Air Express'.trim().toLowerCase():
-            case 'AE'.trim().toLowerCase():
-              item.Transport_Method = 'AIR';
-              break;
-            case 'RAIL'.trim().toLowerCase():
-            case 'Rail Collect'.trim().toLowerCase():
-            case 'Rail Colle'.trim().toLowerCase():
-              item.Transport_Method = 'Land';
-              break;
-            default:
-              item.Transport_Method = 'SEA';
-              break;
-          }
-
-          switch (item.Factory_Name.trim().toLowerCase()) {
-            case 'LYV'.trim().toLowerCase():
-            case 'LVL'.trim().toLowerCase():
-            case 'LHG'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SGN';
-              }
-              break;
-            case 'LYM'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'MMRGN';
-              } else {
-                portOfDeparture = 'RGN';
-              }
-              break;
-            case 'LYF'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'IDSRG';
-              } else {
-                portOfDeparture = 'CGK';
-              }
-              break;
-            default:
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SGN';
-              }
-              break;
-          }
-        }
-
-        const queryPoA = `SELECT PortCode
-                          FROM CMW_PortCode
-                          WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
-        const result: any = await this.EIP.query(queryPoA, {
-          type: QueryTypes.SELECT,
-          replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
-        });
-        return {
-          ...item,
-          Transport_Method: item.Transport_Method,
-          Port_Of_Departure: portOfDeparture,
-          Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
-        };
-      }),
-    );
-    return data.flatMap((item) =>
-      this.mapToCMSFormatCat9(item, dateFrom, dateTo, dockeyCMS),
+      dockeyCMS,
     );
   }
 
-  // cat5
-  private getDbByFactoryCat5(factory: FactoryCode): Sequelize | null {
-    const dbMap: Record<string, Sequelize> = {
-      LYV: this.LYV_WMS,
-      LHG: this.LHG_WMS,
-      LVL: this.LVL_WMS,
-      LYM: this.LYM_WMS,
-      JAZ: this.JAZ_WMS,
-      JZS: this.JZS_WMS,
-    };
-    return dbMap[factory] ?? null;
-  }
-  private mapToCMSFormatCat5(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-    dockeyCMS: string,
-  ) {
-    const custVenName = item.Vendor_ID;
-    const departure = item.Factory_address;
-    const destination = item.Waste_collection_address;
-    const product = `${item.The_type_of_waste} - ${item.Waste_type}`;
-    const activityData = item.Weight_of_waste_treated_Unit_kg;
-    const wasteTreatmentMethod = item.Waste_Treatment_method;
-    const factoryName = item.Factory_Name;
-    const wasteDisposalDate = item.Waste_disposal_date;
-    let dockey = '';
-
-    switch (wasteTreatmentMethod.trim().toLowerCase()) {
-      case 'Waste Recycling'.trim().toLowerCase():
-        dockey = '4.4.01';
-        break;
-      case 'Waste to Energy'.trim().toLowerCase():
-        dockey = '4.4.02';
-        break;
-      case 'Landfill'.trim().toLowerCase():
-        dockey = '4.4.03';
-        break;
-      case 'Waste Incineration'.trim().toLowerCase():
-        dockey = '4.4.04';
-        break;
-      case 'Waste other treatment method'.trim().toLowerCase():
-        dockey = '4.4.05';
-        break;
-      default:
-        dockey = '';
-        break;
-    }
-
-    return ACTIVITY_TYPES_CAT5.filter((item) => item === dockeyCMS).map(
-      (activityType: ActivityTypeCat5) => ({
-        System: 'CMW', //default
-        Corporation: 'LAI YIH', //default
-        Factory: factoryName,
-        Department: '',
-        DocKey: activityType.trim() === '3.6' ? '3.6' : dockey,
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType, //default
-        DataType: activityType.trim() === '3.6' ? '1' : '999', //default
-        DocType: 'CMS Web', //default
-        UndDoc: '',
-        DocFlow: '',
-        DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-        DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-        DocNo: '',
-        UndDocNo: '',
-        CustVenName: custVenName,
-        InvoiceNo: '',
-        TransType: '陸運', //default
-        Departure: departure,
-        Destination: destination,
-        PortType: '',
-        StPort: '',
-        ThPort: '',
-        EndPort: '',
-        Product: product,
-        Quity: '',
-        Amount: '',
-        ActivityData: activityData,
-        ActivityUnit: 'KG', //default
-        Unit: '',
-        UnitWeight: '',
-        Memo: '',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-        AccNo: '6002',
-        AccName: '其他費用',
-        ActivitySource: wasteTreatmentMethod,
-      }),
-    );
-  }
   private async getCMSByFactoryCat5(
     factory: FactoryCode,
     dateFrom: string,
     dateTo: string,
     dockeyCMS: string,
   ) {
-    const db = this.getDbByFactoryCat5(factory);
+    const db = this.getDb('WMS', factory);
     if (!db) return [];
 
-    const query = await buildQueryAutoSentCMSCat5(
-      dateFrom,
-      dateTo,
-      factory,
-      this.EIP,
-    );
-
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-
-    const data = await db.query<any>(query, {
-      type: QueryTypes.SELECT,
-      replacements,
-    });
-
-    return data.flatMap((item) =>
-      this.mapToCMSFormatCat5(item, dateFrom, dateTo, dockeyCMS),
-    );
-  }
-
-  // cat7
-  private getDbByFactoryCat7(factory: FactoryCode): Sequelize | null {
-    const dbMap: Record<FactoryCode, Sequelize> = {
-      LYV: this.LYV_HRIS,
-      LHG: this.LHG_HRIS,
-      LVL: this.LVL_HRIS,
-      LYM: this.LYM_HRIS,
-      JAZ: this.JAZ_HRIS,
-      JZS: this.JZS_HRIS,
-    };
-
-    return dbMap[factory] ?? null;
-  }
-  private mapToCMSFormatCat7(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-    dockeyCMS: string,
-  ) {
-    const staffId = item.Staff_ID ?? '';
-    const Main_transportation_type = item.Main_transportation_type ?? '';
-    const Number_of_working_days = item.Number_of_working_days ?? '';
-    const Factory_address = item.Factory_address ?? '';
-    const Residential_address = item.Residential_address ?? Factory_address;
-    const FactoryName = item.Factory_Name ?? '';
-    const DepartmentName = item.Department_Name ?? '';
-
-    let dockey = '';
-    let transType = '';
-
-    switch (Main_transportation_type.trim().toLowerCase()) {
-      case 'Walking'.trim().toLowerCase(): //步行
-        dockey = '3.3.1';
-        transType = '步行';
-        break;
-      case 'Bicycle'.trim().toLowerCase(): //自行車
-        dockey = '3.3.2';
-        transType = '自行車';
-        break;
-      case 'Electric motorcycle'.trim().toLowerCase(): //電動機車
-        dockey = '3.3.3';
-        transType = '電動機車';
-        break;
-      case 'Motorcycle'.trim().toLowerCase(): //機車
-        dockey = '3.3.4';
-        transType = '機車';
-        break;
-      case 'Electric car'.trim().toLowerCase(): //電動汽車
-        dockey = '3.3.5';
-        transType = '電動汽車';
-        break;
-      case 'Car'.trim().toLowerCase(): //汽車
-        dockey = '3.3.6';
-        transType = '汽車';
-        break;
-      case 'Bus'.trim().toLowerCase(): //公車/客運
-        dockey = '3.3.7';
-        transType = '公車/客運';
-        break;
-      case 'Company shuttle bus'.trim().toLowerCase(): //員工接駁車
-        dockey = '3.3.8';
-        transType = '員工接駁車';
-        break;
-      case 'Subway'.trim().toLowerCase(): //地鐵
-        dockey = '3.3.9';
-        transType = '地鐵';
-        break;
-      default:
-        break;
-    }
-
-    return ACTIVITY_TYPES_CAT7.filter((item) => item === dockeyCMS).map(
-      (activityType: ActivityTypeCat7) => ({
-        System: 'CMS Web',
-        Corporation: 'LAI YIH',
-        Factory: FactoryName,
-        Department: DepartmentName.slice(0, 20),
-        DocKey: dockey,
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType,
-        DataType: '2',
-        DocType: 'CMS Web',
-        DocDate: dayjs('2025/12/31').format('YYYY/MM/DD'),
-        DocDate2: dayjs('2025/12/31').format('YYYY/MM/DD'),
-        UndDocNo: staffId,
-        TransType: transType,
-        Departure: Residential_address,
-        Destination: Factory_address,
-        Attendance: Number_of_working_days.toString(),
-        Memo: '',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-      }),
-    );
+    return getCat5CMSRows(db, this.EIP, factory, dateFrom, dateTo, dockeyCMS);
   }
 
   private async getCMSByFactoryCat7(
@@ -842,10 +223,10 @@ export class PreviewpayloadService {
     dateTo: string,
     dockeyCMS: string,
   ) {
-    const db = this.getDbByFactoryCat7(factory);
+    const db = this.getDb('HRIS', factory);
     if (!db) return [];
 
-    const buildQuery = this.buildQueryMap[factory];
+    const buildQuery = getOwn(this.buildQueryMap, factory);
     if (!buildQuery) return [];
 
     const { dateToExclusive, hasDate } = buildReplacements(dateFrom, dateTo);
@@ -860,350 +241,8 @@ export class PreviewpayloadService {
     });
 
     return data.flatMap((item) =>
-      this.mapToCMSFormatCat7(item, dateFrom, dateTo, dockeyCMS),
+      mapToCMSFormatCat7(item, dateFrom, dateTo, dockeyCMS),
     );
-  }
-
-  private parseJsonArray<T = unknown>(value: unknown): T[] {
-    if (Array.isArray(value)) return value as T[];
-    if (typeof value !== 'string' || !value.trim()) return [];
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? (parsed as T[]) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private formatCat6TripType(type: unknown): string | null {
-    if (!type || typeof type !== 'string') return null;
-    const t = type.toLowerCase().trim();
-    if (t === 'round' || t === 'roundtrip' || t === 'round trip') {
-      return 'Round trip';
-    }
-    return 'One-way';
-  }
-
-  private formatCat6BusinessTripType(type: unknown): string | null {
-    if (!type || typeof type !== 'string') return null;
-    const map: Record<string, string> = {
-      factory_domestic: 'Domestic business trip within the group',
-      outside_domestic: 'Domestic business trip to third party entities',
-      factory_oversea: 'Overseas business trip within the group',
-      outside_oversea: 'Overseas business trip to third party entities',
-    };
-    return map[type.toLowerCase()] ?? type;
-  }
-
-  private formatCat6PlacesAndTransports(routesValue: unknown) {
-    const routes = this.parseJsonArray<Cat6RouteItem>(routesValue);
-    const places: string[] = [];
-    const transports: string[] = [];
-
-    const pushPlace = (value?: string) => {
-      const place = getCat6AirportName(value);
-      if (!place) return;
-      if (places[places.length - 1] === place) return;
-      places.push(place);
-    };
-
-    const isFlightRoute = (route: Cat6RouteItem) => {
-      const transport = route.Transport?.trim().toLowerCase() ?? '';
-      return route.isAirport === true || transport === 'flight';
-    };
-
-    let index = 0;
-    while (index < routes.length) {
-      const route = routes[index];
-      const transport = route.Transport?.trim() ?? '';
-      const nextRoute = routes[index + 1];
-
-      if (isFlightRoute(route)) {
-        const flightStart = route.From?.trim() ?? '';
-        let flightEnd = route.To?.trim() ?? '';
-        let cursor = index;
-
-        while (
-          cursor + 1 < routes.length &&
-          isFlightRoute(routes[cursor + 1])
-        ) {
-          cursor += 1;
-          flightEnd = routes[cursor].To?.trim() ?? flightEnd;
-        }
-
-        pushPlace(flightStart);
-        pushPlace(flightEnd);
-        transports.push('Flight');
-        index = cursor + 1;
-        continue;
-      }
-
-      if (
-        !transport &&
-        places.length === 0 &&
-        nextRoute &&
-        isFlightRoute(nextRoute)
-      ) {
-        pushPlace(nextRoute.From);
-        index += 1;
-        continue;
-      }
-
-      pushPlace(route.AddressDetail ?? route.AddressName);
-      if (transport) {
-        transports.push(transport);
-      }
-      index += 1;
-    }
-
-    const transportLimit = Math.max(places.length - 1, 0);
-    const normalizedTransports = transports.slice(0, transportLimit);
-    while (normalizedTransports.length < transportLimit) {
-      normalizedTransports.push('');
-    }
-
-    return {
-      ...places.reduce<Record<string, string>>((acc, place, index) => {
-        acc[`Place${index + 1}`] = place;
-        return acc;
-      }, {}),
-      ...normalizedTransports.reduce<Record<string, string>>(
-        (acc, transport, index) => {
-          acc[`Transport_${index + 1}`] = transport;
-          return acc;
-        },
-        {},
-      ),
-    };
-  }
-
-  private getCat6AccommodationNights(accommodationValue: unknown) {
-    const accommodations =
-      this.parseJsonArray<Cat6AccommodationItem>(accommodationValue);
-    return accommodations.reduce((sum, item) => {
-      if (item?.type?.trim().toLowerCase() !== 'hotel') return sum;
-      const nights = Number(item?.nights ?? 0);
-      return sum + (Number.isFinite(nights) ? nights : 0);
-    }, 0);
-  }
-
-  private expandCat6PreviewRowsByAssistedIds(
-    row: Record<string, any>,
-  ): Record<string, any>[] {
-    const assistedIds = getCat6AssistedIds(row.AssisstedIDs);
-
-    if (assistedIds.length === 0) {
-      return [
-        {
-          ...row,
-          DOC_NBR: row.DOC_NBR ?? '',
-          EffectiveStaffID: row.UserCreate ?? '',
-        },
-      ];
-    }
-
-    if (assistedIds.length === 1) {
-      return [
-        {
-          ...row,
-          DOC_NBR: row.DOC_NBR ?? '',
-          EffectiveStaffID: assistedIds[0],
-        },
-      ];
-    }
-
-    return assistedIds.map((assistedId, index) => ({
-      ...row,
-      DOC_NBR: appendCat6DocumentSuffix(String(row.DOC_NBR ?? ''), index),
-      EffectiveStaffID: assistedId,
-    }));
-  }
-
-  private transformCat6ActiveRow(
-    row: Record<string, any>,
-  ): Cat6ActivePreviewRow {
-    return {
-      Application_Day: row.CreatedAt
-        ? dayjs(row.CreatedAt).format('YYYY-MM-DD')
-        : '',
-      Document_Number: row.DOC_NBR ?? '',
-      Staff_ID: row.EffectiveStaffID ?? '',
-      Dept: row.Dept ?? row.Department ?? '',
-      Round_trip_One_way: this.formatCat6TripType(row.TypeTravel) ?? '',
-      Start_Time: row.DateStart
-        ? dayjs(row.DateStart).format('YYYY-MM-DD')
-        : '',
-      End_Time: row.DateEnd ? dayjs(row.DateEnd).format('YYYY-MM-DD') : '',
-      Business_Trip_Type: this.formatCat6BusinessTripType(row.Factory) ?? '',
-      ...this.formatCat6PlacesAndTransports(row.Routes),
-      Number_of_nights_stayed: this.getCat6AccommodationNights(
-        row.Accommodation,
-      ),
-      Factory_Code: String(row.Factory_User ?? '')
-        .trim()
-        .toUpperCase(),
-    };
-  }
-
-  private extractCat6Places(row: Cat6ActivePreviewRow): string[] {
-    return Object.keys(row)
-      .filter((key) => /^Place\d+$/.test(key))
-      .sort((left, right) => {
-        const leftIndex = Number(left.replace('Place', ''));
-        const rightIndex = Number(right.replace('Place', ''));
-        return leftIndex - rightIndex;
-      })
-      .map((key) => String(row[key] ?? '').trim())
-      .filter(Boolean);
-  }
-
-  private extractCat6Transports(row: Cat6ActivePreviewRow): string[] {
-    return Object.keys(row)
-      .filter((key) => /^Transport_\d+$/.test(key))
-      .sort((left, right) => {
-        const leftIndex = Number(left.replace('Transport_', ''));
-        const rightIndex = Number(right.replace('Transport_', ''));
-        return leftIndex - rightIndex;
-      })
-      .map((key) => String(row[key] ?? '').trim());
-  }
-
-  private buildCat6CMSLegs(row: Cat6ActivePreviewRow) {
-    const places = this.extractCat6Places(row);
-    const transports = this.extractCat6Transports(row);
-    const legs: { transType: string; dep: string; dest: string }[] = [];
-    const maxLegs = Math.max(places.length - 1, 0);
-
-    for (let index = 0; index < maxLegs; index += 1) {
-      const dep = places[index]?.trim() ?? '';
-      const dest = places[index + 1]?.trim() ?? '';
-      const transType = transports[index]?.trim() ?? '';
-
-      if (!dep || !dest || !transType) {
-        continue;
-      }
-
-      legs.push({
-        transType,
-        dep,
-        dest,
-      });
-    }
-
-    return legs;
-  }
-
-  private getCat6CMSDocKey(businessTripType: string): string {
-    switch (businessTripType.trim().toLowerCase()) {
-      case 'domestic business trip within the group':
-        return '3.5.1';
-      case 'domestic business trip to third party entities':
-        return '3.5.2';
-      case 'overseas business trip within the group':
-        return '3.5.3';
-      case 'overseas business trip to third party entities':
-        return '3.5.4';
-      default:
-        return '';
-    }
-  }
-
-  private mapCat6CMSTransType(transport: string): string {
-    const normalized = transport.trim().toLowerCase();
-
-    switch (normalized) {
-      case 'car':
-        return '計程車/出租車';
-      case 'company shuttle car':
-        return '公司車';
-      case 'flight':
-        return '飛機';
-      case 'personal motocycle':
-        return '個人機車';
-      default:
-        return transport.trim();
-    }
-  }
-
-  private mapCat6RowToPreviewPayload(
-    row: Cat6ActivePreviewRow,
-    factory: string,
-    dateFrom: string,
-    dateTo: string,
-  ): Cat6PreviewPayload[] {
-    const legs = this.buildCat6CMSLegs(row);
-    const docKey = this.getCat6CMSDocKey(row.Business_Trip_Type ?? '');
-    const resolvedFactoryCode =
-      factory.trim().toUpperCase() === 'ALL'
-        ? row.Factory_Code
-        : factory.trim().toUpperCase();
-
-    return legs.map((leg, index) => ({
-      System: 'BPM',
-      Corporation: 'LAI YIH',
-      Factory: getFactory(resolvedFactoryCode as FactoryCode),
-      Department: row.Dept ?? '',
-      DocKey: docKey,
-      ActivitySource: '',
-      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: '3.5',
-      DataType: '2',
-      DocType: '洽公單',
-      DocDate: row.Application_Day
-        ? dayjs(row.Application_Day).format('YYYY/MM/DD')
-        : '',
-      DocDate2: row.Start_Time
-        ? dayjs(row.Start_Time).format('YYYY/MM/DD')
-        : '',
-      DocNo: row.Document_Number ?? '',
-      UndDocNo: `${row.Document_Number ?? ''}-${index + 1}`,
-      TransType: this.mapCat6CMSTransType(leg.transType),
-      Departure: leg.dep,
-      Destination: leg.dest,
-      Memo: row.Business_Trip_Type ?? '',
-      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-      Creator: '',
-    }));
-  }
-
-  private mapCat6RowToAccommodationPreviewPayload(
-    row: Cat6ActivePreviewRow,
-    factory: string,
-    dateFrom: string,
-    dateTo: string,
-  ): Cat6AccommodationPreviewPayload {
-    const resolvedFactoryCode =
-      factory.trim().toUpperCase() === 'ALL'
-        ? row.Factory_Code
-        : factory.trim().toUpperCase();
-
-    return {
-      System: 'BPM',
-      Corporation: 'LAI YIH',
-      Factory: getFactory(resolvedFactoryCode as FactoryCode),
-      Department: row.Dept ?? '',
-      DocKey: '3.5.5',
-      ActivitySource: '住宿',
-      SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-      EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-      ActivityType: '3.5',
-      DataType: '3',
-      DocType: '出差住宿單',
-      DocDate: row.Application_Day
-        ? dayjs(row.Application_Day).format('YYYY/MM/DD')
-        : '',
-      DocDate2: row.Start_Time
-        ? dayjs(row.Start_Time).format('YYYY/MM/DD')
-        : '',
-      DocNo: row.Document_Number ?? '',
-      UndDocNo: row.Document_Number ?? '',
-      TransType: 'double',
-      ActivityData: Number(row.Number_of_nights_stayed ?? 0),
-      Memo: row.Business_Trip_Type ?? '',
-      CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-      Creator: '',
-    };
   }
 
   async exportExcelCat6(
@@ -1213,195 +252,26 @@ export class PreviewpayloadService {
     factory: string,
     dockeyCMS: string,
   ) {
-    let where = '';
-    const replacements: any[] = [];
+    const { where, replacements: finalReplacements } = buildCat6Filter(
+      dateFrom,
+      dateTo,
+      factory && factory.trim().toUpperCase() !== 'ALL' ? factory : null,
+    );
 
-    if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR ,chb.CreatedAt ,23) BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo);
-    }
+    const query = buildCat6PreviewQuery(where);
 
-    if (factory && factory.trim().toUpperCase() !== 'ALL') {
-      where += ` AND chb.DOC_NBR LIKE ?`;
-      replacements.push(`%${factory}%`);
-    }
-    const finalReplacements = [...replacements, ...replacements];
-
-    const query = `
-      WITH Travelers AS (
-                          SELECT chb.*
-                                ,chb.UserCreate          AS TravelerID
-                                ,0                       AS TravelerOrder
-                          FROM   CDS_HRBUSS_BusTripData     chb
-                          WHERE  chb.BPMStatus = 'F'
-                                  AND (
-                                          chb.AssisstedIDs IS NULL
-                                          OR LTRIM(RTRIM(chb.AssisstedIDs))=''
-                                      )
-                                  ${where}
-                          UNION
-                          ALL
-                          SELECT chb.*
-                                ,LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)'))) AS TravelerID
-                                ,ROW_NUMBER() OVER(
-                                      PARTITION BY chb.TripID
-                                      ORDER BY(
-                                          SELECT NULL
-                                      )
-                                  )  AS TravelerOrder
-                          FROM   CDS_HRBUSS_BusTripData chb
-                                  CROSS APPLY (
-                              SELECT CAST(
-                                          '<x>'
-                                        +REPLACE(REPLACE(chb.AssisstedIDs ,',' ,'$') ,'$' ,'</x><x>')
-                                        +'</x>' AS XML
-                                      ) AS DATA
-                          )         AS s
-                          CROSS APPLY s.data.nodes('/x') AS t(v)
-                          WHERE  chb.BPMStatus = 'F'
-                                  AND chb.AssisstedIDs IS NOT NULL
-                                  AND LTRIM(RTRIM(chb.AssisstedIDs))<>''
-                                  AND LTRIM(RTRIM(t.v.value('.' ,'nvarchar(50)')))<>''
-                                  ${where}
-                      )
-
-                  SELECT tr.*
-                        ,COALESCE(
-                            dp.Department_Name COLLATE SQL_Latin1_General_CP1_CI_AS
-                            ,vwd.GROUP_NAME
-                            ,(
-                                SELECT TOP 1 vwd2.GROUP_NAME
-                                FROM   TB_EB_USER teu2
-                                        OUTER APPLY (
-                                    SELECT teed2.GROUP_ID
-                                    FROM   TB_EB_EMPL_DEP AS teed2
-                                    WHERE  teed2.USER_GUID = teu2.USER_GUID
-                                            AND teed2.ORDERS = 0
-                                ) teed2
-                                LEFT JOIN vwDepartment_Factory vwd2
-                                            ON  vwd2.GROUP_ID = teed2.GROUP_ID
-                                WHERE  teu2.ACCOUNT = ISNULL(tr.Factory_User ,'')+tr.TravelerID
-                                        AND vwd2.GROUP_NAME IS NOT NULL
-                            )
-                            ,(
-                                SELECT TOP 1 vwd3.GROUP_NAME
-                                FROM   TB_EB_USER teu3
-                                        OUTER APPLY (
-                                    SELECT teed3.GROUP_ID
-                                    FROM   TB_EB_EMPL_DEP AS teed3
-                                    WHERE  teed3.USER_GUID = teu3.USER_GUID
-                                            AND teed3.ORDERS = 0
-                                ) teed3
-                                LEFT JOIN vwDepartment_Factory vwd3
-                                            ON  vwd3.GROUP_ID = teed3.GROUP_ID
-                                WHERE  teu3.ACCOUNT = ISNULL(tr.Departure ,'')+tr.TravelerID
-                                        AND vwd3.GROUP_NAME IS NOT NULL
-                            )
-                            ,(
-                                SELECT TOP 1 vwd4.GROUP_NAME
-                                FROM   CDS_FMEval_Employee cfe
-                                        JOIN TB_EB_USER teu4
-                                            ON  teu4.ACCOUNT = cfe.BPMAccount
-                                        OUTER APPLY (
-                                    SELECT teed4.GROUP_ID
-                                    FROM   TB_EB_EMPL_DEP AS teed4
-                                    WHERE  teed4.USER_GUID = teu4.USER_GUID
-                                            AND teed4.ORDERS = 0
-                                ) teed4
-                                LEFT JOIN vwDepartment_Factory vwd4
-                                            ON  vwd4.GROUP_ID = teed4.GROUP_ID
-                                WHERE  cfe.EmpID = tr.TravelerID
-                                        AND vwd4.GROUP_NAME IS NOT NULL
-                            )
-                            ,(
-                                SELECT TOP 1 vwd5.GROUP_NAME
-                                FROM   TB_EB_USER teu5
-                                        OUTER APPLY (
-                                    SELECT teed5.GROUP_ID
-                                    FROM   TB_EB_EMPL_DEP AS teed5
-                                    WHERE  teed5.USER_GUID = teu5.USER_GUID
-                                            AND teed5.ORDERS = 0
-                                ) teed5
-                                LEFT JOIN vwDepartment_Factory vwd5
-                                            ON  vwd5.GROUP_ID = teed5.GROUP_ID
-                                WHERE  teu5.ACCOUNT = tr.TravelerID
-                                        AND vwd5.GROUP_NAME IS NOT NULL
-                            )
-                            ,(
-                                SELECT TOP 1 vwd6.GROUP_NAME
-                                FROM   TB_EB_USER teu6
-                                        JOIN TB_EB_EMPL_DEP teed6
-                                            ON  teed6.USER_GUID = teu6.USER_GUID
-                                        LEFT JOIN vwDepartment_Factory vwd6
-                                            ON  vwd6.GROUP_ID = teed6.GROUP_ID
-                                WHERE  teu6.ACCOUNT = tr.TravelerID
-                                        AND vwd6.GROUP_NAME IS NOT NULL
-                                ORDER BY
-                                        teed6.ORDERS
-                            )
-                            ,(
-                                SELECT TOP 1 vwd7.GROUP_NAME
-                                FROM   TB_EB_USER teu7
-                                        JOIN TB_EB_EMPL_DEP teed7
-                                            ON  teed7.USER_GUID = teu7.USER_GUID
-                                        LEFT JOIN vwDepartment_Factory vwd7
-                                            ON  vwd7.GROUP_ID = teed7.GROUP_ID
-                                WHERE  teu7.ACCOUNT LIKE '%'+tr.TravelerID
-                                        AND vwd7.GROUP_NAME IS NOT NULL
-                                ORDER BY
-                                        teed7.ORDERS
-                            )
-                        )                        AS Dept
-                        ,COUNT(*) OVER()          AS TotalRow
-                  FROM   Travelers tr
-                        OUTER APPLY (
-                      SELECT TOP 1 teu.USER_GUID
-                      FROM   TB_EB_USER teu
-                      WHERE  (
-                                tr.Factory_User IS NOT NULL
-                                AND teu.ACCOUNT=tr.Factory_User+tr.TravelerID
-                            )
-                            OR (tr.Factory_User IS NULL AND teu.ACCOUNT=tr.TravelerID)
-                  )                               AS teu
-                  OUTER APPLY (
-                      SELECT teed.GROUP_ID
-                      FROM   TB_EB_EMPL_DEP AS teed
-                      WHERE  teed.USER_GUID = teu.USER_GUID
-                            AND teed.ORDERS = 0
-                  )                               AS teed
-                  LEFT JOIN vwDepartment_Factory  AS vwd
-                              ON  vwd.GROUP_ID = teed.GROUP_ID
-                        LEFT JOIN [JZS_HRIS].[HRIS].[dbo].[View_Data_Person] dp
-                              ON  dp.Person_ID COLLATE SQL_Latin1_General_CP1_CI_AS = tr.TravelerID COLLATE SQL_Latin1_General_CP1_CI_AS
-                  WHERE  tr.DOC_NBR LIKE 'LYV-HR-BT%'
-                        OR tr.DOC_NBR LIKE 'LHG-SUGG%'
-                        OR tr.DOC_NBR LIKE 'LVL-HR-BTF%'
-                        OR tr.DOC_NBR LIKE 'LVL-ODBT%'
-                        OR tr.DOC_NBR LIKE 'LYM-HR-BT%'
-                        OR tr.DOC_NBR LIKE 'JZS-SUGG%'
-                        OR tr.DOC_NBR LIKE 'JAZ_BizTrip%'
-                  ORDER BY
-                        tr.CreatedAt ASC
-                        ,tr.DOC_NBR
-                        ,tr.TravelerOrder;
-    `;
-
-    const rawRows = (await this.UOF.query(query, {
+    const rawRows = await this.UOF.query(query, {
       type: QueryTypes.SELECT,
       replacements: finalReplacements,
-    })) as Record<string, any>[];
+    });
 
-    const transformedRows = rawRows.flatMap((row) =>
-      this.expandCat6PreviewRowsByAssistedIds(row).map((expandedRow) =>
-        this.transformCat6ActiveRow(expandedRow),
-      ),
-    );
+    const transformedRows = toCat6ActiveRows(rawRows);
 
     if (dockeyCMS === '3.5.5') {
       const accommodationPayloadRows = transformedRows
         .filter((row) => Number(row.Number_of_nights_stayed ?? 0) > 0)
         .map((row) =>
-          this.mapCat6RowToAccommodationPreviewPayload(
+          mapCat6RowToAccommodationPreviewPayload(
             row,
             factory,
             dateFrom,
@@ -1409,68 +279,21 @@ export class PreviewpayloadService {
           ),
         );
 
-      sheet.columns = [
-        { header: 'System', key: 'System', width: 15 },
-        { header: 'Corporation', key: 'Corporation', width: 15 },
-        { header: 'Factory', key: 'Factory', width: 18 },
-        { header: 'Department', key: 'Department', width: 20 },
-        { header: 'DocKey', key: 'DocKey', width: 12 },
-        { header: 'ActivitySource', key: 'ActivitySource', width: 15 },
-        { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
-        { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
-        { header: 'ActivityType', key: 'ActivityType', width: 12 },
-        { header: 'DataType', key: 'DataType', width: 10 },
-        { header: 'DocType', key: 'DocType', width: 18 },
-        { header: 'DocDate', key: 'DocDate', width: 15 },
-        { header: 'DocDate2', key: 'DocDate2', width: 15 },
-        { header: 'DocNo', key: 'DocNo', width: 20 },
-        { header: 'UndDocNo', key: 'UndDocNo', width: 22 },
-        { header: 'TransType', key: 'TransType', width: 20 },
-        { header: 'ActivityData', key: 'ActivityData', width: 18 },
-        { header: 'Memo', key: 'Memo', width: 35 },
-        { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
-        { header: 'Creator', key: 'Creator', width: 15 },
-      ];
-
-      sheet.getRow(1).font = { bold: true };
-
-      accommodationPayloadRows.forEach((item) => sheet.addRow(item));
+      this.writePreviewSheet(
+        sheet,
+        PREVIEW_CAT6_ACCOMMODATION_COLUMNS,
+        accommodationPayloadRows,
+      );
       return;
     }
 
     const payloadRows = transformedRows
       .filter((row) => Number(row.Number_of_nights_stayed ?? 0) > 0)
       .flatMap((row) =>
-        this.mapCat6RowToPreviewPayload(row, factory, dateFrom, dateTo),
+        mapCat6RowToPreviewPayload(row, factory, dateFrom, dateTo),
       );
 
-    sheet.columns = [
-      { header: 'System', key: 'System', width: 15 },
-      { header: 'Corporation', key: 'Corporation', width: 15 },
-      { header: 'Factory', key: 'Factory', width: 18 },
-      { header: 'Department', key: 'Department', width: 20 },
-      { header: 'DocKey', key: 'DocKey', width: 12 },
-      { header: 'ActivitySource', key: 'ActivitySource', width: 15 },
-      { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
-      { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
-      { header: 'ActivityType', key: 'ActivityType', width: 12 },
-      { header: 'DataType', key: 'DataType', width: 10 },
-      { header: 'DocType', key: 'DocType', width: 18 },
-      { header: 'DocDate', key: 'DocDate', width: 15 },
-      { header: 'DocDate2', key: 'DocDate2', width: 15 },
-      { header: 'DocNo', key: 'DocNo', width: 20 },
-      { header: 'UndDocNo', key: 'UndDocNo', width: 22 },
-      { header: 'TransType', key: 'TransType', width: 20 },
-      { header: 'Departure', key: 'Departure', width: 35 },
-      { header: 'Destination', key: 'Destination', width: 35 },
-      { header: 'Memo', key: 'Memo', width: 35 },
-      { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
-      { header: 'Creator', key: 'Creator', width: 15 },
-    ];
-
-    sheet.getRow(1).font = { bold: true };
-
-    payloadRows.forEach((item) => sheet.addRow(item));
+    this.writePreviewSheet(sheet, PREVIEW_CAT6_COLUMNS, payloadRows);
   }
   // Preview Excel
   async previewExcel(
@@ -1485,19 +308,19 @@ export class PreviewpayloadService {
     const id = uuidv4();
     const moduleName = module.trim();
     const fileName = `Preview-Payload-${factory}-${moduleName}-${dateFrom}-${dateTo}-${dockeyCMS}.xlsx`;
-    const folder = path.join(this.rootFolder, moduleName);
-    if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
-    const filePath = path.join(folder, fileName);
+    const filePath = getExcelFilePath(this.rootFolder, moduleName, fileName);
 
-    await this.insertFileRecord(
+    await insertFileRecord(this.EIP, {
       id,
-      moduleName,
+      module: moduleName,
       fileName,
       filePath,
       factory,
       userID,
-    );
+    });
 
+    // Runs in the background: nothing awaits it, so an error that escapes must be caught here
+    // (an unhandled rejection would stop the whole backend).
     this.createFileExcel(
       id,
       moduleName,
@@ -1507,7 +330,7 @@ export class PreviewpayloadService {
       factory,
       ry,
       dockeyCMS,
-    );
+    ).catch((error) => console.error('createFileExcel failed:', error));
 
     return true;
   }
@@ -1522,77 +345,65 @@ export class PreviewpayloadService {
     ry: string,
     dockeyCMS: string,
   ) {
-    try {
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet(module);
-
-      switch (module.trim().toLowerCase()) {
-        case 'cat1andcat4':
-          await this.exportExcelCat1And4(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-            dockeyCMS,
-          );
-          break;
-        case 'cat5':
-          await this.exportExcelCat5(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-            dockeyCMS,
-          );
-          break;
-        case 'cat6':
-          await this.exportExcelCat6(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-            dockeyCMS,
-          );
-          break;
-        case 'cat7':
-          await this.exportExcelCat7(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-            dockeyCMS,
-          );
-          break;
-        case 'cat9andcat12':
-          await this.exportExcelCat9And12(
-            sheet,
-            dateFrom,
-            dateTo,
-            factory,
-            ry,
-            dockeyCMS,
-          );
-          break;
-        default:
-          throw new Error(`Module "${module}" không hợp lệ`);
-      }
-
-      await workbook.xlsx.writeFile(filePath);
-
-      const statusDone = await this.updateFileSuccess(id);
-      if (statusDone.length) {
-        this.eventsGateway.broadcastEvent(
-          'file-excel-done',
-          'Export file excel success!',
-        );
-      }
-    } catch (error) {
-      await this.updateFileError(id);
-      this.eventsGateway.broadcastEvent(
-        'file-excel-error',
-        'Error export file excel!',
-      );
-    }
+    await runFileExport({
+      eip: this.EIP,
+      gateway: this.eventsGateway,
+      id,
+      filePath,
+      sheetName: module,
+      fill: async (sheet) => {
+        switch (module.trim().toLowerCase()) {
+          case 'cat1andcat4':
+            await this.exportExcelCat1And4(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              dockeyCMS,
+            );
+            break;
+          case 'cat5':
+            await this.exportExcelCat5(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              dockeyCMS,
+            );
+            break;
+          case 'cat6':
+            await this.exportExcelCat6(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              dockeyCMS,
+            );
+            break;
+          case 'cat7':
+            await this.exportExcelCat7(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              dockeyCMS,
+            );
+            break;
+          case 'cat9andcat12':
+            await this.exportExcelCat9And12(
+              sheet,
+              dateFrom,
+              dateTo,
+              factory,
+              ry,
+              dockeyCMS,
+            );
+            break;
+          default:
+            throw new Error(`Module "${module}" không hợp lệ`);
+        }
+      },
+    });
   }
 
   async exportExcelCat1And4(
@@ -1602,68 +413,12 @@ export class PreviewpayloadService {
     factory: string,
     dockeyCMS: string,
   ) {
-    let data: any[];
-    if (factory.trim().toUpperCase() === 'ALL') {
-      const results = await Promise.all(
-        FACTORY_LIST.map((f) =>
-          this.getCMSByFactory(f, dateFrom, dateTo, dockeyCMS),
-        ),
-      );
-      data = results.flat();
-    } else {
-      data = await this.getCMSByFactory(
-        factory as FactoryCode,
-        dateFrom,
-        dateTo,
-        dockeyCMS,
-      );
-    }
+    const data = await this.collectByFactory(factory, (f) =>
+      this.getCMSByFactory(f, dateFrom, dateTo, dockeyCMS),
+    );
 
     // Set columns giống exportPreviewPayload
-    sheet.columns = [
-      { header: 'System', key: 'System', width: 15 },
-      { header: 'Corporation', key: 'Corporation', width: 15 },
-      { header: 'Factory', key: 'Factory', width: 15 },
-      { header: 'Department', key: 'Department', width: 15 },
-      { header: 'DocKey', key: 'DocKey', width: 15 },
-      { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
-      { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
-      { header: 'ActivityType', key: 'ActivityType', width: 15 },
-      { header: 'DataType', key: 'DataType', width: 15 },
-      { header: 'DocType', key: 'DocType', width: 15 },
-      { header: 'UndDoc', key: 'UndDoc', width: 15 },
-      { header: 'DocFlow', key: 'DocFlow', width: 15 },
-      { header: 'DocDate', key: 'DocDate', width: 15 },
-      { header: 'DocDate2', key: 'DocDate2', width: 15 },
-      { header: 'DocNo', key: 'DocNo', width: 15 },
-      { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
-      { header: 'CustVenName', key: 'CustVenName', width: 25 },
-      { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
-      { header: 'TransType', key: 'TransType', width: 15 },
-      { header: 'Departure', key: 'Departure', width: 25 },
-      { header: 'Destination', key: 'Destination', width: 15 },
-      { header: 'PortType', key: 'PortType', width: 15 },
-      { header: 'StPort', key: 'StPort', width: 15 },
-      { header: 'ThPort', key: 'ThPort', width: 15 },
-      { header: 'EndPort', key: 'EndPort', width: 15 },
-      { header: 'Product', key: 'Product', width: 20 },
-      { header: 'Quity', key: 'Quity', width: 12 },
-      { header: 'Amount', key: 'Amount', width: 12 },
-      { header: 'ActivityData', key: 'ActivityData', width: 15 },
-      { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
-      { header: 'Unit', key: 'Unit', width: 10 },
-      { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
-      { header: 'Memo', key: 'Memo', width: 20 },
-      { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
-      { header: 'Creator', key: 'Creator', width: 15 },
-      { header: 'ActivitySource', key: 'ActivitySource', width: 20 },
-    ];
-
-    sheet.getRow(1).font = { bold: true };
-
-    for (const row of data) {
-      sheet.addRow(row);
-    }
+    this.writePreviewSheet(sheet, PREVIEW_CAT1_AND_CAT4_COLUMNS, data);
   }
 
   async exportExcelCat5(
@@ -1673,69 +428,11 @@ export class PreviewpayloadService {
     factory: string,
     dockeyCMS: string,
   ) {
-    let data: any[];
-    if (factory.trim().toUpperCase() === 'ALL') {
-      const results = await Promise.all(
-        FACTORY_LIST.map((f) =>
-          this.getCMSByFactoryCat5(f, dateFrom, dateTo, dockeyCMS),
-        ),
-      );
-      data = results.flat();
-    } else {
-      data = await this.getCMSByFactoryCat5(
-        factory as FactoryCode,
-        dateFrom,
-        dateTo,
-        dockeyCMS,
-      );
-    }
+    const data = await this.collectByFactory(factory, (f) =>
+      this.getCMSByFactoryCat5(f, dateFrom, dateTo, dockeyCMS),
+    );
 
-    sheet.columns = [
-      { header: 'System', key: 'System', width: 15 },
-      { header: 'Corporation', key: 'Corporation', width: 15 },
-      { header: 'Factory', key: 'Factory', width: 15 },
-      { header: 'Department', key: 'Department', width: 15 },
-      { header: 'DocKey', key: 'DocKey', width: 15 },
-      { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
-      { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
-      { header: 'ActivityType', key: 'ActivityType', width: 15 },
-      { header: 'DataType', key: 'DataType', width: 15 },
-      { header: 'DocType', key: 'DocType', width: 15 },
-      { header: 'UndDoc', key: 'UndDoc', width: 15 },
-      { header: 'DocFlow', key: 'DocFlow', width: 15 },
-      { header: 'DocDate', key: 'DocDate', width: 15 },
-      { header: 'DocDate2', key: 'DocDate2', width: 15 },
-      { header: 'DocNo', key: 'DocNo', width: 15 },
-      { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
-      { header: 'CustVenName', key: 'CustVenName', width: 25 },
-      { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
-      { header: 'TransType', key: 'TransType', width: 15 },
-      { header: 'Departure', key: 'Departure', width: 25 },
-      { header: 'Destination', key: 'Destination', width: 25 },
-      { header: 'PortType', key: 'PortType', width: 15 },
-      { header: 'StPort', key: 'StPort', width: 15 },
-      { header: 'ThPort', key: 'ThPort', width: 15 },
-      { header: 'EndPort', key: 'EndPort', width: 15 },
-      { header: 'Product', key: 'Product', width: 30 },
-      { header: 'Quity', key: 'Quity', width: 12 },
-      { header: 'Amount', key: 'Amount', width: 12 },
-      { header: 'ActivityData', key: 'ActivityData', width: 15 },
-      { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
-      { header: 'Unit', key: 'Unit', width: 10 },
-      { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
-      { header: 'Memo', key: 'Memo', width: 20 },
-      { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
-      { header: 'Creator', key: 'Creator', width: 15 },
-      { header: 'AccNo', key: 'AccNo', width: 10 },
-      { header: 'AccName', key: 'AccName', width: 15 },
-      { header: 'ActivitySource', key: 'ActivitySource', width: 25 },
-    ];
-
-    sheet.getRow(1).font = { bold: true };
-
-    for (const row of data) {
-      sheet.addRow(row);
-    }
+    this.writePreviewSheet(sheet, PREVIEW_CAT5_COLUMNS, data);
   }
 
   async exportExcelCat7(
@@ -1745,51 +442,11 @@ export class PreviewpayloadService {
     factory: string,
     dockeyCMS: string,
   ) {
-    let data: any[];
-    if (factory.trim().toUpperCase() === 'ALL') {
-      const results = await Promise.all(
-        FACTORY_LIST.map((f) =>
-          this.getCMSByFactoryCat7(f, dateFrom, dateTo, dockeyCMS),
-        ),
-      );
-      data = results.flat();
-    } else {
-      data = await this.getCMSByFactoryCat7(
-        factory,
-        dateFrom,
-        dateTo,
-        dockeyCMS,
-      );
-    }
+    const data = await this.collectByFactory(factory, (f) =>
+      this.getCMSByFactoryCat7(f, dateFrom, dateTo, dockeyCMS),
+    );
 
-    sheet.columns = [
-      { header: 'System', key: 'System', width: 15 },
-      { header: 'Corporation', key: 'Corporation', width: 15 },
-      { header: 'Factory', key: 'Factory', width: 15 },
-      { header: 'Department', key: 'Department', width: 20 },
-      { header: 'DocKey', key: 'DocKey', width: 15 },
-      { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
-      { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
-      { header: 'ActivityType', key: 'ActivityType', width: 15 },
-      { header: 'DataType', key: 'DataType', width: 15 },
-      { header: 'DocType', key: 'DocType', width: 15 },
-      { header: 'DocDate', key: 'DocDate', width: 15 },
-      { header: 'DocDate2', key: 'DocDate2', width: 15 },
-      { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
-      { header: 'TransType', key: 'TransType', width: 15 },
-      { header: 'Departure', key: 'Departure', width: 25 },
-      { header: 'Destination', key: 'Destination', width: 25 },
-      { header: 'Attendance', key: 'Attendance', width: 15 },
-      { header: 'Memo', key: 'Memo', width: 20 },
-      { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
-      { header: 'Creator', key: 'Creator', width: 15 },
-    ];
-
-    sheet.getRow(1).font = { bold: true };
-
-    for (const row of data) {
-      sheet.addRow(row);
-    }
+    this.writePreviewSheet(sheet, PREVIEW_CAT7_COLUMNS, data);
   }
 
   async exportExcelCat9And12(
@@ -1800,67 +457,10 @@ export class PreviewpayloadService {
     ry: string,
     dockeyCMS: string,
   ) {
-    let data: any[];
-    if (factory.trim().toUpperCase() === 'ALL') {
-      const results = await Promise.all(
-        FACTORY_LIST.map((f) =>
-          this.getCMSByFactoryCat9(f, dateFrom, dateTo, ry, dockeyCMS),
-        ),
-      );
-      data = results.flat();
-    } else {
-      data = await this.getCMSByFactoryCat9(
-        factory as FactoryCode,
-        dateFrom,
-        dateTo,
-        ry,
-        dockeyCMS,
-      );
-    }
+    const data = await this.collectByFactory(factory, (f) =>
+      this.getCMSByFactoryCat9(f, dateFrom, dateTo, ry, dockeyCMS),
+    );
 
-    sheet.columns = [
-      { header: 'System', key: 'System', width: 15 },
-      { header: 'Corporation', key: 'Corporation', width: 15 },
-      { header: 'Factory', key: 'Factory', width: 15 },
-      { header: 'Department', key: 'Department', width: 15 },
-      { header: 'DocKey', key: 'DocKey', width: 15 },
-      { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
-      { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
-      { header: 'ActivityType', key: 'ActivityType', width: 15 },
-      { header: 'DataType', key: 'DataType', width: 15 },
-      { header: 'DocType', key: 'DocType', width: 15 },
-      { header: 'UndDoc', key: 'UndDoc', width: 15 },
-      { header: 'DocFlow', key: 'DocFlow', width: 15 },
-      { header: 'DocDate', key: 'DocDate', width: 15 },
-      { header: 'DocDate2', key: 'DocDate2', width: 15 },
-      { header: 'DocNo', key: 'DocNo', width: 15 },
-      { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
-      { header: 'CustVenName', key: 'CustVenName', width: 25 },
-      { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
-      { header: 'TransType', key: 'TransType', width: 15 },
-      { header: 'Departure', key: 'Departure', width: 25 },
-      { header: 'Destination', key: 'Destination', width: 15 },
-      { header: 'PortType', key: 'PortType', width: 15 },
-      { header: 'StPort', key: 'StPort', width: 15 },
-      { header: 'ThPort', key: 'ThPort', width: 15 },
-      { header: 'EndPort', key: 'EndPort', width: 15 },
-      { header: 'Product', key: 'Product', width: 20 },
-      { header: 'Quity', key: 'Quity', width: 12 },
-      { header: 'Amount', key: 'Amount', width: 12 },
-      { header: 'ActivityData', key: 'ActivityData', width: 15 },
-      { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
-      { header: 'Unit', key: 'Unit', width: 10 },
-      { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
-      { header: 'Memo', key: 'Memo', width: 20 },
-      { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
-      { header: 'Creator', key: 'Creator', width: 15 },
-      { header: 'ActivitySource', key: 'ActivitySource', width: 20 },
-    ];
-
-    sheet.getRow(1).font = { bold: true };
-
-    for (const row of data) {
-      sheet.addRow(row);
-    }
+    this.writePreviewSheet(sheet, PREVIEW_CAT9_AND_CAT12_COLUMNS, data);
   }
 }

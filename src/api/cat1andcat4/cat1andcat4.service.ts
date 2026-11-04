@@ -5,25 +5,47 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
+import { orderByClause } from 'src/helper/sql.helper';
 import { Sequelize } from 'sequelize-typescript';
 import {
   buildQuery,
   buildQueryAutoSentCMS,
-  buildQueryTest,
 } from 'src/helper/cat1andcat4.helper';
 import {
-  ACTIVITY_TYPES,
-  ActivityType,
   IDataPortCodeCat1AndCat4,
   IDataStyleAutoFill,
 } from 'src/types/cat1andcat4';
+import { mapToCMSFormatCat1And4 } from 'src/helper/cat1andcat4.cms';
+import { CMS_PAYLOAD_COLUMNS } from 'src/helper/cms-payload.columns';
 import * as ExcelJS from 'exceljs';
-import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import dayjs from 'dayjs';
 import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
+import { getDayAfter } from 'src/helper/date.helper';
+import { getOwn } from 'src/helper/object.helper';
+import { memoizeByKey } from 'src/helper/lookup.helper';
 import { PassThrough } from 'stream';
-dayjs().format();
+import {
+  buildImportMessage,
+  countUpserts,
+  readImportRows,
+} from 'src/helper/excel-import.helper';
+
+// The factories that have a Cat1&4 database (the order is the order of the "ALL" query).
+const CAT1_AND_CAT4_FACTORIES: FactoryCode[] = ['LYV', 'LHG', 'LVL', 'LYM'];
+
+type PortCodeRow = {
+  Supplier_ID: string;
+  Transport_Method: string;
+  Port_Code: string;
+  Factory_Code: string;
+};
+
+type TaxFreeZoneRow = {
+  Factory: string;
+  Supplier_ID: string;
+  Country: string;
+  Tax_Free_Zone_Address: string;
+};
 
 @Injectable()
 export class Cat1andcat4Service {
@@ -35,7 +57,10 @@ export class Cat1andcat4Service {
     @Inject('LYM_ERP') private readonly LYM_ERP: Sequelize,
   ) {}
 
-  private getVerificationComparisonKey(row: any) {
+  private getVerificationComparisonKey(row: {
+    DocNo?: unknown;
+    Product?: unknown;
+  }) {
     return [row.DocNo, row.Product]
       .map((value) =>
         String(value ?? '')
@@ -210,33 +235,23 @@ export class Cat1andcat4Service {
     sortField: string = 'No',
     sortOrder: string = 'asc',
   ) {
-    let db: Sequelize;
-    switch (factory.trim()) {
-      case 'LYV':
-        db = this.LYV_ERP;
-        break;
-      case 'LHG':
-        db = this.LHG_ERP;
-        break;
-      case 'LYM':
-        db = this.LYM_ERP;
-        break;
-      case 'LVL':
-        db = this.LVL_ERP;
-        break;
-      default:
-        return await this.getAllFactoryDataTest(
-          dateFrom,
-          dateTo,
-          usage,
-          unitWeight,
-          weight,
-          departure,
-          page,
-          limit,
-          sortField,
-          sortOrder,
-        );
+    const trimmedFactory = factory.trim();
+    const db = CAT1_AND_CAT4_FACTORIES.includes(trimmedFactory)
+      ? this.getDbByFactory(trimmedFactory)
+      : null;
+    if (!db) {
+      return await this.getAllFactoryDataTest(
+        dateFrom,
+        dateTo,
+        usage,
+        unitWeight,
+        weight,
+        departure,
+        page,
+        limit,
+        sortField,
+        sortOrder,
+      );
     }
 
     return await this.getAFactoryDataTest(
@@ -262,7 +277,7 @@ export class Cat1andcat4Service {
     const records: IDataPortCodeCat1AndCat4[] = await this.EIP.query(
       `SELECT *
         FROM CMW_PortCode_Cat1_4
-        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+        ORDER BY ${orderByClause(sortField, sortOrder)}
         `,
       { type: QueryTypes.SELECT },
     );
@@ -276,7 +291,7 @@ export class Cat1andcat4Service {
     const records: IDataStyleAutoFill[] = await this.EIP.query(
       `SELECT *,ROW_NUMBER() OVER(ORDER BY PrefixOfMatCode) AS [No]
         FROM CMW_StyleAutoFill
-        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+        ORDER BY ${orderByClause(sortField, sortOrder)}
         `,
       { type: QueryTypes.SELECT },
     );
@@ -320,7 +335,7 @@ export class Cat1andcat4Service {
     const records: IDataPortCodeCat1AndCat4[] = await this.EIP.query(
       `SELECT ROW_NUMBER() OVER (ORDER BY ID) AS No,*
         FROM CMW_TAX_FREE_ZONE_ADDRESS
-        ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+        ORDER BY ${orderByClause(sortField, sortOrder)}
         `,
       { type: QueryTypes.SELECT },
     );
@@ -372,282 +387,120 @@ export class Cat1andcat4Service {
     }
   }
 
-  // private async getAFactoryData(
-  //   db: Sequelize,
-  //   dateFrom: string,
-  //   dateTo: string,
-  //   factory: string,
-  //   page: number,
-  //   limit: number,
-  //   sortField: string,
-  //   sortOrder: string,
-  // ) {
-  //   try {
-  //     const offset = (page - 1) * limit;
-
-  //     const { query, countQuery } = await buildQuery(
-  //       dateFrom,
-  //       dateTo,
-  //       factory,
-  //       this.EIP,
-  //     );
-  //     const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-  //     const [dataResults, countResults] = await Promise.all([
-  //       db.query(query, {
-  //         replacements,
-  //         type: QueryTypes.SELECT,
-  //       }),
-  //       db.query(countQuery, {
-  //         replacements,
-  //         type: QueryTypes.SELECT,
-  //       }),
-  //     ]);
-  //     // console.log(dataResults);
-  //     let data = dataResults;
-  //     data.sort((a, b) => {
-  //       const aValue = a[sortField];
-  //       const bValue = b[sortField];
-  //       if (sortOrder === 'asc') {
-  //         return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-  //       } else {
-  //         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-  //       }
-  //     });
-  //     data = data.slice(offset, offset + limit);
-  //     const total = (countResults[0] as { total: number })?.total || 0;
-  //     const hasMore = offset + data.length < total;
-  //     return { data, page, limit, total, hasMore };
-  //   } catch (error: any) {
-  //     throw new InternalServerErrorException(error);
-  //   }
-  // }
-
-  // private async getAllFactoryData(
-  //   dateFrom: string,
-  //   dateTo: string,
-  //   factory: string,
-  //   page: number,
-  //   limit: number,
-  //   sortField: string,
-  //   sortOrder: string,
-  // ) {
-  //   try {
-  //     const offset = (page - 1) * limit;
-
-  //     const { query, countQuery } = await buildQuery(
-  //       dateFrom,
-  //       dateTo,
-  //       factory,
-  //       this.EIP,
-  //     );
-  //     const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-
-  //     const connects = [this.LYV_ERP, this.LHG_ERP, this.LYM_ERP, this.LVL_ERP];
-  //     const [dataResults, countResults] = await Promise.all([
-  //       Promise.all(
-  //         connects.map((conn) => {
-  //           return conn.query(query, {
-  //             type: QueryTypes.SELECT,
-  //             replacements,
-  //           });
-  //         }),
-  //       ),
-  //       Promise.all(
-  //         connects.map((conn) => {
-  //           return conn.query(countQuery, {
-  //             type: QueryTypes.SELECT,
-  //             replacements,
-  //           });
-  //         }),
-  //       ),
-  //     ]);
-  //     // console.log(dataResults,countResults);
-  //     let data = dataResults.flat();
-  //     data.sort((a, b) => {
-  //       const aValue = a[sortField];
-  //       const bValue = b[sortField];
-  //       if (sortOrder === 'asc') {
-  //         return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-  //       } else {
-  //         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-  //       }
-  //     });
-
-  //     data = data.slice(offset, offset + limit);
-
-  //     const total = countResults.reduce((sum, result) => {
-  //       return sum + ((result[0] as { total: number })?.total || 0);
-  //     }, 0);
-  //     const hasMore = offset + data.length < total;
-
-  //     return { data, page, limit, total, hasMore };
-  //   } catch (error: any) {
-  //     throw new InternalServerErrorException(error);
-  //   }
-  // }
-
   async importExcelPortCode(
     file: Express.Multer.File,
     userid: string,
     factory: string,
   ) {
     try {
-      let insertCount = 0;
-      let updateCount = 0;
-      if (!file.path || !fs.existsSync(file.path)) {
-        throw new Error('File path not found!');
-      }
-
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(file.path);
-      const worksheet = workbook.getWorksheet(1);
-      if (!worksheet) {
-        throw new Error('No worksheet found in the Excel file');
-      }
-
-      const headerRow = worksheet.getRow(1);
-      const headers: string[] = [];
-      headerRow.eachCell((cell) => {
-        if (cell.value) {
-          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
-        }
-      });
-
-      const requiredHeaders = [
-        'Supplier_ID',
-        'Transport_Method',
-        'Port_Code',
-        'Factory_Code',
-      ];
-      const missingHeaders = requiredHeaders.filter(
-        (h) => !headers.includes(h),
-      );
-
-      if (missingHeaders.length > 0) {
-        throw new Error(
-          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
-        );
-      }
-
-      const data: {
-        Supplier_ID: string;
-        Transport_Method: string;
-        Port_Code: string;
-        Factory_Code: string;
-      }[] = [];
-
-      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-        if (rowNumber === 1 && row.cellCount > 0) return;
-
-        const rowData: any = {};
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const headerCell = headerRow.getCell(colNumber);
-          const headerValue = headerCell.value;
-          if (headerValue !== null && headerValue !== undefined) {
-            const key = headerValue.toString().trim().replace(/\s+/g, '_');
-            rowData[key] = cell.value;
-          }
-        });
-        if (
+      const data = await readImportRows<PortCodeRow>(
+        file,
+        ['Supplier_ID', 'Transport_Method', 'Port_Code', 'Factory_Code'],
+        (rowData) =>
           rowData?.Supplier_ID &&
           rowData?.Transport_Method &&
           rowData?.Port_Code &&
-          rowData?.Factory_Code
-        ) {
-          data.push(rowData);
-        }
-      });
+          rowData?.Factory_Code,
+      );
 
-      for (let item of data) {
-        const id = uuidv4();
-        const records: { total: number }[] = await this.EIP.query(
-          `SELECT COUNT(*) total
-            FROM CMW_PortCode_Cat1_4
-            WHERE SupplierID = ? AND TransportMethod = ? AND PortCode = ? AND FactoryCode = ?`,
-          {
-            replacements: [
-              item.Supplier_ID,
-              item.Transport_Method,
-              item.Port_Code,
-              item.Factory_Code,
-            ],
-            type: QueryTypes.SELECT,
-          },
-        );
-
-        if (records[0].total > 0) {
-          await this.EIP.query(
-            `UPDATE CMW_PortCode_Cat1_4
-            SET
-                  PortCode = ?,
-                  FactoryCode = ?,
-                  UpdatedBy = ?,
-                  UpdatedFactory = ?,
-                  UpdatedDate = GETDATE()
-            WHERE SupplierID = ? AND TransportMethod = ?`,
-            {
-              replacements: [
-                item.Port_Code,
-                item.Factory_Code,
-                userid,
-                factory,
-                item.Supplier_ID,
-                item.Transport_Method,
-              ],
-              type: QueryTypes.SELECT,
-            },
-          );
-          updateCount++;
-        } else {
-          await this.EIP.query(
-            `INSERT INTO CMW_PortCode_Cat1_4
-              (
-                    Id,
-                    SupplierID,
-                    PortCode,
-                    FactoryCode,
-                    TransportMethod,
-                    CreatedBy,
-                    CreatedFactory,
-                    CreatedDate
-              )
-              VALUES
-              (
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    GETDATE()
-              )`,
-            {
-              replacements: [
-                id,
-                item.Supplier_ID,
-                item.Port_Code,
-                item.Factory_Code,
-                item.Transport_Method,
-                userid,
-                factory,
-              ],
-              type: QueryTypes.INSERT,
-            },
-          );
-          insertCount++;
-        }
-      }
-      const records: any = await this.EIP.query(
+      const { insertCount, updateCount } = await countUpserts(data, (item) =>
+        this.upsertPortCode(item, userid, factory),
+      );
+      const records = await this.EIP.query(
         `SELECT *
           FROM CMW_PortCode_Cat1_4`,
         { type: QueryTypes.SELECT },
       );
-      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      const message = buildImportMessage(insertCount, updateCount, data.length);
       return { message, records };
     } catch (error: any) {
       throw new InternalServerErrorException(`${error.message}`);
     }
+  }
+
+  private async upsertPortCode(
+    item: PortCodeRow,
+    userid: string,
+    factory: string,
+  ): Promise<'insert' | 'update'> {
+    const id = uuidv4();
+    const records: { total: number }[] = await this.EIP.query(
+      `SELECT COUNT(*) total
+        FROM CMW_PortCode_Cat1_4
+        WHERE SupplierID = ? AND TransportMethod = ? AND PortCode = ? AND FactoryCode = ?`,
+      {
+        replacements: [
+          item.Supplier_ID,
+          item.Transport_Method,
+          item.Port_Code,
+          item.Factory_Code,
+        ],
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    if (records[0].total > 0) {
+      await this.EIP.query(
+        `UPDATE CMW_PortCode_Cat1_4
+        SET
+              PortCode = ?,
+              FactoryCode = ?,
+              UpdatedBy = ?,
+              UpdatedFactory = ?,
+              UpdatedDate = GETDATE()
+        WHERE SupplierID = ? AND TransportMethod = ?`,
+        {
+          replacements: [
+            item.Port_Code,
+            item.Factory_Code,
+            userid,
+            factory,
+            item.Supplier_ID,
+            item.Transport_Method,
+          ],
+          type: QueryTypes.UPDATE,
+        },
+      );
+      return 'update';
+    }
+
+    await this.EIP.query(
+      `INSERT INTO CMW_PortCode_Cat1_4
+          (
+                Id,
+                SupplierID,
+                PortCode,
+                FactoryCode,
+                TransportMethod,
+                CreatedBy,
+                CreatedFactory,
+                CreatedDate
+          )
+          VALUES
+          (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                GETDATE()
+          )`,
+      {
+        replacements: [
+          id,
+          item.Supplier_ID,
+          item.Port_Code,
+          item.Factory_Code,
+          item.Transport_Method,
+          userid,
+          factory,
+        ],
+        type: QueryTypes.INSERT,
+      },
+    );
+    return 'insert';
   }
 
   async importExcelStyleAutoFill(
@@ -656,75 +509,26 @@ export class Cat1andcat4Service {
     factory: string,
   ) {
     try {
-      let insertCount = 0;
-      let updateCount = 0;
-      if (!file.path || !fs.existsSync(file.path)) {
-        throw new Error('File path not found!');
-      }
-
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(file.path);
-      const worksheet = workbook.getWorksheet(1);
-      if (!worksheet) {
-        throw new Error('No worksheet found in the Excel file');
-      }
-
-      const headerRow = worksheet.getRow(1);
-      const headers: string[] = [];
-      headerRow.eachCell((cell) => {
-        if (cell.value) {
-          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
-        }
-      });
-
-      const requiredHeaders = ['No', 'Prefix_of_Mat_Code', 'Style'];
-      const missingHeaders = requiredHeaders.filter(
-        (h) => !headers.includes(h),
-      );
-
-      if (missingHeaders.length > 0) {
-        throw new Error(
-          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
-        );
-      }
-
-      const data: {
+      const data = await readImportRows<{
         No: string;
         Prefix_of_Mat_Code: string;
         Style: string;
-      }[] = [];
+      }>(
+        file,
+        ['No', 'Prefix_of_Mat_Code', 'Style'],
+        (rowData) =>
+          rowData?.No && rowData?.Prefix_of_Mat_Code && rowData?.Style,
+      );
 
-      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-        if (rowNumber === 1 && row.cellCount > 0) return;
-
-        const rowData: any = {};
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const headerCell = headerRow.getCell(colNumber);
-          const headerValue = headerCell.value;
-          if (headerValue !== null && headerValue !== undefined) {
-            const key = headerValue.toString().trim().replace(/\s+/g, '_');
-            rowData[key] = cell.value;
-          }
-        });
-        if (rowData?.No && rowData?.Prefix_of_Mat_Code && rowData?.Style) {
-          data.push(rowData);
-        }
-      });
-
-      for (const item of data) {
-        const action = await this.upsertStyleAutoFill(item, userid, factory);
-        if (action === 'update') {
-          updateCount++;
-        } else if (action === 'insert') {
-          insertCount++;
-        }
-      }
-      const records: any = await this.EIP.query(
+      const { insertCount, updateCount } = await countUpserts(data, (item) =>
+        this.upsertStyleAutoFill(item, userid, factory),
+      );
+      const records = await this.EIP.query(
         `SELECT *, ROW_NUMBER() OVER(ORDER BY PrefixOfMatCode) AS [No]
           FROM CMW_StyleAutoFill`,
         { type: QueryTypes.SELECT },
       );
-      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      const message = buildImportMessage(insertCount, updateCount, data.length);
       return { message, records };
     } catch (error: any) {
       throw new InternalServerErrorException(`${error.message}`);
@@ -737,158 +541,109 @@ export class Cat1andcat4Service {
     factory: string,
   ) {
     try {
-      let insertCount = 0;
-      let updateCount = 0;
-      if (!file.path || !fs.existsSync(file.path)) {
-        throw new Error('File path not found!');
-      }
-
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(file.path);
-      const worksheet = workbook.getWorksheet(1);
-      if (!worksheet) {
-        throw new Error('No worksheet found in the Excel file');
-      }
-
-      const headerRow = worksheet.getRow(1);
-      const headers: string[] = [];
-      headerRow.eachCell((cell) => {
-        if (cell.value) {
-          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
-        }
-      });
-
-      const requiredHeaders = [
-        'No',
-        'Factory',
-        'Supplier_ID',
-        'Country',
-        'Tax_Free_Zone_Address',
-      ];
-      const missingHeaders = requiredHeaders.filter(
-        (h) => !headers.includes(h),
-      );
-
-      if (missingHeaders.length > 0) {
-        throw new Error(
-          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
-        );
-      }
-
-      const data: {
-        Factory: string;
-        Supplier_ID: string;
-        Country: string;
-        Tax_Free_Zone_Address: string;
-      }[] = [];
-
-      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-        if (rowNumber === 1 && row.cellCount > 0) return;
-
-        const rowData: any = {};
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const headerCell = headerRow.getCell(colNumber);
-          const headerValue = headerCell.value;
-          if (headerValue !== null && headerValue !== undefined) {
-            const key = headerValue.toString().trim().replace(/\s+/g, '_');
-            rowData[key] = cell.value;
-          }
-        });
-        if (
+      const data = await readImportRows<TaxFreeZoneRow>(
+        file,
+        ['No', 'Factory', 'Supplier_ID', 'Country', 'Tax_Free_Zone_Address'],
+        (rowData) =>
           rowData?.Factory ||
           rowData?.Supplier_ID ||
           rowData?.Country ||
-          rowData?.Tax_Free_Zone_Address
-        ) {
-          data.push(rowData);
-        }
-      });
+          rowData?.Tax_Free_Zone_Address,
+      );
 
-      for (let item of data) {
-        const id = uuidv4();
-        const records: { total: number }[] = await this.EIP.query(
-          `SELECT COUNT(*) total
-            FROM CMW_TAX_FREE_ZONE_ADDRESS 
-            WHERE Factory = ? AND SupplierID = ?`,
-          {
-            replacements: [item.Factory, item.Supplier_ID],
-            type: QueryTypes.SELECT,
-          },
-        );
-
-        if (records[0].total > 0) {
-          await this.EIP.query(
-            `UPDATE CMW_TAX_FREE_ZONE_ADDRESS
-              SET
-                Country = ?,
-                TaxFreeZoneAddress = ?,
-                UpdatedBy = ?,
-                UpdatedFactory = ?,
-                UpdatedAt = GETDATE()
-              WHERE Factory = ? AND SupplierID = ?`,
-            {
-              replacements: [
-                item.Country,
-                item.Tax_Free_Zone_Address,
-                userid,
-                factory,
-                item.Factory,
-                item.Supplier_ID,
-              ],
-              type: QueryTypes.SELECT,
-            },
-          );
-          updateCount++;
-        } else {
-          await this.EIP.query(
-            `INSERT INTO CMW_TAX_FREE_ZONE_ADDRESS
-              (
-                ID,
-                Factory,
-                SupplierID,
-                Country,
-                TaxFreeZoneAddress,
-                CreatedBy,
-                CreatedFactory,
-                CreatedAt
-              )
-              VALUES
-              (
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                GETDATE()
-              )`,
-            {
-              replacements: [
-                id,
-                item.Factory,
-                item.Supplier_ID,
-                item.Country,
-                item.Tax_Free_Zone_Address,
-                userid,
-                factory,
-              ],
-              type: QueryTypes.INSERT,
-            },
-          );
-          insertCount++;
-        }
-      }
-      const records: any = await this.EIP.query(
+      const { insertCount, updateCount } = await countUpserts(data, (item) =>
+        this.upsertTaxFreeZone(item, userid, factory),
+      );
+      const records = await this.EIP.query(
         `SELECT *
           FROM CMW_TAX_FREE_ZONE_ADDRESS`,
         { type: QueryTypes.SELECT },
       );
-      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      const message = buildImportMessage(insertCount, updateCount, data.length);
       return { message, records };
     } catch (error: any) {
       throw new InternalServerErrorException(`${error.message}`);
     }
+  }
+
+  private async upsertTaxFreeZone(
+    item: TaxFreeZoneRow,
+    userid: string,
+    factory: string,
+  ): Promise<'insert' | 'update'> {
+    const id = uuidv4();
+    const records: { total: number }[] = await this.EIP.query(
+      `SELECT COUNT(*) total
+        FROM CMW_TAX_FREE_ZONE_ADDRESS
+        WHERE Factory = ? AND SupplierID = ?`,
+      {
+        replacements: [item.Factory, item.Supplier_ID],
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    if (records[0].total > 0) {
+      await this.EIP.query(
+        `UPDATE CMW_TAX_FREE_ZONE_ADDRESS
+          SET
+            Country = ?,
+            TaxFreeZoneAddress = ?,
+            UpdatedBy = ?,
+            UpdatedFactory = ?,
+            UpdatedAt = GETDATE()
+          WHERE Factory = ? AND SupplierID = ?`,
+        {
+          replacements: [
+            item.Country,
+            item.Tax_Free_Zone_Address,
+            userid,
+            factory,
+            item.Factory,
+            item.Supplier_ID,
+          ],
+          type: QueryTypes.UPDATE,
+        },
+      );
+      return 'update';
+    }
+
+    await this.EIP.query(
+      `INSERT INTO CMW_TAX_FREE_ZONE_ADDRESS
+          (
+            ID,
+            Factory,
+            SupplierID,
+            Country,
+            TaxFreeZoneAddress,
+            CreatedBy,
+            CreatedFactory,
+            CreatedAt
+          )
+          VALUES
+          (
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            GETDATE()
+          )`,
+      {
+        replacements: [
+          id,
+          item.Factory,
+          item.Supplier_ID,
+          item.Country,
+          item.Tax_Free_Zone_Address,
+          userid,
+          factory,
+        ],
+        type: QueryTypes.INSERT,
+      },
+    );
+    return 'insert';
   }
 
   private async getAFactoryDataTest(
@@ -905,59 +660,55 @@ export class Cat1andcat4Service {
     sortField: string = 'No',
     sortOrder: string = 'asc',
   ) {
-    try {
-      const offset = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-      const query = await buildQueryTest(
-        sortField,
-        sortOrder,
-        factory,
-        usage,
-        unitWeight,
-        weight,
-        departure,
-        this.EIP,
-      );
+    const query = await buildQuery(
+      sortField,
+      sortOrder,
+      factory,
+      usage,
+      unitWeight,
+      weight,
+      departure,
+      this.EIP,
+    );
 
-      const replacements = {
-        startDate: dateFrom,
-        endDate: dayjs(dateTo)
-          .add(1, 'day')
-          .startOf('day')
-          .format('YYYY-MM-DD'),
-        offset,
-        limit,
-      };
+    const replacements = {
+      startDate: dateFrom,
+      endDate: getDayAfter(dateTo),
+      offset,
+      limit,
+    };
 
-      let data: any[] = await db.query(query, {
-        replacements,
-        type: QueryTypes.SELECT,
-      });
+    let data: any[] = await db.query(query, {
+      replacements,
+      type: QueryTypes.SELECT,
+    });
 
-      data = await this.applyTaxFreeZoneOverrides(data, factory);
+    data = await this.applyTaxFreeZoneOverrides(data, factory);
 
-      data = await Promise.all(
-        data.map(async (item: any) => {
-          const prefix = String(item?.MatID ?? '')
-            .trim()
-            .charAt(0);
-          const styleAutoFill = await this.getStyleAutoFillByPrefix(prefix);
-          return {
-            ...item,
-            Style:
-              (item.Style === '' ? styleAutoFill : item?.Style) ||
-              (item?.Style ?? styleAutoFill ?? 'N/A'),
-          };
-        }),
-      );
+    const styleOfPrefix = memoizeByKey((prefix) =>
+      this.getStyleAutoFillByPrefix(prefix),
+    );
+    data = await Promise.all(
+      data.map(async (item: any) => {
+        const prefix = String(item?.MatID ?? '')
+          .trim()
+          .charAt(0);
+        const styleAutoFill = await styleOfPrefix(prefix);
+        return {
+          ...item,
+          Style:
+            (item.Style === '' ? styleAutoFill : item?.Style) ||
+            (item?.Style ?? styleAutoFill ?? 'N/A'),
+        };
+      }),
+    );
 
-      const total = data.length > 0 ? data[0].TotalRowsCount : 0;
-      const hasMore = offset + data.length < total;
+    const total = data.length > 0 ? data[0].TotalRowsCount : 0;
+    const hasMore = offset + data.length < total;
 
-      return { data, page, limit, total, hasMore };
-    } catch (error: any) {
-      throw error;
-    }
+    return { data, page, limit, total, hasMore };
   }
 
   private async getAllFactoryDataTest(
@@ -973,27 +724,19 @@ export class Cat1andcat4Service {
     sortOrder: string,
   ) {
     try {
-      const startedAt = Date.now();
       const offset = (page - 1) * limit;
-      const connects: { factoryName: string; conn: Sequelize }[] = [
-        { factoryName: 'LYV', conn: this.LYV_ERP },
-        { factoryName: 'LHG', conn: this.LHG_ERP },
-        { factoryName: 'LVL', conn: this.LVL_ERP },
-        { factoryName: 'LYM', conn: this.LYM_ERP },
-      ];
+      const connects = CAT1_AND_CAT4_FACTORIES.map((factoryName) => ({
+        factoryName,
+        conn: this.getDbByFactory(factoryName)!,
+      }));
       const replacements = {
         startDate: dateFrom,
-        endDate: dayjs(dateTo)
-          .add(1, 'day')
-          .startOf('day')
-          .format('YYYY-MM-DD'),
+        endDate: getDayAfter(dateTo),
       };
 
       const results = await Promise.all(
         connects.map(async ({ factoryName, conn }) => {
-          const factoryStartedAt = Date.now();
-          const buildQueryStartedAt = Date.now();
-          const query = await buildQueryTest(
+          const query = await buildQuery(
             sortField,
             sortOrder,
             factoryName,
@@ -1004,28 +747,18 @@ export class Cat1andcat4Service {
             this.EIP,
             true,
           );
-          const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
-
-          const queryStartedAt = Date.now();
           let rows: any[] = await conn.query(query, {
             type: QueryTypes.SELECT,
             replacements,
           });
-          const queryDurationMs = Date.now() - queryStartedAt;
 
-          const overrideStartedAt = Date.now();
           rows = await this.applyTaxFreeZoneOverrides(rows, factoryName);
-          const overrideDurationMs = Date.now() - overrideStartedAt;
-          const totalDurationMs = Date.now() - factoryStartedAt;
-          console.log(
-            `[Cat1AndCat4][getAllFactoryDataTest] factory=${factoryName} rows=${rows.length} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
-          );
 
           return rows;
         }),
       );
 
-      let allData: any[] = results.flat();
+      const allData: any[] = results.flat();
 
       allData.sort((a, b) => {
         if (sortOrder === 'asc') {
@@ -1039,12 +772,11 @@ export class Cat1andcat4Service {
         .slice(offset, offset + limit)
         .map((row, index) => ({ ...row, No: offset + index + 1 }));
       const hasMore = offset + data.length < total;
-      const totalDurationMs = Date.now() - startedAt;
-      console.log(
-        `[Cat1AndCat4][getAllFactoryDataTest] page=${page} limit=${limit} mergedRows=${allData.length} returnedRows=${data.length} totalMs=${totalDurationMs}`,
-      );
       return { data, page, limit, total, hasMore };
-    } catch (error) {}
+    } catch (error) {
+      // The error is only logged: as before, the caller gets `undefined` (an empty response).
+      console.error('getAllFactoryDataTest failed:', error);
+    }
   }
 
   async autoSentCMS(
@@ -1054,16 +786,7 @@ export class Cat1andcat4Service {
     dockeyCMS: string,
   ) {
     try {
-      if (factory.trim().toUpperCase() === 'ALL') {
-        return this.autoSentCMSAllFactories(dateFrom, dateTo, dockeyCMS);
-      }
-
-      return this.getCMSByFactory(
-        factory as FactoryCode,
-        dateFrom,
-        dateTo,
-        dockeyCMS,
-      );
+      return this.getCMSRows(factory, dateFrom, dateTo, dockeyCMS);
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
@@ -1102,12 +825,12 @@ export class Cat1andcat4Service {
     const safePage = page > 0 ? page : 1;
     const safeLimit = limit > 0 ? limit : 50;
 
-    const previewRows = (await this.autoSentCMS(
+    const previewRows = await this.autoSentCMS(
       previewDateFrom,
       previewDateTo,
       factory,
       dockeyCMS,
-    )) as any[];
+    );
 
     let where = 'WHERE 1=1';
     const replacements: any[] = [];
@@ -1125,7 +848,7 @@ export class Cat1andcat4Service {
     where += ' AND ActivityType = ?';
     replacements.push(activityType);
 
-    const loggingRows = (await this.EIP.query(
+    const loggingRows = await this.EIP.query(
       `
       SELECT *
       FROM CMW_Category_1_And_4_Log
@@ -1136,7 +859,7 @@ export class Cat1andcat4Service {
         type: QueryTypes.SELECT,
         replacements,
       },
-    )) as any[];
+    );
 
     const previewKeys = new Set(
       previewRows.map((row) => this.getVerificationComparisonKey(row)),
@@ -1149,9 +872,10 @@ export class Cat1andcat4Service {
       loggingKeys.has(this.getVerificationComparisonKey(row)),
     ).length;
     const missingCount = previewRows.length - matchedCount;
-    const extraCount = loggingRows.filter(
+    const extraRows = loggingRows.filter(
       (row) => !previewKeys.has(this.getVerificationComparisonKey(row)),
-    ).length;
+    );
+    const extraCount = extraRows.length;
 
     const previewRowsWithStatus = previewRows.map((row) => {
       const isMatched = loggingKeys.has(this.getVerificationComparisonKey(row));
@@ -1161,23 +885,20 @@ export class Cat1andcat4Service {
       };
     });
 
-    const extraRowsWithStatus = loggingRows
-      .filter((row) => !previewKeys.has(this.getVerificationComparisonKey(row)))
-      .map((row) => ({
-        ...row,
-        VerificationStatus: 'EXTRA',
-      }));
+    const extraRowsWithStatus = extraRows.map((row) => ({
+      ...row,
+      VerificationStatus: 'EXTRA',
+    }));
 
     const rowsWithStatus = [...previewRowsWithStatus, ...extraRowsWithStatus];
 
-    const filteredRows =
-      normalizedStatus === 'MATCHED'
-        ? rowsWithStatus.filter((row) => row.VerificationStatus === 'MATCHED')
-        : normalizedStatus === 'MISSING'
-          ? rowsWithStatus.filter((row) => row.VerificationStatus === 'MISSING')
-          : normalizedStatus === 'EXTRA'
-            ? rowsWithStatus.filter((row) => row.VerificationStatus === 'EXTRA')
-            : rowsWithStatus;
+    const filteredRows = ['MATCHED', 'MISSING', 'EXTRA'].includes(
+      normalizedStatus,
+    )
+      ? rowsWithStatus.filter(
+          (row) => row.VerificationStatus === normalizedStatus,
+        )
+      : rowsWithStatus;
 
     const total = filteredRows.length;
     const offset = (safePage - 1) * safeLimit;
@@ -1201,18 +922,25 @@ export class Cat1andcat4Service {
     };
   }
 
-  private async autoSentCMSAllFactories(
+  /**
+   * CMS payload rows of every factory (in FACTORY_LIST order) when factory is 'ALL', otherwise of that one factory.
+   * Not async on purpose: a bad `factory` throws right here, inside the caller's try.
+   */
+  private getCMSRows(
+    factory: string,
     dateFrom: string,
     dateTo: string,
     dockeyCMS: string,
-  ) {
-    const results = await Promise.all(
-      FACTORY_LIST.map((factory) =>
-        this.getCMSByFactory(factory, dateFrom, dateTo, dockeyCMS),
-      ),
-    );
+  ): Promise<any[]> {
+    if (factory.trim().toUpperCase() === 'ALL') {
+      return Promise.all(
+        FACTORY_LIST.map((f) =>
+          this.getCMSByFactory(f, dateFrom, dateTo, dockeyCMS),
+        ),
+      ).then((results) => results.flat());
+    }
 
-    return results.flat();
+    return this.getCMSByFactory(factory, dateFrom, dateTo, dockeyCMS);
   }
 
   private async getCMSByFactory(
@@ -1224,40 +952,26 @@ export class Cat1andcat4Service {
     const db = this.getDbByFactory(factory);
     if (!db) return [];
 
-    // const startedAt = Date.now();
-    // const buildQueryStartedAt = Date.now();
     const query = await buildQueryAutoSentCMS(factory, this.EIP);
-    // const buildQueryDurationMs = Date.now() - buildQueryStartedAt;
 
     const replacements =
       dateFrom && dateTo
         ? {
             startDate: dateFrom,
-            endDate: dayjs(dateTo)
-              .add(1, 'day')
-              .startOf('day')
-              .format('YYYY-MM-DD'),
+            endDate: getDayAfter(dateTo),
           }
         : {};
 
-    // const queryStartedAt = Date.now();
     let data = await db.query<any>(query, {
       type: QueryTypes.SELECT,
       replacements,
     });
-    // const queryDurationMs = Date.now() - queryStartedAt;
 
-    // const overrideStartedAt = Date.now();
     data = await this.applyTaxFreeZoneOverrides(data, factory);
-    // const overrideDurationMs = Date.now() - overrideStartedAt;
 
     const mapped = data.flatMap((item) =>
-      this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
+      mapToCMSFormatCat1And4(item, dateFrom, dateTo, dockeyCMS),
     );
-    // const totalDurationMs = Date.now() - startedAt;
-    // console.log(
-    //   `[Cat1AndCat4][getCMSByFactory] factory=${factory} dockeyCMS=${dockeyCMS} sourceRows=${data.length} mappedRows=${mapped.length} buildQueryMs=${buildQueryDurationMs} queryMs=${queryDurationMs} overrideMs=${overrideDurationMs} totalMs=${totalDurationMs}`,
-    // );
 
     return mapped;
   }
@@ -1270,101 +984,7 @@ export class Cat1andcat4Service {
       LYM: this.LYM_ERP,
     };
 
-    return dbMap[factory] ?? null;
-  }
-
-  private mapToCMSFormat(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-    dockeyCMS: string,
-  ) {
-    const factory = item.FactoryCode ?? '';
-    // const docKey = `${item.MatID ?? ''}${item.ReceivedNo ?? ''}`;
-    const matId = item.MatID ?? '';
-    const docKey = matId.substring(0, 1);
-    if (docKey.startsWith('W')) {
-      return [];
-    }
-    const docDate = item.RKDate ? dayjs(item.RKDate).format('YYYY/MM/DD') : '';
-    // const docDate2 = item.PurDate
-    //   ? dayjs(item.PurDate).format('YYYY/MM/DD')
-    //   : '';
-    // const docNo = item.PurNo ?? '';
-    const custVenName = item.SupplierCode ?? '';
-    const transportationMethod = item.TransportationMethod ?? '';
-    const departure = item.Departure ?? '';
-    const portOfDeparture = item.PortOfDeparture ?? '';
-    const portOfArrival = item.PortOfArrival ?? '';
-    const destination = item.Destination ?? '';
-    const activityData = item.WeightUnitkg ?? 0;
-    const qtyReceive = item.QtyReceive ?? 0;
-    const receivedNo = item.ReceivedNo ?? '';
-
-    let transType = '';
-    let portType = '';
-
-    switch (transportationMethod.trim().toLowerCase()) {
-      case 'SEA'.trim().toLowerCase():
-      case 'SEA+LAND'.trim().toLowerCase():
-        transType = '海運';
-        portType = '海港';
-        break;
-      case 'AIR'.trim().toLowerCase():
-        transType = '空運';
-        portType = '空港';
-        break;
-      case 'LAND'.trim().toLowerCase():
-        transType = '陸運';
-        portType = '';
-        break;
-      default:
-        break;
-    }
-
-    return ACTIVITY_TYPES.filter((item) => item === dockeyCMS).map(
-      (activityType: ActivityType) => ({
-        System: 'CMS Web',
-        Corporation: 'Lai Yih',
-        Factory: factory,
-        Department: '',
-        DocKey:
-          activityType.trim() === '4.1'
-            ? `${activityType.trim()}${docKey}`
-            : activityType.trim(),
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType.trim(),
-        DataType: activityType.trim() === '3.1' ? '1' : '999',
-        DocType: '入庫單',
-        UndDoc: '',
-        DocFlow: '',
-        DocDate: docDate,
-        DocDate2: docDate,
-        DocNo: receivedNo.trim(),
-        UndDocNo: '',
-        CustVenName: custVenName,
-        InvoiceNo: '',
-        TransType: transType,
-        Departure: departure,
-        Destination: destination,
-        PortType: portType,
-        StPort: portOfDeparture,
-        ThPort: '',
-        EndPort: portOfArrival,
-        Product: matId.trim(),
-        Quity: qtyReceive,
-        Amount: '',
-        ActivityData: activityData,
-        ActivityUnit: 'KG',
-        Unit: '',
-        UnitWeight: '',
-        Memo: '',
-        CreateDateTime: '',
-        Creator: '',
-        ActivitySource: matId.charAt(0),
-      }),
-    );
+    return getOwn(dbMap, factory) ?? null;
   }
 
   async exportPreviewPayload(
@@ -1375,22 +995,7 @@ export class Cat1andcat4Service {
   ) {
     try {
       // Lấy data giống autoSentCMS
-      let data: any[];
-      if (factory.trim().toUpperCase() === 'ALL') {
-        const results = await Promise.all(
-          FACTORY_LIST.map((f) =>
-            this.getCMSByFactory(f, dateFrom, dateTo, dockeyCMS),
-          ),
-        );
-        data = results.flat();
-      } else {
-        data = await this.getCMSByFactory(
-          factory as FactoryCode,
-          dateFrom,
-          dateTo,
-          dockeyCMS,
-        );
-      }
+      const data = await this.getCMSRows(factory, dateFrom, dateTo, dockeyCMS);
 
       // Xuất Excel
       const passThrough = new PassThrough();
@@ -1410,44 +1015,7 @@ export class Cat1andcat4Service {
 
       const worksheet = workbook.addWorksheet('PreviewPayload');
 
-      worksheet.columns = [
-        { header: 'System', key: 'System', width: 15 },
-        { header: 'Corporation', key: 'Corporation', width: 15 },
-        { header: 'Factory', key: 'Factory', width: 15 },
-        { header: 'Department', key: 'Department', width: 15 },
-        { header: 'DocKey', key: 'DocKey', width: 15 },
-        { header: 'SPeriodData', key: 'SPeriodData', width: 15 },
-        { header: 'EPeriodData', key: 'EPeriodData', width: 15 },
-        { header: 'ActivityType', key: 'ActivityType', width: 15 },
-        { header: 'DataType', key: 'DataType', width: 15 },
-        { header: 'DocType', key: 'DocType', width: 15 },
-        { header: 'UndDoc', key: 'UndDoc', width: 15 },
-        { header: 'DocFlow', key: 'DocFlow', width: 15 },
-        { header: 'DocDate', key: 'DocDate', width: 15 },
-        { header: 'DocDate2', key: 'DocDate2', width: 15 },
-        { header: 'DocNo', key: 'DocNo', width: 15 },
-        { header: 'UndDocNo', key: 'UndDocNo', width: 15 },
-        { header: 'CustVenName', key: 'CustVenName', width: 25 },
-        { header: 'InvoiceNo', key: 'InvoiceNo', width: 15 },
-        { header: 'TransType', key: 'TransType', width: 15 },
-        { header: 'Departure', key: 'Departure', width: 25 },
-        { header: 'Destination', key: 'Destination', width: 15 },
-        { header: 'PortType', key: 'PortType', width: 15 },
-        { header: 'StPort', key: 'StPort', width: 15 },
-        { header: 'ThPort', key: 'ThPort', width: 15 },
-        { header: 'EndPort', key: 'EndPort', width: 15 },
-        { header: 'Product', key: 'Product', width: 20 },
-        { header: 'Quity', key: 'Quity', width: 12 },
-        { header: 'Amount', key: 'Amount', width: 12 },
-        { header: 'ActivityData', key: 'ActivityData', width: 15 },
-        { header: 'ActivityUnit', key: 'ActivityUnit', width: 15 },
-        { header: 'Unit', key: 'Unit', width: 10 },
-        { header: 'UnitWeight', key: 'UnitWeight', width: 12 },
-        { header: 'Memo', key: 'Memo', width: 20 },
-        { header: 'CreateDateTime', key: 'CreateDateTime', width: 20 },
-        { header: 'Creator', key: 'Creator', width: 15 },
-        { header: 'ActivitySource', key: 'ActivitySource', width: 20 },
-      ];
+      worksheet.columns = CMS_PAYLOAD_COLUMNS;
 
       worksheet.getRow(1).font = { bold: true };
       worksheet.getRow(1).commit();

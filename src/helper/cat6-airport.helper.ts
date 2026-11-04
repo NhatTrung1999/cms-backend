@@ -1,3 +1,5 @@
+import { getOwn } from './object.helper';
+
 const CAT6_AIRPORT_NAMES: Record<string, string> = {
   NUE: 'Nuremberg Airport (Albrecht Durer Airport Nurnberg)',
   CAN: 'Guangzhou Baiyun International Airport',
@@ -19,5 +21,5 @@ const CAT6_AIRPORT_NAMES: Record<string, string> = {
 export const getCat6AirportName = (value?: string | null) => {
   const code = value?.trim().toUpperCase() ?? '';
   if (!code) return '';
-  return CAT6_AIRPORT_NAMES[code] ?? value?.trim() ?? '';
+  return getOwn(CAT6_AIRPORT_NAMES, code) ?? value?.trim() ?? '';
 };

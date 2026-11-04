@@ -1,7 +1,15 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { AuthService } from './auth.service';
 import { Public } from 'src/decorators';
+import { UserRequest } from 'src/helper/common.helper';
 
 @Controller('auth')
 export class AuthController {
@@ -10,7 +18,7 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Request() req) {
+  async login(@Request() req: UserRequest) {
     const response = await this.authService.login(req.user);
     return response;
   }
@@ -21,10 +29,9 @@ export class AuthController {
     return this.authService.refresh(refreshToken);
   }
 
-  // @UseGuards(JwtAuthGuard)
   @Public()
   @Get('profile')
-  getProfile(@Request() req) {
+  getProfile(@Request() req: UserRequest) {
     return req.user;
   }
 }

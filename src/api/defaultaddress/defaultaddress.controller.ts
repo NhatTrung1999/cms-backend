@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { DefaultaddressService } from './defaultaddress.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { getFactortyID, getUserId } from 'src/helper/common.helper';
+import { getFactoryID, getUserId, UserRequest } from 'src/helper/common.helper';
 
 @Controller('defaultaddress')
 export class DefaultaddressController {
@@ -35,9 +35,9 @@ export class DefaultaddressController {
     updateDto: {
       DefaultAddress: string;
     },
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.defaultaddressService.updateDefaultAddress(
       id,
@@ -58,11 +58,10 @@ export class DefaultaddressController {
   )
   async importExcelDefaultAddress(
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
-    console.log(file);
     if (!file) throw new BadRequestException('No file uploaded!');
 
     const data = await this.defaultaddressService.importExcelDefaultAddress(
@@ -76,7 +75,7 @@ export class DefaultaddressController {
   @Post('sync-default-address')
   async syncDefaultAddress(
     @Body() body: { factory: string; syncDefaultAddress: string },
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
     const userid = getUserId(req);
     return this.defaultaddressService.syncDefaultAddress(

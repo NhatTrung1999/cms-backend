@@ -17,7 +17,7 @@ import {
   CreateLogCat7,
   CreateLogCat9And12,
 } from './dto/create-logcat.dto';
-import { getFactortyID, getUserId } from 'src/helper/common.helper';
+import { getFactoryID, getUserId, UserRequest } from 'src/helper/common.helper';
 import { Response } from 'express';
 
 @Controller('logcat')
@@ -55,8 +55,11 @@ export class LogcatController {
   }
 
   @Post('create-log-cat1-4')
-  async createLogCat1And4(@Body() data: CreateLogCat1And4[], @Request() req) {
-    const factory = getFactortyID(req);
+  async createLogCat1And4(
+    @Body() data: CreateLogCat1And4[],
+    @Request() req: UserRequest,
+  ) {
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat1And4(data, factory, userid);
   }
@@ -106,8 +109,11 @@ export class LogcatController {
   }
 
   @Post('create-log-cat5')
-  async createLogCat5(@Body() data: CreateLogCat5[], @Request() req) {
-    const factory = getFactortyID(req);
+  async createLogCat5(
+    @Body() data: CreateLogCat5[],
+    @Request() req: UserRequest,
+  ) {
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat5(data, factory, userid);
   }
@@ -159,9 +165,9 @@ export class LogcatController {
   @Post('create-log-cat6-business-travel')
   async createLogCat6BusinessTravel(
     @Body() data: CreateLogCat6BusinessTravel[],
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat6BusinessTravel(
       data,
@@ -216,9 +222,9 @@ export class LogcatController {
   @Post('create-log-cat6-accommodation')
   async createLogCat6Accommodation(
     @Body() data: CreateLogCat6Accommodation[],
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat6Accommodation(data, factory, userid);
   }
@@ -268,8 +274,11 @@ export class LogcatController {
   }
 
   @Post('create-log-cat7')
-  async createLogCat7(@Body() data: CreateLogCat7[], @Request() req) {
-    const factory = getFactortyID(req);
+  async createLogCat7(
+    @Body() data: CreateLogCat7[],
+    @Request() req: UserRequest,
+  ) {
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat7(data, factory, userid);
   }
@@ -319,8 +328,11 @@ export class LogcatController {
   }
 
   @Post('create-log-cat9-12')
-  async createLogCat9And12(@Body() data: CreateLogCat9And12[], @Request() req) {
-    const factory = getFactortyID(req);
+  async createLogCat9And12(
+    @Body() data: CreateLogCat9And12[],
+    @Request() req: UserRequest,
+  ) {
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.logcatService.createLogCat9And12(data, factory, userid);
   }

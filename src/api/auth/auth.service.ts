@@ -33,14 +33,13 @@ export class AuthService {
     return await this.usersService.checkLock(userid);
   }
 
-  async checkExistUser(userid: string){
-    return await this.usersService.checkExistUser(userid)
+  async checkExistUser(userid: string) {
+    return await this.usersService.checkExistUser(userid);
   }
 
   async login(user: any) {
-    const permissionState = await this.usersService.getUserModulePermissionState(
-      user.UserID,
-    );
+    const permissionState =
+      await this.usersService.getUserModulePermissionState(user.UserID);
     const payload = { ...user, ...permissionState };
     return {
       payload,

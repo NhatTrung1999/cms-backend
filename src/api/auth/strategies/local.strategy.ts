@@ -15,7 +15,11 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: Request): Promise<any> {
-    const { userid, password, factory } = req.body;
+    const { userid, password, factory } = req.body as {
+      userid: string;
+      password: string;
+      factory?: string;
+    };
 
     let user: any;
 
@@ -23,7 +27,7 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     if (SPECIAL_ACCOUNTS.includes(userid.trim().toLowerCase())) {
       user = await this.authService.validateUser(userid, password, factory);
     } else {
-      let checkLock = await this.authService.checkLockErp(userid);
+      const checkLock = await this.authService.checkLockErp(userid);
       if (!checkLock) {
         throw new UnauthorizedException(
           'Account ERP is locked! Please enter your other account!',

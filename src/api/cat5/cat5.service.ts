@@ -5,11 +5,25 @@ import {
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { buildQueryAutoSentCMS } from 'src/helper/cat5.helper';
-import dayjs from 'dayjs';
+import {
+  buildCat5CountQuery,
+  buildCat5Filter,
+  buildCat5PageQuery,
+} from 'src/helper/cat5.queries';
+import { getCat5CMSRows } from 'src/helper/cat5.cms';
+import { sortByField } from 'src/helper/sort.helper';
+import { getOwn } from 'src/helper/object.helper';
 import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
-import { ACTIVITY_TYPES, ActivityType } from 'src/types/cat5';
-dayjs().format();
+
+// The factories that have a WMS database (the order is the order of the "ALL" page).
+const CAT5_FACTORIES: FactoryCode[] = [
+  'LYV',
+  'LHG',
+  'LYM',
+  'LVL',
+  'JAZ',
+  'JZS',
+];
 
 @Injectable()
 export class Cat5Service {
@@ -32,35 +46,18 @@ export class Cat5Service {
     sortField: string = 'Waste_disposal_date',
     sortOrder: string = 'asc',
   ) {
-    let db: Sequelize;
-    switch (factory) {
-      case 'LYV':
-        db = this.LYV_WMS;
-        break;
-      case 'LHG':
-        db = this.LHG_WMS;
-        break;
-      case 'LYM':
-        db = this.LYM_WMS;
-        break;
-      case 'LVL':
-        db = this.LVL_WMS;
-        break;
-      case 'JAZ':
-        db = this.JAZ_WMS;
-        break;
-      case 'JZS':
-        db = this.JZS_WMS;
-        break;
-      default:
-        return await this.getAllDataFactory(
-          dateFrom,
-          dateTo,
-          page,
-          limit,
-          sortField,
-          sortOrder,
-        );
+    const db = CAT5_FACTORIES.includes(factory)
+      ? this.getDbByFactory(factory)
+      : null;
+    if (!db) {
+      return await this.getAllDataFactory(
+        dateFrom,
+        dateTo,
+        page,
+        limit,
+        sortField,
+        sortOrder,
+      );
     }
 
     return await this.getDataFactory(
@@ -83,67 +80,12 @@ export class Cat5Service {
     sortField: string,
     sortOrder: string,
   ) {
-    // console.log(dateFrom, dateTo, factory, page, limit, sortField, sortOrder);
     const offset = (page - 1) * limit;
-    let where = 'WHERE 1=1 AND dwc.DISABLED = 0 AND dwo.QUANTITY<>0';
-    const replacements: any[] = [];
+    const { where, replacements } = buildCat5Filter(dateFrom, dateTo);
 
-    if (dateTo && dateFrom) {
-      where += ` AND dwo.WASTE_DATE BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo);
-    }
+    const query = buildCat5PageQuery(where);
 
-    const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
-                          ,dwc.CONSOLIDATED_WASTE_CODE AS Consolidated_Waste
-                          ,dwc.WASTE_CODE AS Waste_Code
-                          ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
-                          ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
-                          ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
-                          ,dwc.LOCATION_CODE AS Location_Code
-                          ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                          ,CASE 
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
-                                ELSE NULL
-                          END                                AS The_type_of_waste
-                          ,CASE 
-                                WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
-                                WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
-                                ELSE NULL
-                          END                                AS Waste_type
-                          ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
-                          ,dtm.TREATMENT_METHOD_ID            AS Treatment_Method_ID
-                          ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
-                          ,CAST('0' AS INT)                   AS TKT_Ton_km
-                    FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
-                          LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
-                                ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
-                          LEFT JOIN dbo.DATA_TREATMENT_METHOD dtm
-                                ON  dtm.TREATMENT_METHOD_ID = dwo.TREATMENT_METHOD_ID
-                          LEFT JOIN dbo.DATA_EMERET_WASTE_CATEGORY dewc
-                                ON  dewc.EMERET_WASTE_ID = dwo.EMERET_WASTE_ID
-                          LEFT JOIN dbo.DATA_WASTE_CATEGORY dwc
-                                ON  dwc.WASTE_CODE = dwo.WASTE_CODE
-                          LEFT JOIN dbo.DATA_TREATMENT_DISTANCE td
-                                ON  td.CODE = dwo.LOCATION_CODE
-                    ${where}`;
-    // ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
-    // OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
-
-    // console.log(query);
-    const countQuery = `SELECT COUNT(*) AS total
-                        FROM dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
-                        LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
-                              ON dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
-                        LEFT JOIN dbo.DATA_TREATMENT_METHOD dtm
-                              ON dtm.TREATMENT_METHOD_ID = dwo.TREATMENT_METHOD_ID
-                        LEFT JOIN dbo.DATA_EMERET_WASTE_CATEGORY dewc
-                              ON dewc.EMERET_WASTE_ID = dwo.EMERET_WASTE_ID
-                        LEFT JOIN dbo.DATA_WASTE_CATEGORY dwc
-                              ON dwc.WASTE_CODE = dwo.WASTE_CODE
-                        LEFT JOIN dbo.DATA_TREATMENT_DISTANCE td
-                              ON td.CODE = dwo.LOCATION_CODE
-                        ${where}`;
+    const countQuery = buildCat5CountQuery(where);
 
     const [dataResults, countResults] = await Promise.all([
       db.query(query, { replacements, type: QueryTypes.SELECT }),
@@ -154,15 +96,7 @@ export class Cat5Service {
     ]);
 
     let data = dataResults;
-    data.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
+    sortByField(data, sortField, sortOrder);
 
     data = data.slice(offset, offset + limit);
 
@@ -171,10 +105,6 @@ export class Cat5Service {
     const hasMore = offset + data.length < total;
 
     return { data, page, limit, total, hasMore };
-
-    // const total = totalResult[0]?.total || 0;
-    // const hasMore = offset + data.length < total;
-    // return { data, page, limit, total, hasMore };
   }
 
   private async getAllDataFactory(
@@ -188,72 +118,14 @@ export class Cat5Service {
     try {
       const offset = (page - 1) * limit;
 
-      let where = 'WHERE 1=1 AND dwc.DISABLED = 0 AND dwo.QUANTITY<>0';
-      const replacements: any[] = [];
+      const { where, replacements } = buildCat5Filter(dateFrom, dateTo);
 
-      if (dateTo && dateFrom) {
-        where += ` AND dwo.WASTE_DATE BETWEEN ? AND ?`;
-        replacements.push(dateFrom, dateTo);
-      }
+      const query = buildCat5PageQuery(where);
 
-      const query = `SELECT dwo.WASTE_DATE                     AS Waste_disposal_date
-                            ,dwc.CONSOLIDATED_WASTE_CODE AS Consolidated_Waste
-                            ,dwc.WASTE_CODE AS Waste_Code
-                            ,dtv.TREATMENT_VENDOR_NAME          AS Vendor_Name
-                            ,dtv.TREATMENT_VENDOR_ID            AS Vendor_ID
-                            ,td.ADDRESS+'('+CONVERT(VARCHAR(5) ,td.DISTANCE)+'km)' AS Waste_collection_address
-                            ,dwc.LOCATION_CODE AS Location_Code
-                            ,CAST('0' AS INT)                   AS Transportation_Distance_km
-                            ,CASE 
-                                  WHEN dwo.HAZARDOUS<>'N/A' THEN 'hazardous waste'
-                                  WHEN dwo.NON_HAZARDOUS<>'N/A' THEN 'Non-hazardous waste'
-                                  ELSE NULL
-                            END                                AS The_type_of_waste
-                            ,CASE 
-                                  WHEN dwo.HAZARDOUS<>'N/A' THEN dwo.HAZARDOUS
-                                  WHEN dwo.NON_HAZARDOUS<>'N/A' THEN dwo.NON_HAZARDOUS
-                                  ELSE NULL
-                            END                                AS Waste_type
-                            ,dtm.TREATMENT_METHOD_ENGLISH_NAME  AS Waste_Treatment_method
-                            ,dtm.TREATMENT_METHOD_ID            AS Treatment_Method_ID
-                            ,dwo.QUANTITY                       AS Weight_of_waste_treated_Unit_kg
-                            ,CAST('0' AS INT)                   AS TKT_Ton_km
-                      FROM   dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
-                            LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
-                                  ON  dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
-                            LEFT JOIN dbo.DATA_TREATMENT_METHOD dtm
-                                  ON  dtm.TREATMENT_METHOD_ID = dwo.TREATMENT_METHOD_ID
-                            LEFT JOIN dbo.DATA_EMERET_WASTE_CATEGORY dewc
-                                  ON  dewc.EMERET_WASTE_ID = dwo.EMERET_WASTE_ID
-                            LEFT JOIN dbo.DATA_WASTE_CATEGORY dwc
-                                  ON  dwc.WASTE_CODE = dwo.WASTE_CODE
-                            LEFT JOIN dbo.DATA_TREATMENT_DISTANCE td
-                                  ON  td.CODE = dwo.LOCATION_CODE
-                         ${where}`;
-      // ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
-      // OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
-
-      const countQuery = `SELECT COUNT(*) AS total
-                          FROM dbo.DATA_WASTE_OUTPUT_CUSTOMER dwo
-                          LEFT JOIN dbo.DATA_TREATMENT_VENDOR dtv
-                                ON dtv.TREATMENT_VENDOR_ID = dwo.TREATMENT_SUPPLIER
-                          LEFT JOIN dbo.DATA_TREATMENT_METHOD dtm
-                                ON dtm.TREATMENT_METHOD_ID = dwo.TREATMENT_METHOD_ID
-                          LEFT JOIN dbo.DATA_EMERET_WASTE_CATEGORY dewc
-                                ON dewc.EMERET_WASTE_ID = dwo.EMERET_WASTE_ID
-                          LEFT JOIN dbo.DATA_WASTE_CATEGORY dwc
-                                ON dwc.WASTE_CODE = dwo.WASTE_CODE
-                          LEFT JOIN dbo.DATA_TREATMENT_DISTANCE td
-                                ON td.CODE = dwo.LOCATION_CODE
-                      ${where}`;
-      const connects = [
-        this.LYV_WMS,
-        this.LHG_WMS,
-        this.LYM_WMS,
-        this.LVL_WMS,
-        this.JAZ_WMS,
-        this.JZS_WMS,
-      ];
+      const countQuery = buildCat5CountQuery(where);
+      const connects = CAT5_FACTORIES.map(
+        (factoryName) => this.getDbByFactory(factoryName)!,
+      );
 
       const [dataResults, countResults] = await Promise.all([
         Promise.all(
@@ -273,15 +145,7 @@ export class Cat5Service {
 
       let data = dataResults.flat();
 
-      data.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        if (sortOrder === 'asc') {
-          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-        } else {
-          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-        }
-      });
+      sortByField(data, sortField, sortOrder);
 
       data = data.slice(offset, offset + limit);
 
@@ -308,12 +172,7 @@ export class Cat5Service {
         return this.autoSentCMSAllFactories(dateFrom, dateTo, dockeyCMS);
       }
 
-      return this.getCMSByFactory(
-        factory as FactoryCode,
-        dateFrom,
-        dateTo,
-        dockeyCMS,
-      );
+      return this.getCMSByFactory(factory, dateFrom, dateTo, dockeyCMS);
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
@@ -342,23 +201,7 @@ export class Cat5Service {
     const db = this.getDbByFactory(factory);
     if (!db) return [];
 
-    const query = await buildQueryAutoSentCMS(
-      dateFrom,
-      dateTo,
-      factory,
-      this.EIP,
-    );
-
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
-
-    const data = await db.query<any>(query, {
-      type: QueryTypes.SELECT,
-      replacements,
-    });
-
-    return data.flatMap((item) =>
-      this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
-    );
+    return getCat5CMSRows(db, this.EIP, factory, dateFrom, dateTo, dockeyCMS);
   }
 
   private getDbByFactory(factory: FactoryCode): Sequelize | null {
@@ -371,89 +214,6 @@ export class Cat5Service {
       JZS: this.JZS_WMS,
     };
 
-    return dbMap[factory] ?? null;
-  }
-
-  private mapToCMSFormat(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-    dockeyCMS: string,
-  ) {
-    const custVenName = item.Vendor_ID;
-    const departure = item.Factory_address;
-    const destination = item.Waste_collection_address;
-    const product = `${item.The_type_of_waste} - ${item.Waste_type}`;
-    const activityData = item.Weight_of_waste_treated_Unit_kg;
-    const wasteTreatmentMethod = item.Waste_Treatment_method;
-    const factoryName = item.Factory_Name;
-    const wasteDisposalDate = item.Waste_disposal_date;
-    // const wasteCode = item.Waste_Code;
-    let dockey = '';
-
-    switch (wasteTreatmentMethod.trim().toLowerCase()) {
-      case 'Waste Recycling'.trim().toLowerCase():
-        dockey = '4.4.01';
-        break;
-      case 'Waste to Energy'.trim().toLowerCase():
-        dockey = '4.4.02';
-        break;
-      case 'Landfill'.trim().toLowerCase():
-        dockey = '4.4.03';
-        break;
-      case 'Waste Incineration'.trim().toLowerCase():
-        dockey = '4.4.04';
-        break;
-      case 'Waste other treatment method'.trim().toLowerCase():
-        dockey = '4.4.05';
-        break;
-      default:
-        dockey = '';
-        break;
-    }
-
-    return ACTIVITY_TYPES.filter((item) => item === dockeyCMS).map(
-      (activityType: ActivityType) => ({
-        System: 'CMW', //default
-        Corporation: 'LAI YIH', //default
-        Factory: factoryName,
-        Department: '',
-        // DocKey: `${dayjs(wasteDisposalDate).format('YYYY/MM/DD')} ${wasteCode}`, //default
-        DocKey: activityType.trim() === '3.6' ? '3.6' : dockey, //default
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType, //default
-        DataType: activityType.trim() === '3.6' ? '1' : '999', //default
-        DocType: 'CMS Web', //default
-        UndDoc: '',
-        DocFlow: '',
-        DocDate: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-        DocDate2: dayjs(wasteDisposalDate).format('YYYY/MM/DD'),
-        DocNo: '',
-        UndDocNo: '',
-        CustVenName: custVenName,
-        InvoiceNo: '',
-        TransType: '陸運', //default
-        Departure: departure,
-        Destination: destination,
-        PortType: '',
-        StPort: '',
-        ThPort: '',
-        EndPort: '',
-        Product: product,
-        Quity: '',
-        Amount: '',
-        ActivityData: activityData,
-        ActivityUnit: 'KG', //default
-        Unit: '',
-        UnitWeight: '',
-        Memo: '',
-        CreateDateTime: dayjs().format('YYYY/MM/DD HH:mm:ss'),
-        Creator: '',
-        AccNo: '6002',
-        AccName: '其他費用',
-        ActivitySource: wasteTreatmentMethod,
-      }),
-    );
+    return getOwn(dbMap, factory) ?? null;
   }
 }

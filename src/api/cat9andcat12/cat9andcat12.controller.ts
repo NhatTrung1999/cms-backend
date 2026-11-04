@@ -11,7 +11,7 @@ import {
 import { Cat9andcat12Service } from './cat9andcat12.service';
 import { Public } from 'src/decorators';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { getFactortyID, getUserId } from 'src/helper/common.helper';
+import { getFactoryID, getUserId, UserRequest } from 'src/helper/common.helper';
 
 @Controller('cat9-and-cat12')
 export class Cat9andcat12Controller {
@@ -54,9 +54,9 @@ export class Cat9andcat12Controller {
   )
   async importExcelPortCode(
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     if (!file) throw new BadRequestException('No file uploaded!');
 
@@ -77,7 +77,6 @@ export class Cat9andcat12Controller {
     @Query('ry') ry: string,
     @Query('dockey') dockeyCMS: string,
   ) {
-    console.log(ry);
     const data = await this.cat9andcat12Service.autoSentCMS(
       dateFrom,
       dateTo,

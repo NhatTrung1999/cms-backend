@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { QueryTypes } from 'sequelize';
+import { orderByClause } from 'src/helper/sql.helper';
 import { Sequelize } from 'sequelize-typescript';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -143,11 +144,14 @@ export class UsersService {
     const allowed = new Set(modulePaths);
 
     await this.EIP.transaction(async (t) => {
-      await this.EIP.query(`DELETE FROM CMW_UserModulePermission WHERE UserID = ?`, {
-        replacements: [userid],
-        type: QueryTypes.DELETE,
-        transaction: t,
-      });
+      await this.EIP.query(
+        `DELETE FROM CMW_UserModulePermission WHERE UserID = ?`,
+        {
+          replacements: [userid],
+          type: QueryTypes.DELETE,
+          transaction: t,
+        },
+      );
 
       for (const modulePath of uniqueAllModulePaths) {
         await this.EIP.query(
@@ -193,11 +197,11 @@ export class UsersService {
       replacements.push(`%${name}%`);
     }
 
-    let query = `
+    const query = `
       SELECT ID, UserID, Name,Email,Role, Status, CreatedAt, CreatedDate, UpdatedAt, UpdatedDate
       FROM CMW_Account
       ${where}
-      ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+      ORDER BY ${orderByClause(sortField, sortOrder)}
     `;
 
     const result = await this.EIP.query<any>(query, {

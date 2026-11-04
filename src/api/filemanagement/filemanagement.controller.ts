@@ -8,22 +8,20 @@ import {
   Res,
 } from '@nestjs/common';
 import { FilemanagementService } from './filemanagement.service';
-import { getUserId } from 'src/helper/common.helper';
+import { getUserId, UserRequest } from 'src/helper/common.helper';
 import { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
-// import { Public } from 'src/decorators';
 
 @Controller('filemanagement')
 export class FilemanagementController {
   constructor(private readonly filemanagementService: FilemanagementService) {}
 
-  // @Public()
   @Get('get-data')
   async getData(
     @Query('Module') module: string,
     @Query('File_Name') file_name: string,
-    @Request() req,
+    @Request() req: UserRequest,
     @Query('sortField') sortField: string,
     @Query('sortOrder') sortOrder: string,
   ) {
@@ -50,14 +48,13 @@ export class FilemanagementController {
     @Query('DateTo') dateTo: string,
     @Query('Factory') factory: string,
     @Query('RY') ry: string,
-    @Request() req,
+    @Request() req: UserRequest,
     @Query('Fields') fields?: string[],
     @Query('Usage') usage?: boolean,
     @Query('UnitWeight') unitWeight?: boolean,
     @Query('Weight') weight?: boolean,
     @Query('Departure') departure?: boolean,
   ) {
-    // console.log(fields);
     const userID = getUserId(req);
     const res = await this.filemanagementService.generateFileExcel(
       module,
@@ -82,7 +79,6 @@ export class FilemanagementController {
   @Get('download/:id')
   async downloadFile(@Param('id') id: string, @Res() res: Response) {
     const fileRecord = await this.filemanagementService.getFileById(id);
-    // console.log(fileRecord);
     if (!fs.existsSync(fileRecord.Path)) {
       throw new NotFoundException('File not found on server');
     }

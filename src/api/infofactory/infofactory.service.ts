@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { orderByClause } from 'src/helper/sql.helper';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 
@@ -24,7 +25,7 @@ export class InfofactoryService {
       replacements.push(`%${city}%`);
     }
 
-    const query = `SELECT * FROM CMW_Info_Factory ${where} ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}`;
+    const query = `SELECT * FROM CMW_Info_Factory ${where} ORDER BY ${orderByClause(sortField, sortOrder)}`;
 
     const data = await this.EIP.query(query, {
       replacements,

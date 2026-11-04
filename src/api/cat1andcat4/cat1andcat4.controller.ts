@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { Cat1andcat4Service } from './cat1andcat4.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { getFactortyID, getUserId } from 'src/helper/common.helper';
+import { getFactoryID, getUserId, UserRequest } from 'src/helper/common.helper';
 import { Public } from 'src/decorators';
 import { Response } from 'express';
 import dayjs from 'dayjs';
@@ -91,9 +91,9 @@ export class Cat1andcat4Controller {
     updateDto: {
       TaxFreeZoneAddress: string;
     },
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     return this.cat1andcat4Service.update(id, updateDto, factory, userid);
   }
@@ -104,9 +104,9 @@ export class Cat1andcat4Controller {
   )
   async importExcelPortCode(
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     if (!file) throw new BadRequestException('No file uploaded!');
 
@@ -124,9 +124,9 @@ export class Cat1andcat4Controller {
   )
   async importExcelStyleAutoFill(
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     if (!file) throw new BadRequestException('No file uploaded!');
 
@@ -144,9 +144,9 @@ export class Cat1andcat4Controller {
   )
   async importExcelTaxFreeZoneAddress(
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
+    @Request() req: UserRequest,
   ) {
-    const factory = getFactortyID(req);
+    const factory = getFactoryID(req);
     const userid = getUserId(req);
     if (!file) throw new BadRequestException('No file uploaded!');
 

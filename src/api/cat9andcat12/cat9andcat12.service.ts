@@ -1,24 +1,46 @@
 import {
   Inject,
   Injectable,
-  UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
+import { orderByClause } from 'src/helper/sql.helper';
 import { QueryTypes } from 'sequelize';
-import {
-  ACTIVITY_TYPES,
-  ActivityType,
-  IDataCat9AndCat12,
-  IDataPortCode,
-} from 'src/types/cat9andcat12';
-import * as ExcelJS from 'exceljs';
-import * as fs from 'fs';
+import { IDataPortCode } from 'src/types/cat9andcat12';
 import { v4 as uuidv4 } from 'uuid';
-import dayjs from 'dayjs';
-import { buildQueryAutoSentCMS } from 'src/helper/cat9andcat12.helper';
+import {
+  buildImportMessage,
+  countUpserts,
+  readImportRows,
+} from 'src/helper/excel-import.helper';
+import { getCat9AndCat12CMSRows } from 'src/helper/cat9andcat12.cms';
+import { addPortsToRows, ShipmentRow } from 'src/helper/shipment.helper';
 import { FACTORY_LIST, FactoryCode } from 'src/helper/factory.helper';
-dayjs().format();
+import { sortByField } from 'src/helper/sort.helper';
+import { getOwn } from 'src/helper/object.helper';
+import {
+  buildCat9AndCat12AllCountQuery,
+  buildCat9AndCat12AllPageQuery,
+  buildCat9AndCat12CountQuery,
+  buildCat9AndCat12Filter,
+  buildCat9AndCat12PageQuery,
+} from 'src/helper/cat9andcat12.queries';
+
+const ALL_PAGE_FACTORIES: FactoryCode[] = [
+  'LYV',
+  'LHG',
+  'LYM',
+  'LVL',
+  'LYF',
+  'JAZ',
+  'JZS',
+];
+
+type PortCodeRow = {
+  Customer_Number: string;
+  Transport_Method: string;
+  Port_Code: string;
+};
 
 @Injectable()
 export class Cat9andcat12Service {
@@ -43,40 +65,20 @@ export class Cat9andcat12Service {
     sortField: string = 'No',
     sortOrder: string = 'asc',
   ) {
-    let db: Sequelize;
-    switch (factory) {
-      case 'LYV':
-        db = this.LYV_ERP;
-        break;
-      case 'LHG':
-        db = this.LHG_ERP;
-        break;
-      case 'LYM':
-        db = this.LYM_ERP;
-        break;
-      case 'LVL':
-        db = this.LVL_ERP;
-        break;
-      case 'LYF':
-        db = this.LYF_ERP;
-        break;
-      case 'JAZ':
-        db = this.JAZ_ERP;
-        break;
-      case 'JZS':
-        db = this.JZS_ERP;
-        break;
-      default:
-        return await this.getAllDataFactory(
-          dateFrom,
-          dateTo,
-          factory,
-          ry,
-          page,
-          limit,
-          sortField,
-          sortOrder,
-        );
+    const db = FACTORY_LIST.includes(factory)
+      ? this.getDbByFactory(factory)
+      : null;
+    if (!db) {
+      return await this.getAllDataFactory(
+        dateFrom,
+        dateTo,
+        factory,
+        ry,
+        page,
+        limit,
+        sortField,
+        sortOrder,
+      );
     }
 
     return await this.getDataFactory(
@@ -99,7 +101,7 @@ export class Cat9andcat12Service {
     const records: IDataPortCode[] = await this.EIP.query(
       `SELECT *
       FROM CMW_PortCode
-      ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
+      ORDER BY ${orderByClause(sortField, sortOrder)}
       `,
       { type: QueryTypes.SELECT },
     );
@@ -120,271 +122,15 @@ export class Cat9andcat12Service {
     try {
       const offset = (page - 1) * limit;
 
-      let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-      let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-      const replacements: any[] = [];
+      const { where, where1, replacements } = buildCat9AndCat12Filter(
+        dateFrom,
+        dateTo,
+        ry,
+      );
 
-      if (dateFrom && dateTo) {
-        where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
-        where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
-        replacements.push(dateFrom, dateTo, dateFrom, dateTo);
-      }
+      const query = buildCat9AndCat12PageQuery(where, where1);
 
-      if (ry === 'Product') {
-        where += ` AND CHARINDEX('-', id.RYNO) > 0`;
-        where1 += ` AND CHARINDEX('-', id.RYNO) > 0`;
-      } else if (ry === 'Component') {
-        where += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
-        where1 += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
-      }
-
-      const query = `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
-                          ,*
-                    FROM   (
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,sb.Booking_No AS Booking_No
-                                    ,im.INV_NO               AS Invoice_Number
-                                    ,id.STYLE_NAME           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
-                                    ,p.Qty                   AS Quantity
-                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,ISNULL(
-                                        ISNULL(
-                                            bg.SHPIDS
-                                          ,CASE 
-                                                WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                                WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                                WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                                WHEN do.ShipMode_1 IS NULL THEN ''
-                                                ELSE do.ShipMode_1 END
-                                        )
-                                      ,y.ShipMode
-                                    )                       AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_M im
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = im.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = im.INV_NO
-                                    LEFT JOIN (
-                                              SELECT INV_NO
-                                                    ,RYNO
-                                                    ,SUM(PAIRS)     Qty
-                                                    ,SUM(GW)        GW
-                                              FROM   PACKING_D
-                                              GROUP BY
-                                                    INV_NO
-                                                    ,RYNO
-                                          ) p
-                                          ON  p.INV_NO = id.INV_NO
-                                              AND p.RYNO = id.RYNO
-                                    LEFT JOIN YWDD y
-                                          ON  y.DDBH = id.RYNO
-                                    LEFT JOIN DE_ORDERM do
-                                          ON  do.ORDERNO = y.YSBH
-                                    LEFT JOIN B_GradeOrder bg
-                                          ON  bg.ORDER_B = y.YSBH
-                              ${where} AND NOT EXISTS (
-                                                    SELECT 1
-                                                    FROM   INVOICE_SAMPLE is1
-                                                    WHERE  is1.Inv_No = im.Inv_No
-                                                )
-                              UNION
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,sb.Booking_No AS Booking_No
-                                    ,is1.Inv_No              AS Invoice_Number
-                                    ,'SAMPLE SHOE'           AS Article_Name
-                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
-                                    ,is1.Qty                 AS Quantity
-                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'AIR'                   AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_SAMPLE is1
-                                    LEFT JOIN INVOICE_M im
-                                          ON  im.Inv_No = is1.Inv_No
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = is1.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = is1.Inv_No
-                              ${where1}
-                          ) AS Cat9AndCat12`;
-
-      const countQuery = `SELECT COUNT(*) AS total
-                        FROM   (
-                                  SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
-                          ,*
-                    FROM   (
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,im.INV_NO               AS Invoice_Number
-                                    ,id.STYLE_NAME           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
-                                    ,p.Qty                   AS Quantity
-                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,ISNULL(
-                                        ISNULL(
-                                            bg.SHPIDS
-                                          ,CASE 
-                                                WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
-                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
-                                                WHEN do.ShipMode_1 IS NULL THEN '' 
-                                                ELSE 'N/A' END
-                                        )
-                                      ,y.ShipMode
-                                    )                       AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_M im
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = im.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = im.INV_NO
-                                    LEFT JOIN (
-                                              SELECT INV_NO
-                                                    ,RYNO
-                                                    ,SUM(PAIRS)     Qty
-                                                    ,SUM(GW)        GW
-                                              FROM   PACKING_D
-                                              GROUP BY
-                                                    INV_NO
-                                                    ,RYNO
-                                          ) p
-                                          ON  p.INV_NO = id.INV_NO
-                                              AND p.RYNO = id.RYNO
-                                    LEFT JOIN YWDD y
-                                          ON  y.DDBH = id.RYNO
-                                    LEFT JOIN DE_ORDERM do
-                                          ON  do.ORDERNO = y.YSBH
-                                    LEFT JOIN B_GradeOrder bg
-                                          ON  bg.ORDER_B = y.YSBH
-                              ${where} AND NOT EXISTS (
-                                                    SELECT 1
-                                                    FROM   INVOICE_SAMPLE is1
-                                                    WHERE  is1.Inv_No = im.Inv_No
-                                                )
-                              UNION
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,is1.Inv_No              AS Invoice_Number
-                                    ,'SAMPLE SHOE'           AS Article_Name
-                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
-                                    ,is1.Qty                 AS Quantity
-                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'AIR'                   AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_SAMPLE is1
-                                    LEFT JOIN INVOICE_M im
-                                          ON  im.Inv_No = is1.Inv_No
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = is1.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = is1.Inv_No
-                              ${where1}
-                          ) AS Cat9AndCat12
-                        ) AS sub`;
+      const countQuery = buildCat9AndCat12CountQuery(where, where1);
 
       const [dataResults, countResults] = await Promise.all([
         db.query(query, {
@@ -397,138 +143,10 @@ export class Cat9andcat12Service {
         }),
       ]);
 
-      let data: any = dataResults;
-      data = await Promise.all(
-        data.map(async (item) => {
-          if (
-            item?.Article_ID.trim().toLowerCase() ===
-            'SAMPLE SHOE'.trim().toLowerCase()
-          ) {
-            item.Transport_Method = 'AIR';
-            item.Port_Of_Departure = 'SGN';
-          } else {
-            switch (item?.Transport_Method.trim().toLowerCase()) {
-              case '11 SC'.trim().toLowerCase():
-              case 'Ocean'.trim().toLowerCase():
-              case 'Sea Air Collect'.trim().toLowerCase():
-              case 'SC'.trim().toLowerCase():
-              case 'Sea/Air'.trim().toLowerCase():
-              case 'Partial'.trim().toLowerCase():
-                item.Transport_Method = 'SEA';
-                break;
-              case '20 CC'.trim().toLowerCase():
-              case 'AC'.trim().toLowerCase():
-              case '10 AC'.trim().toLowerCase():
-              case 'CC'.trim().toLowerCase():
-              case 'Air PP'.trim().toLowerCase():
-              case 'Air Express'.trim().toLowerCase():
-              case 'AE'.trim().toLowerCase():
-                item.Transport_Method = 'AIR';
-                break;
-              case 'RAIL'.trim().toLowerCase():
-              case 'Rail Collect'.trim().toLowerCase():
-              case 'Rail Colle'.trim().toLowerCase():
-                item.Transport_Method = 'Land';
-                break;
-              default:
-                item.Transport_Method = 'SEA';
-                break;
-            }
-            switch (factory.trim().toLowerCase()) {
-              case 'LYV'.trim().toLowerCase():
-              case 'LVL'.trim().toLowerCase():
-              case 'LHG'.trim().toLowerCase():
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'SEA'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'VNCLP';
-                }
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'Land'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'SOTH';
-                }
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'AIR'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'SGN';
-                }
-                break;
-              case 'LYM'.trim().toLowerCase():
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'SEA'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'MMRGN';
-                } else {
-                  item.Port_Of_Departure = 'RGN';
-                }
-                break;
-              case 'LYF'.trim().toLowerCase():
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'SEA'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'IDSRG';
-                } else {
-                  item.Port_Of_Departure = 'CGK';
-                }
-                break;
-              default:
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'SEA'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'VNCLP';
-                }
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'Land'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'SOTH';
-                }
-                if (
-                  item.Transport_Method.trim().toLowerCase() ===
-                  'AIR'.trim().toLowerCase()
-                ) {
-                  item.Port_Of_Departure = 'SGN';
-                }
-                break;
-            }
-          }
+      let data = dataResults as ShipmentRow[];
+      data = await addPortsToRows(data, this.EIP, factory);
 
-          const queryPoA = `SELECT PortCode
-                        FROM CMW_PortCode
-                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
-          const result: any = await this.EIP.query(queryPoA, {
-            type: QueryTypes.SELECT,
-            replacements: [
-              `%${item.Transport_Method}%`,
-              `%${item.Customer_ID}%`,
-            ],
-          });
-
-          return {
-            ...item,
-            Transport_Method: item.Transport_Method,
-            Port_Of_Departure: item.Port_Of_Departure,
-            Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
-          };
-        }),
-      );
-
-      data.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        if (sortOrder === 'asc') {
-          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-        } else {
-          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-        }
-      });
+      sortByField(data, sortField, sortOrder);
 
       data = data.slice(offset, offset + limit);
 
@@ -554,288 +172,26 @@ export class Cat9andcat12Service {
   ) {
     const offset = (page - 1) * limit;
 
-    const getQuery = (
-      factoryName: string,
-    ) => `SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
-                          ,*
-                          ,'${factoryName}' AS Factory_Name
-                    FROM   (
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,sb.Booking_No AS Booking_No
-                                    ,im.INV_NO               AS Invoice_Number
-                                    ,id.STYLE_NAME           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
-                                    ,p.Qty                   AS Quantity
-                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,ISNULL(
-                                        ISNULL(
-                                            bg.SHPIDS
-                                          ,CASE 
-                                                WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN '10 AC'
-                                                WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN '20 CC'
-                                                WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN '11 SC'
-                                                WHEN do.ShipMode_1 IS NULL THEN ''
-                                                ELSE do.ShipMode_1 END
-                                        )
-                                      ,y.ShipMode
-                                    )                       AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_M im
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = im.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = im.INV_NO
-                                    LEFT JOIN (
-                                              SELECT INV_NO
-                                                    ,RYNO
-                                                    ,SUM(PAIRS)     Qty
-                                                    ,SUM(GW)        GW
-                                              FROM   PACKING_D
-                                              GROUP BY
-                                                    INV_NO
-                                                    ,RYNO
-                                          ) p
-                                          ON  p.INV_NO = id.INV_NO
-                                              AND p.RYNO = id.RYNO
-                                    LEFT JOIN YWDD y
-                                          ON  y.DDBH = id.RYNO
-                                    LEFT JOIN DE_ORDERM do
-                                          ON  do.ORDERNO = y.YSBH
-                                    LEFT JOIN B_GradeOrder bg
-                                          ON  bg.ORDER_B = y.YSBH
-                              ${where} AND NOT EXISTS (
-                                                    SELECT 1
-                                                    FROM   INVOICE_SAMPLE is1
-                                                    WHERE  is1.Inv_No = im.Inv_No
-                                                )
-                              UNION
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,sb.Booking_No AS Booking_No
-                                    ,is1.Inv_No              AS Invoice_Number
-                                    ,'SAMPLE SHOE'           AS Article_Name
-                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
-                                    ,is1.Qty                 AS Quantity
-                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'AIR'                   AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_SAMPLE is1
-                                    LEFT JOIN INVOICE_M im
-                                          ON  im.Inv_No = is1.Inv_No
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = is1.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = is1.Inv_No
-                              ${where1}
-                          ) AS Cat9AndCat1`;
-    const getCountQuery = (factoryName: string) => `SELECT COUNT(*) AS total
-                        FROM   (
-                                  SELECT CAST(ROW_NUMBER() OVER(ORDER BY [Date]) AS INT) AS [No]
-                          ,*
-                          ,'${factoryName}' AS Factory_Name
-                    FROM   (
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,im.INV_NO               AS Invoice_Number
-                                    ,id.STYLE_NAME           AS Article_Name
-                                    ,id.ARTICLE              AS Article_ID
-                                    ,p.Qty                   AS Quantity
-                                    ,ISNULL(p.GW ,0)         AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,ISNULL(
-                                        ISNULL(
-                                            bg.SHPIDS
-                                          ,CASE 
-                                                WHEN (do.ShipMode='Air')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Air Expres')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'AIR'
-                                                WHEN(do.ShipMode='Ocean')
-                                            AND (do.Shipmode_1 IS NULL) THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%SC%' THEN 'SEA'
-                                                WHEN do.Shipmode_1 LIKE '%AC%' THEN 'AIR'
-                                                WHEN do.Shipmode_1 LIKE '%CC%' THEN 'AIR'
-                                                WHEN do.ShipMode_1 IS NULL THEN '' 
-                                                ELSE 'N/A' END
-                                        )
-                                      ,y.ShipMode
-                                    )                       AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_M im
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = im.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = im.INV_NO
-                                    LEFT JOIN (
-                                              SELECT INV_NO
-                                                    ,RYNO
-                                                    ,SUM(PAIRS)     Qty
-                                                    ,SUM(GW)        GW
-                                              FROM   PACKING_D
-                                              GROUP BY
-                                                    INV_NO
-                                                    ,RYNO
-                                          ) p
-                                          ON  p.INV_NO = id.INV_NO
-                                              AND p.RYNO = id.RYNO
-                                    LEFT JOIN YWDD y
-                                          ON  y.DDBH = id.RYNO
-                                    LEFT JOIN DE_ORDERM do
-                                          ON  do.ORDERNO = y.YSBH
-                                    LEFT JOIN B_GradeOrder bg
-                                          ON  bg.ORDER_B = y.YSBH
-                              ${where} AND NOT EXISTS (
-                                                    SELECT 1
-                                                    FROM   INVOICE_SAMPLE is1
-                                                    WHERE  is1.Inv_No = im.Inv_No
-                                                )
-                              UNION
-                              SELECT im.INV_DATE             AS [Date]
-                                    ,IIF(CHARINDEX('-' ,id.RYNO)>0 ,id.RYNO ,'N/A') AS RYProduct
-                                    ,IIF(
-                                          id.RYNO LIKE '%[BSU]%'
-                                          AND CHARINDEX('-' ,id.RYNO)=0
-                                        ,id.RYNO
-                                        ,'N/A'
-                                      )                       AS RYComponent
-                                    ,CASE 
-                                          WHEN id.RYNO LIKE '%B%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'BOTTOM UNIT'
-                                          WHEN id.RYNO LIKE '%S%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'SOCKLINER'
-                                          WHEN id.RYNO LIKE '%U%'
-                                                AND CHARINDEX('-' ,id.RYNO)=0 THEN 'UPPER UNIT'
-                                          ELSE 'FINISH SHOE'
-                                      END                     AS ComponentName
-                                    ,sb.ExFty_Date           AS Shipment_Date
-                                    ,is1.Inv_No              AS Invoice_Number
-                                    ,'SAMPLE SHOE'           AS Article_Name
-                                    ,ISNULL(id.ARTICLE, 'SAMPLE SHOE')              AS Article_ID
-                                    ,is1.Qty                 AS Quantity
-                                    ,ISNULL(is1.GW ,0)       AS Gross_Weight
-                                    ,im.CUSTID               AS Customer_ID
-                                    ,'Truck'                 AS Local_Land_Transportation
-                                    ,CAST('0' AS INT)        AS Land_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Distance
-                                    ,CAST('0' AS INT)        AS Air_Transport_Distance
-                                    ,'AIR'                   AS Transport_Method
-                                    ,CAST('0' AS INT)        AS Land_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Sea_Transport_Ton_Kilometers
-                                    ,CAST('0' AS INT)        AS Air_Transport_Ton_Kilometers
-                              FROM   INVOICE_SAMPLE is1
-                                    LEFT JOIN INVOICE_M im
-                                          ON  im.Inv_No = is1.Inv_No
-                                    LEFT JOIN INVOICE_D     AS id
-                                          ON  id.INV_NO = is1.INV_NO
-                                    LEFT JOIN Ship_Booking  AS sb
-                                          ON  sb.INV_NO = is1.Inv_No
-                              ${where1}
-                          ) AS Cat9AndCat12
-                        ) AS sub`;
+    const { where, where1, replacements } = buildCat9AndCat12Filter(
+      dateFrom,
+      dateTo,
+      ry,
+    );
+    const getQuery = (factoryName: string) =>
+      buildCat9AndCat12AllPageQuery(factoryName, where, where1);
+    const getCountQuery = (factoryName: string) =>
+      buildCat9AndCat12AllCountQuery(factoryName, where, where1);
 
-    let where = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-    let where1 = 'WHERE 1=1 AND sb.CFMID IS NOT NULL';
-    const replacements: any[] = [];
-
-    if (dateFrom && dateTo) {
-      where += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
-      where1 += ` AND CONVERT(VARCHAR ,sb.ExFty_Date ,23) BETWEEN ? AND ?`;
-      replacements.push(dateFrom, dateTo, dateFrom, dateTo);
-    }
-
-    if (ry === 'Product') {
-      where += ` AND CHARINDEX('-', id.RYNO) > 0`;
-      where1 += ` AND CHARINDEX('-', id.RYNO) > 0`;
-    } else if (ry === 'Component') {
-      where += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
-      where1 += ` AND id.RYNO LIKE '%[BSU]%' AND CHARINDEX('-' ,id.RYNO)=0`;
-    }
-    const connects = [
-      { conn: this.LYV_ERP, factoryName: 'LYV' },
-      { conn: this.LHG_ERP, factoryName: 'LHG' },
-      { conn: this.LYM_ERP, factoryName: 'LYM' },
-      { conn: this.LVL_ERP, factoryName: 'LVL' },
-      { conn: this.LYF_ERP, factoryName: 'LYF' },
-      { conn: this.JAZ_ERP, factoryName: 'JAZ' },
-      { conn: this.JZS_ERP, factoryName: 'JZS' },
-    ];
+    // The order decides the order of the rows of the "ALL" page.
+    const connects = ALL_PAGE_FACTORIES.map((factoryName) => ({
+      conn: this.getDbByFactory(factoryName)!,
+      factoryName,
+    }));
     const [dataResults, countResults] = await Promise.all([
       Promise.all(
         connects.map(({ conn, factoryName }) => {
           const query = getQuery(factoryName);
-          return conn.query(query, {
+          return conn.query<ShipmentRow>(query, {
             type: QueryTypes.SELECT,
             replacements,
           });
@@ -854,136 +210,15 @@ export class Cat9andcat12Service {
 
     const allData = dataResults.flat();
 
-    let data: any = allData.map((item, index) => ({ ...item, No: index + 1 }));
+    let data: ShipmentRow[] = allData.map((item, index) => ({
+      ...item,
+      No: index + 1,
+    }));
 
-    data = await Promise.all(
-      data.map(async (item) => {
-        if (
-          item?.Article_ID.trim().toLowerCase() ===
-          'SAMPLE SHOE'.trim().toLowerCase()
-        ) {
-          item.Transport_Method = 'AIR';
-          item.Port_Of_Departure = 'SGN';
-        } else {
-          switch (item?.Transport_Method.trim().toLowerCase()) {
-            case '11 SC'.trim().toLowerCase():
-            case 'Ocean'.trim().toLowerCase():
-            case 'Sea Air Collect'.trim().toLowerCase():
-            case 'SC'.trim().toLowerCase():
-            case 'Sea/Air'.trim().toLowerCase():
-            case 'Partial'.trim().toLowerCase():
-              item.Transport_Method = 'SEA';
-              break;
-            case '20 CC'.trim().toLowerCase():
-            case 'AC'.trim().toLowerCase():
-            case '10 AC'.trim().toLowerCase():
-            case 'CC'.trim().toLowerCase():
-            case 'Air PP'.trim().toLowerCase():
-            case 'Air Express'.trim().toLowerCase():
-            case 'AE'.trim().toLowerCase():
-              item.Transport_Method = 'AIR';
-              break;
-            case 'RAIL'.trim().toLowerCase():
-            case 'Rail Collect'.trim().toLowerCase():
-            case 'Rail Colle'.trim().toLowerCase():
-              item.Transport_Method = 'Land';
-              break;
-            default:
-              item.Transport_Method = 'SEA';
-              break;
-          }
-          switch (factory.trim().toLowerCase()) {
-            case 'LYV'.trim().toLowerCase():
-            case 'LVL'.trim().toLowerCase():
-            case 'LHG'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'SGN';
-              }
-              break;
-            case 'LYM'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'MMRGN';
-              } else {
-                item.Port_Of_Departure = 'RGN';
-              }
-              break;
-            case 'LYF'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'IDSRG';
-              } else {
-                item.Port_Of_Departure = 'CGK';
-              }
-              break;
-            default:
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                item.Port_Of_Departure = 'SGN';
-              }
-              break;
-          }
-        }
+    // No factory is passed: the port rules follow the Factory_Name of each row (like the ALL Excel export and the CMS payload).
+    data = await addPortsToRows(data, this.EIP);
 
-        const queryPoA = `SELECT PortCode
-                        FROM CMW_PortCode
-                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
-        const result: any = await this.EIP.query(queryPoA, {
-          type: QueryTypes.SELECT,
-          replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
-        });
-
-        return {
-          ...item,
-          Transport_Method: item.Transport_Method,
-          Port_Of_Departure: item.Port_Of_Departure,
-          Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
-        };
-      }),
-    );
-
-    data.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
+    sortByField(data, sortField, sortOrder);
 
     data = data.slice(offset, offset + limit);
 
@@ -1001,154 +236,104 @@ export class Cat9andcat12Service {
     factory: string,
   ) {
     try {
-      let insertCount = 0;
-      let updateCount = 0;
-      if (!file.path || !fs.existsSync(file.path)) {
-        throw new Error('File path not found!');
-      }
-
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(file.path);
-      const worksheet = workbook.getWorksheet(1);
-      if (!worksheet) {
-        throw new Error('No worksheet found in the Excel file');
-      }
-
-      const headerRow = worksheet.getRow(1);
-      // console.log(headerRow);
-      const headers: string[] = [];
-      headerRow.eachCell((cell) => {
-        if (cell.value) {
-          headers.push(cell.value.toString().trim().replace(/\s+/g, '_'));
-        }
-      });
-
-      // console.log(headers);
-
-      const requiredHeaders = [
-        'Customer_Number',
-        'Transport_Method',
-        'Port_Code',
-      ];
-      const missingHeaders = requiredHeaders.filter(
-        (h) => !headers.includes(h),
-      );
-
-      if (missingHeaders.length > 0) {
-        throw new Error(
-          `Excel file format is invalid! Missing columns: ${missingHeaders.join(', ')}`,
-        );
-      }
-
-      const data: {
-        Customer_Number: string;
-        Transport_Method: string;
-        Port_Code: string;
-      }[] = [];
-
-      worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-        if (rowNumber === 1 && row.cellCount > 0) return;
-
-        const rowData: any = {};
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const headerCell = headerRow.getCell(colNumber);
-          const headerValue = headerCell.value;
-          if (headerValue !== null && headerValue !== undefined) {
-            const key = headerValue.toString().trim().replace(/\s+/g, '_');
-            rowData[key] = String(cell.value);
-          }
-        });
-        if (
+      const data = await readImportRows<PortCodeRow>(
+        file,
+        ['Customer_Number', 'Transport_Method', 'Port_Code'],
+        (rowData) =>
           rowData?.Customer_Number ||
           rowData?.Transport_Method ||
-          rowData?.Port_Code
-        ) {
-          data.push(rowData);
-        }
-      });
-      // console.log(data);
-      // return { data, length: data.length };
+          rowData?.Port_Code,
+        { cellsAsStrings: true },
+      );
 
-      for (let item of data) {
-        const id = uuidv4();
-        const records: { total: number }[] = await this.EIP.query(
-          `SELECT COUNT(*) total
-            FROM CMW_PortCode
-            WHERE CustomerNumber = ? AND TransportMethod = ?`,
-          {
-            replacements: [item.Customer_Number, item.Transport_Method],
-            type: QueryTypes.SELECT,
-          },
-        );
-
-        if (records[0].total > 0) {
-          await this.EIP.query(
-            `UPDATE CMW_PortCode
-            SET
-                  PortCode = ?,
-                  UpdatedAt = ?,
-                  UpdatedFactory = ?,
-                  UpdatedDate = GETDATE()
-            WHERE CustomerNumber = ? AND TransportMethod = ?`,
-            {
-              replacements: [
-                item.Port_Code,
-                userid,
-                factory,
-                item.Customer_Number,
-                item.Transport_Method,
-              ],
-              type: QueryTypes.SELECT,
-            },
-          );
-          updateCount++;
-        } else {
-          await this.EIP.query(
-            `INSERT INTO CMW_PortCode
-                    (
-                          Id,
-                          CustomerNumber,
-                          PortCode,
-                          TransportMethod,
-                          CreatedAt,
-                          CreatedFactory,
-                          CreatedDate
-                    )
-                    VALUES
-                    (
-                          ?,
-                          ?,
-                          ?,
-                          ?,
-                          ?,
-                          ?,
-                          GETDATE()
-                    )`,
-            {
-              replacements: [
-                id,
-                item.Customer_Number,
-                item.Port_Code,
-                item.Transport_Method,
-                userid,
-                factory,
-              ],
-              type: QueryTypes.INSERT,
-            },
-          );
-          insertCount++;
-        }
-      }
-      const records: any = await this.EIP.query(
+      const { insertCount, updateCount } = await countUpserts(data, (item) =>
+        this.upsertPortCode(item, userid, factory),
+      );
+      const records = await this.EIP.query(
         `SELECT *
           FROM CMW_PortCode`,
         { type: QueryTypes.SELECT },
       );
-      const message = `Processed successfully! Inserted: ${insertCount} records, Updated: ${updateCount} records. Total rows processed: ${data.length}.`;
+      const message = buildImportMessage(insertCount, updateCount, data.length);
       return { message, records };
     } catch (error: any) {
       throw new InternalServerErrorException(`${error.message}`);
     }
+  }
+
+  private async upsertPortCode(
+    item: PortCodeRow,
+    userid: string,
+    factory: string,
+  ): Promise<'insert' | 'update'> {
+    const id = uuidv4();
+    const records: { total: number }[] = await this.EIP.query(
+      `SELECT COUNT(*) total
+        FROM CMW_PortCode
+        WHERE CustomerNumber = ? AND TransportMethod = ?`,
+      {
+        replacements: [item.Customer_Number, item.Transport_Method],
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    if (records[0].total > 0) {
+      await this.EIP.query(
+        `UPDATE CMW_PortCode
+        SET
+              PortCode = ?,
+              UpdatedAt = ?,
+              UpdatedFactory = ?,
+              UpdatedDate = GETDATE()
+        WHERE CustomerNumber = ? AND TransportMethod = ?`,
+        {
+          replacements: [
+            item.Port_Code,
+            userid,
+            factory,
+            item.Customer_Number,
+            item.Transport_Method,
+          ],
+          type: QueryTypes.UPDATE,
+        },
+      );
+      return 'update';
+    }
+
+    await this.EIP.query(
+      `INSERT INTO CMW_PortCode
+              (
+                    Id,
+                    CustomerNumber,
+                    PortCode,
+                    TransportMethod,
+                    CreatedAt,
+                    CreatedFactory,
+                    CreatedDate
+              )
+              VALUES
+              (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    GETDATE()
+              )`,
+      {
+        replacements: [
+          id,
+          item.Customer_Number,
+          item.Port_Code,
+          item.Transport_Method,
+          userid,
+          factory,
+        ],
+        type: QueryTypes.INSERT,
+      },
+    );
+    return 'insert';
   }
 
   async autoSentCMS(
@@ -1163,13 +348,7 @@ export class Cat9andcat12Service {
         return this.autoSentCMSAllFactories(dateFrom, dateTo, ry, dockeyCMS);
       }
 
-      return this.getCMSByFactory(
-        factory as FactoryCode,
-        dateFrom,
-        dateTo,
-        ry,
-        dockeyCMS,
-      );
+      return this.getCMSByFactory(factory, dateFrom, dateTo, ry, dockeyCMS);
     } catch (error: any) {
       throw new InternalServerErrorException(error);
     }
@@ -1200,145 +379,14 @@ export class Cat9andcat12Service {
     const db = this.getDbByFactory(factory);
     if (!db) return [];
 
-    const query = await buildQueryAutoSentCMS(
+    return getCat9AndCat12CMSRows(
+      db,
+      this.EIP,
+      factory,
       dateFrom,
       dateTo,
-      factory,
       ry,
-      this.EIP,
-    );
-
-    const replacements =
-      dateFrom && dateTo ? [dateFrom, dateTo, dateFrom, dateTo] : [];
-
-    let data = await db.query<any>(query, {
-      type: QueryTypes.SELECT,
-      replacements,
-    });
-
-    data = await Promise.all(
-      data.map(async (item: any) => {
-        let portOfDeparture = '';
-        if (
-          item?.Article_ID.trim().toLowerCase() ===
-          'SAMPLE SHOE'.trim().toLowerCase()
-        ) {
-          item.Transport_Method = 'AIR';
-          portOfDeparture = 'SGN';
-        } else {
-          switch (item?.Transport_Method.trim().toLowerCase()) {
-            case '11 SC'.trim().toLowerCase():
-            case 'Ocean'.trim().toLowerCase():
-            case 'Sea Air Collect'.trim().toLowerCase():
-            case 'SC'.trim().toLowerCase():
-            case 'Sea/Air'.trim().toLowerCase():
-            case 'Partial'.trim().toLowerCase():
-              item.Transport_Method = 'SEA';
-              break;
-            case '20 CC'.trim().toLowerCase():
-            case 'AC'.trim().toLowerCase():
-            case '10 AC'.trim().toLowerCase():
-            case 'CC'.trim().toLowerCase():
-            case 'Air PP'.trim().toLowerCase():
-            case 'Air Express'.trim().toLowerCase():
-            case 'AE'.trim().toLowerCase():
-              item.Transport_Method = 'AIR';
-              break;
-            case 'RAIL'.trim().toLowerCase():
-            case 'Rail Collect'.trim().toLowerCase():
-            case 'Rail Colle'.trim().toLowerCase():
-              item.Transport_Method = 'Land';
-              break;
-            default:
-              item.Transport_Method = 'SEA';
-              break;
-          }
-
-          switch (item.Factory_Name.trim().toLowerCase()) {
-            case 'LYV'.trim().toLowerCase():
-            case 'LVL'.trim().toLowerCase():
-            case 'LHG'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SGN';
-              }
-              break;
-            case 'LYM'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'MMRGN';
-              } else {
-                portOfDeparture = 'RGN';
-              }
-              break;
-            case 'LYF'.trim().toLowerCase():
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'IDSRG';
-              } else {
-                portOfDeparture = 'CGK';
-              }
-              break;
-            default:
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'SEA'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'VNCLP';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'Land'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SOTH';
-              }
-              if (
-                item.Transport_Method.trim().toLowerCase() ===
-                'AIR'.trim().toLowerCase()
-              ) {
-                portOfDeparture = 'SGN';
-              }
-              break;
-          }
-        }
-
-        const queryPoA = `SELECT PortCode
-                        FROM CMW_PortCode
-                        WHERE TransportMethod LIKE ? AND CustomerNumber LIKE ?`;
-        const result: any = await this.EIP.query(queryPoA, {
-          type: QueryTypes.SELECT,
-          replacements: [`%${item.Transport_Method}%`, `%${item.Customer_ID}%`],
-        });
-        // console.log(result[0].PortCode);
-        return {
-          ...item,
-          Transport_Method: item.Transport_Method,
-          Port_Of_Departure: portOfDeparture,
-          Port_Of_Arrival: result[0]?.PortCode.trim().toUpperCase() || 'N/A',
-        };
-      }),
-    );
-
-    return data.flatMap((item) =>
-      this.mapToCMSFormat(item, dateFrom, dateTo, dockeyCMS),
+      dockeyCMS,
     );
   }
 
@@ -1353,99 +401,9 @@ export class Cat9andcat12Service {
       JZS: this.JZS_ERP,
     };
 
-    return dbMap[factory] ?? null;
+    return getOwn(dbMap, factory) ?? null;
   }
 
-  private mapToCMSFormat(
-    item: any,
-    dateFrom: string,
-    dateTo: string,
-    dockeyCMS: string,
-  ) {
-    const date = item.Date;
-    const factory = item.Factory;
-    const factoryAddress = item.Factory_address;
-    const shipmentDate = item.Shipment_Date;
-    const bookingNo = item.Booking_No;
-    const customerID = item.Customer_ID;
-    const invoiceNumber = item.Invoice_Number;
-    const transportMethod = item.Transport_Method; // AIR OR SEA
-    const portOfArrival = item.Port_Of_Arrival; // DEPARTURE AND END PORT
-    const portOfDeparture = item.Port_Of_Departure; // ST PORT
-    const quantity = item.Quantity;
-    const grossWeight = item.Gross_Weight; // ACTIVITY DATA
-    const createdDate = dayjs().format('YYYY-MM-DD HH:mm:ss');
-
-    let dockey = '';
-    let transtType = '';
-    let portType = '';
-
-    switch (transportMethod.trim().toLowerCase()) {
-      case 'SEA'.trim().toLowerCase():
-        dockey = '3.2.01';
-        transtType = '海運';
-        portType = '海港';
-        break;
-      case 'AIR'.trim().toLowerCase():
-        dockey = '3.2.02';
-        transtType = '空運';
-        portType = '空港';
-        break;
-      case 'LAND'.trim().toLowerCase():
-        dockey = '3.2.03';
-        transtType = '陸運';
-        portType = '';
-        break;
-      default:
-        dockey = '';
-        break;
-    }
-
-    return ACTIVITY_TYPES.filter((item) => item === dockeyCMS).map(
-      (activityType: ActivityType) => ({
-        System: 'ERP', // DEFAULT
-        Corporation: 'LAI YIH', // DEFAULT
-        Factory: factory,
-        Department: 'Shipping', // DEFAULT
-        // DocKey:
-        //   transportMethod.trim().toLowerCase() !== 'AIR'.trim().toLowerCase()
-        //     ? '3.2.01'
-        //     : '3.2.02', // DEFAULT
-        DocKey: activityType.trim() === '5.3'.trim() ? '5.3' : dockey, // DEFAULT
-        SPeriodData: dayjs(dateFrom).format('YYYY/MM/DD'),
-        EPeriodData: dayjs(dateTo).format('YYYY/MM/DD'),
-        ActivityType: activityType, // DEFAULT
-        DataType: activityType.trim() === '3.2' ? '1' : '999', // DEFAULT
-        DocType: 'Invoice', // DEFAULT 應收憑單
-        UndDoc: '銷貨單', // DEFAULT
-        DocFlow: '銷貨相關流程', // DEFAULT
-        DocDate: dayjs(date).format('YYYY/MM/DD'),
-        DocDate2: dayjs(shipmentDate).format('YYYY/MM/DD'),
-        DocNo: bookingNo, // DEFAULT
-        UndDocNo: '', // DEFAULT
-        CustVenName: customerID,
-        InvoiceNo: invoiceNumber,
-        TransType: transtType,
-        Departure: factoryAddress,
-        Destination: portOfArrival,
-        PortType: portType,
-        StPort: portOfDeparture,
-        ThPort: '', // DEFAULT
-        EndPort: portOfArrival,
-        Product: '', // DEFAULT
-        Quity: quantity,
-        Amount: '', // DEFAULT
-        ActivityData: +Number(grossWeight).toFixed(2) || 0,
-        ActivityUnit: 'Kg', // DEFAULT 噸
-        Unit: '', // DEFAULT
-        UnitWeight: '', // DEFAULT
-        Memo: '', // DEFAULT
-        CreateDateTime: createdDate,
-        Creator: '',
-        ActivitySource: 'Incineration (not energy recovery)',
-      }),
-    );
-  }
   // logging
   async getLoggingCat9AndCat12(
     dateFrom: string,
@@ -1457,7 +415,6 @@ export class Cat9andcat12Service {
     sortOrder: string = 'asc',
   ) {
     const offset = (page - 1) * limit;
-    const replacements = dateFrom && dateTo ? [dateFrom, dateTo] : [];
 
     const [dataResults, countResults] = await Promise.all([
       this.EIP.query(
@@ -1475,15 +432,7 @@ export class Cat9andcat12Service {
     ]);
 
     let data = dataResults;
-    data.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
+    sortByField(data, sortField, sortOrder);
 
     data = data.slice(offset, offset + limit);
 
@@ -1492,13 +441,5 @@ export class Cat9andcat12Service {
     const hasMore = offset + data.length < total;
 
     return { data, page, limit, total, hasMore };
-    // const records: any[] = await this.EIP.query(
-    //   `SELECT *
-    //     FROM CMW_Category_7_Log
-    //     ORDER BY ${sortField} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
-    //         `,
-    //   { type: QueryTypes.SELECT },
-    // );
-    // return records;
   }
 }
